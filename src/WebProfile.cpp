@@ -13,6 +13,9 @@
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
 #include <QWebEngineClientHints>
 #endif
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+#include <QWebEngineProfileBuilder>
+#endif
 
 namespace Pacitum {
 
@@ -22,9 +25,28 @@ static bool g_guest = false;
 void setGuestMode(bool on) { g_guest = on; }
 bool guestMode() { return g_guest; }
 
+static QString g_storagePath, g_cachePath;
+static bool g_builtWithStorage = false;
+void setMainProfileStorage(const QString& persistentStoragePath, const QString& cachePath) {
+    g_storagePath = persistentStoragePath; g_cachePath = cachePath;
+}
+bool mainProfileBuiltWithStorage() { mainProfile(); return g_builtWithStorage; }
+
 QWebEngineProfile* mainProfile() {
     // Guest (1.6 profiles): an off-the-record profile -- nothing is written to disk.
-    static QWebEngineProfile* p = g_guest ? new QWebEngineProfile() : new QWebEngineProfile(QStringLiteral("Pacitum"));
+    static QWebEngineProfile* p = []() -> QWebEngineProfile* {
+        if (g_guest) return new QWebEngineProfile();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+        if (!g_storagePath.isEmpty()) {
+            QWebEngineProfileBuilder b;
+            b.setPersistentStoragePath(g_storagePath);
+            if (!g_cachePath.isEmpty()) b.setCachePath(g_cachePath);
+            g_builtWithStorage = true;
+            return b.createProfile(QStringLiteral("Pacitum"));
+        }
+#endif
+        return new QWebEngineProfile(QStringLiteral("Pacitum"));
+    }();
     return p;
 }
 

@@ -604,12 +604,16 @@ void BrowserWindow::showExtensionsMenu() {
             if (e.optionsUrl.isValid())
                 connect(sub->addAction(QStringLiteral("Options")), &QAction::triggered, this, [this, u = e.optionsUrl]{ newTab(u.toString()); });
             auto* pin = sub->addAction(QStringLiteral("Pin to toolbar")); pin->setCheckable(true); pin->setChecked(ce->pinned(id));
-            connect(pin, &QAction::toggled, this, [id](bool v){ ChromeExtensions::instance()->setPinned(id, v); });
+            // 1.9.1: these run once the menu has closed. Switching an extension on starts it inside
+            // Chromium; doing that from inside the menu's own event loop froze Pacitum (1.9.0).
+            connect(pin, &QAction::toggled, this, [this, id](bool v){ QTimer::singleShot(0, this, [id, v]{ ChromeExtensions::instance()->setPinned(id, v); }); });
             auto* on = sub->addAction(QStringLiteral("Enabled")); on->setCheckable(true); on->setChecked(e.enabled);
-            connect(on, &QAction::toggled, this, [id](bool v){ ChromeExtensions::instance()->setEnabled(id, v); });
+            connect(on, &QAction::toggled, this, [this, id](bool v){ QTimer::singleShot(0, this, [id, v]{ ChromeExtensions::instance()->setEnabled(id, v); }); });
             connect(sub->addAction(QStringLiteral("Remove…")), &QAction::triggered, this, [this, id, name]{
-                if (QMessageBox::question(this, QStringLiteral("Remove extension"), QStringLiteral("Remove \"%1\"?").arg(name)) == QMessageBox::Yes)
-                    ChromeExtensions::instance()->uninstall(id);
+                QTimer::singleShot(0, this, [this, id, name]{
+                    if (QMessageBox::question(this, QStringLiteral("Remove extension"), QStringLiteral("Remove \"%1\"?").arg(name)) == QMessageBox::Yes)
+                        ChromeExtensions::instance()->uninstall(id);
+                });
             });
         }
         if (ChromeExtensions::available()) {

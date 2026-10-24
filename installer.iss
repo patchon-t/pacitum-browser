@@ -2,7 +2,7 @@
 #define AppName "Pacitum Browser"
 ; CI passes /DAppVer=<version from build/pacitum-version.txt> (1.9.x or legacy 1.8.x)
 #ifndef AppVer
-#define AppVer "1.9.0"
+#define AppVer "1.9.1"
 #endif
 #define AppExe "PacitumBrowser.exe"
 [Setup]

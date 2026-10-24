@@ -5,7 +5,7 @@ Pacitum builds on **Windows, Linux and macOS** with Qt 6.8+ (Qt WebEngine), CMak
 **Two editions from one source:** with Qt **6.11 or newer** you get Pacitum **1.9.x** (newer Chromium, Chrome extensions);
 with Qt **6.8 LTS** you get the **1.8.x legacy** edition (no Chrome extensions; its updater only offers 1.8.x releases).
 CMake prints which one it is (`-- Pacitum 1.9.0 with Qt 6.11.x`) and writes it to `build/pacitum-version.txt`. The examples
-below use 6.8.3; use your 6.11 path for 1.9. To release: tag `v1.9.0` and `v1.8.12` (each workflow job uploads only to its own tag).
+below use 6.8.3; use your 6.11 path for 1.9. To release: run Actions → Release with a tag such as `v1.9.1` (needs `release-notes/<tag>.md`) (each workflow job uploads only to its own tag).
 Install Qt with the official Qt Online Installer (or `aqtinstall`) and include the modules
 **Qt WebEngine, Qt WebChannel, Qt Positioning**, and optionally **Qt Serial Port** and **Qt Connectivity** (Bluetooth).
 

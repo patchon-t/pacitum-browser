@@ -16,6 +16,13 @@ QWebEngineProfile* mainProfile();
 // Guest window process: mainProfile() is off-the-record. Must be set before the first mainProfile() call.
 void setGuestMode(bool on);
 bool guestMode();
+// Where mainProfile() keeps its data. Must be set before the first mainProfile() call: with Qt 6.9+
+// the profile is created with these paths (QWebEngineProfileBuilder). Changing the storage path of
+// a profile afterwards makes Qt recreate its preferences, and with Qt 6.11 that left the Chrome
+// extension engine holding a deleted object: switching an extension on crashed Pacitum 1.9.0.
+void setMainProfileStorage(const QString& persistentStoragePath, const QString& cachePath);
+// True when mainProfile() was created with those paths (nothing left to set afterwards).
+bool mainProfileBuiltWithStorage();
 
 // The unmodified QtWebEngine UA (captured before any change).
 QString defaultUserAgent();

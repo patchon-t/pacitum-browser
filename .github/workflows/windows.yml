@@ -158,6 +158,64 @@ jobs:
       - uses: actions/upload-artifact@v7.0.2
         if: failure()   # logs/screens only when a test fails (keeps Actions storage small)
         with: { name: "permissions-test-${{ matrix.line }}", path: permissions/, if-no-files-found: ignore, retention-days: 1 }
+      - name: Chrome extensions test (add from the Web Store, enable, use, remove)
+        shell: pwsh
+        run: |
+          $log = "$env:LOCALAPPDATA\Pacitum\Pacitum Browser"
+          Remove-Item "$log\crash.log" -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force exttest | Out-Null
+          # Chromium's own log: a CHECK failure or crash inside the extension system ends up here.
+          $env:QTWEBENGINE_CHROMIUM_FLAGS = "--enable-logging --log-file=$PWD\exttest\chromium.log --v=0"
+          $started = Get-Date
+          $p = Start-Process dist\PacitumBrowser.exe -ArgumentList '--extensions-test' -PassThru
+          if (-not $p.WaitForExit(300000)) { Write-Host "extensions test hung; killing"; $p.Kill(); $p.WaitForExit() }
+          Copy-Item "$log\startup.log","$log\crash.log" exttest\ -ErrorAction SilentlyContinue
+          Get-Content exttest\startup.log -ErrorAction SilentlyContinue | Select-String 'EXT TEST|EXTENSIONS|extension|FATAL|CRITICAL' | ForEach-Object { $_.Line }
+          Write-Host "exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) {
+            Write-Host "--- Windows crash records"
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$started} -ErrorAction SilentlyContinue |
+              Where-Object { $_.ProviderName -in 'Application Error','Windows Error Reporting' } | Select-Object -First 6 | ForEach-Object { $_.Message } | Tee-Object exttest\events.txt
+            Write-Host "--- Chromium log (errors)"
+            Get-Content exttest\chromium.log -ErrorAction SilentlyContinue | Select-String 'FATAL|ERROR|Check failed|NOTREACHED' | Select-Object -Last 40 | ForEach-Object { $_.Line }
+          }
+          $ok = Select-String -Path exttest\startup.log -Pattern 'EXTENSIONS OK' -Quiet
+          if ($p.ExitCode -ne 0 -or -not $ok) { Write-Error "EXTENSIONS TEST FAILED"; exit 1 }
+      - name: Extensions crash stack (diagnostics, only when the test failed)
+        if: failure() && matrix.line == 'main'
+        shell: pwsh
+        timeout-minutes: 40
+        run: |
+          # Run the test again with Windows crash dumps on, fetch Qt WebEngine's debug symbols and
+          # let the debugger name the crashing functions.
+          $dumps = "$PWD\exttest\dumps"; New-Item -ItemType Directory -Force $dumps | Out-Null
+          $k = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\PacitumBrowser.exe'
+          New-Item -Path $k -Force | Out-Null
+          New-ItemProperty -Path $k -Name DumpFolder -Value $dumps -PropertyType ExpandString -Force | Out-Null
+          New-ItemProperty -Path $k -Name DumpType -Value 1 -PropertyType DWord -Force | Out-Null
+          $p = Start-Process dist\PacitumBrowser.exe -ArgumentList '--extensions-test' -PassThru
+          if (-not $p.WaitForExit(300000)) { $p.Kill() }
+          Start-Sleep -Seconds 5
+          $dump = Get-ChildItem $dumps -Filter *.dmp | Select-Object -First 1
+          Write-Host "exit code $($p.ExitCode); dump: $($dump.FullName)"
+          if (-not $dump) { exit 0 }
+          $ver = Split-Path (Split-Path $env:QT_ROOT_DIR -Parent) -Leaf
+          Write-Host "Qt $ver"
+          pip install --quiet "${{ matrix.aqt }}"
+          aqt list-qt windows desktop --modules $ver win64_msvc2022_64 | Out-String | Write-Host
+          New-Item -ItemType Directory -Force D:\qtsym | Out-Null
+          # WebEngine's own symbols are a module of their own (qtwebengine.debug_information)
+          aqt install-qt windows desktop $ver win64_msvc2022_64 -m qtwebengine.debug_information -O D:\qtsym 2>&1 | Select-Object -Last 8 | Out-String | Write-Host
+          $pdb = Get-ChildItem D:\qtsym -Recurse -Filter Qt6WebEngineCore.pdb -ErrorAction SilentlyContinue | Select-Object -First 1
+          Write-Host "pdb: $($pdb.FullName)"
+          $cdb = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe' -ErrorAction SilentlyContinue
+          if (-not $cdb) { choco install windows-sdk-10-version-2004-windbg -y --no-progress | Out-Null; $cdb = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe' -ErrorAction SilentlyContinue }
+          Write-Host "cdb: $($cdb.FullName)"
+          $sym = "$PWD\dist;" + ($(if ($pdb) { $pdb.DirectoryName } else { '' }))
+          & $cdb.FullName -z $dump.FullName -y $sym -c ".symopt+0x40;.ecxr;kn 30;.frame 0;dv /t;.frame 1;dv /t;.frame 2;dv /t;.frame 3;dv /t;q" 2>&1 | Select-Object -Last 200 | Tee-Object exttest\stack.txt
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with: { name: "extensions-test-${{ matrix.line }}", path: exttest/, if-no-files-found: ignore, retention-days: 3 }
       - name: Stress test (tabs, switching, fullscreen, loads)
         shell: pwsh
         run: |

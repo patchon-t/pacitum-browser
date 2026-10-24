@@ -12,6 +12,7 @@
 #include <QString>
 #include <QStringList>
 #include <QUrl>
+#include <functional>
 #include <QtWebEngineCore/qtwebenginecoreglobal.h>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0) && QT_CONFIG(webengine_extensions)
@@ -50,12 +51,23 @@ public:
     void openPopup(const QString& id, QWidget* anchor);
     static QString webStoreId(const QUrl& url);     // "" when the URL isn't a store detail page
     static QStringList describePermissions(const QString& extensionDir);
+    // CI (--extensions-test): add, enable, use, disable and remove extensions; logs EXTENSIONS OK|FAIL.
+    void runSelfTest(QWidget* anchor, const std::function<void(const QString&)>& openPage);
 signals:
     void changed();
     void message(const QString& text);              // short notices ("Added uBlock Origin")
+    void installed(const QString& id);              // added and ready (with its final ID)
 private:
     explicit ChromeExtensions(QObject* parent);
-    QString crxToZip(const QString& crxPath, QString* error) const;
+    QString crxToZip(const QString& crxPath, QString* error);   // also sets m_lastKey
+    void installSource(const QString& source, const QByteArray& key);
+    static QString idFromKey(const QByteArray& derKey);
+    static QByteArray crxPublicKey(const QByteArray& crx);
+    static bool addKeyToManifest(const QString& dir, const QByteArray& key);
+    QList<QByteArray> m_keys;                       // .crx public key per pending install
+    QByteArray m_lastKey;
+    QString m_expectId;                             // reloading under its store ID
+    void downloadFromStore(const QString& id, const QString& name);   // no questions asked (callers ask)
     QPointer<QWebEngineProfile> m_profile;
     QNetworkAccessManager* m_net = nullptr;
     QStringList m_pending;                          // names being installed (for the notice)
