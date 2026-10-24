@@ -269,6 +269,20 @@ UpdateFlow::UpdateFlow(QObject* parent) : QObject(parent) {
         }
         refreshProgress();
     });
+    connect(up, &Updater::updateAvailable, this, [this](const UpdateInfo& info, bool){
+        if (!m_retryFresh) return;
+        m_retryFresh = false;
+        m_info = info;   // the current file, size and checksum
+        startDownload(m_retryWindow ? m_retryWindow.data() : hostWindow());
+    });
+    auto retryFailed = [this](const QString& err){
+        if (!m_retryFresh) return;
+        m_retryFresh = false;
+        m_state = Failed; m_error = err;
+        if (m_sheet && m_sheet->isVisible()) fillFailed(err); else setPills(UpdatePill::Available);
+    };
+    connect(up, &Updater::checkFailed, this, [retryFailed](const QString& err, bool){ retryFailed(err); });
+    connect(up, &Updater::upToDate, this, [this, retryFailed](bool){ retryFailed(tr("The update is no longer available. Check again later.")); });
     connect(up, &Updater::downloadFinished, this, [this](bool ok, const QString& err){
         if (m_state != Downloading) return;
         if (m_cancelled) {   // Cancel: back to "available"
@@ -460,9 +474,22 @@ void UpdateFlow::fillFailed(const QString& error) {
         s->setButtons(tr("Try again"), tr("Close"));
         s->primary()->setObjectName(QStringLiteral("UpdPrimary"));
         s->primary()->style()->unpolish(s->primary()); s->primary()->style()->polish(s->primary());
-        connect(s->primary(), &QPushButton::clicked, this, [this, s]{ startDownload(s->parentWidget()); });
+        connect(s->primary(), &QPushButton::clicked, this, [this, s]{ retryFresh(s->parentWidget()); });
         connect(s->secondary(), &QPushButton::clicked, this, [this]{ hideSheet(); });
     });
+}
+
+// 1.9.1: "Try again" asks GitHub again before downloading. The file can change after the check
+// (an installer replaced on the release page): the old link then breaks and its size no longer
+// matches, so retrying with the old details failed every time.
+void UpdateFlow::retryFresh(QWidget* window) {
+    m_retryFresh = true;
+    m_retryWindow = window;
+    m_state = Downloading;   // keeps the background offer from opening the card meanwhile
+    m_received = 0; m_total = -1;
+    if (m_sheet) m_sheet->swap([this]{ fillDownloading(); });
+    Updater::logLine(QStringLiteral("update: retry, checking the release again"));
+    Updater::instance()->check(false);
 }
 
 // Must read exactly like the helper's pop-up (UpdateOverlay.cpp), which takes over at the same spot.

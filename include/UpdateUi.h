@@ -94,9 +94,12 @@ private:
     void refreshProgress();
     void hideSheet();
     void install();
+    void retryFresh(QWidget* window);    // "Try again": check the release again, then download
     void showDone(QWidget* window, const QJsonObject& pending);
 
     State m_state = Idle;
+    bool m_retryFresh = false;
+    QPointer<QWidget> m_retryWindow;
     UpdateInfo m_info;
     QString m_error;
     QList<QPointer<UpdatePill>> m_pills;
