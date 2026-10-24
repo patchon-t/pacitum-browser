@@ -17,7 +17,6 @@ jobs:
       matrix:
         include:
           - { line: main,   qt: '6.11.*' }
-          - { line: legacy, qt: '6.8.*' }
     name: linux (${{ matrix.line }}, Qt ${{ matrix.qt }})
     steps:
       - uses: actions/checkout@v7.0.1
@@ -94,7 +93,6 @@ jobs:
       matrix:
         include:
           - { line: main,   qt: '6.11.*' }
-          - { line: legacy, qt: '6.8.*' }
     name: macos (${{ matrix.line }}, Qt ${{ matrix.qt }})
     steps:
       - uses: actions/checkout@v7.0.1

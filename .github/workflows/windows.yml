@@ -5,7 +5,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    # Two release lines from one source: Qt 6.11 -> Pacitum 1.9.x, Qt 6.8 LTS -> 1.8.x "legacy"
+    # Qt 6.11 only (Pacitum 1.9.x). The Qt 6.8 "legacy" 1.8.x line is no longer built (last: 1.8.12).
     strategy:
       fail-fast: false
       matrix:
@@ -14,7 +14,6 @@ jobs:
           # ("Failed to locate XML data for Qt version 6.11.x"). The fix is merged upstream
           # (miurahr/aqtinstall#1000) but not released: install that commit, pinned so it can't drift.
           - { line: main,   qt: '6.11.*', aqt: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b' }
-          - { line: legacy, qt: '6.8.*',  aqt: '' }
     name: build (${{ matrix.line }}, Qt ${{ matrix.qt }})
     steps:
       - uses: actions/checkout@v7.0.1
