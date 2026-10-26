@@ -11,6 +11,8 @@ struct PacitumPalette {
     // 1.5 additions
     QString omnibox, omniboxHover, pressed, borderStrong, textTertiary,
             accentHover, accentPressed, focusRing, warning;
+    // 2.0: red accent = indicators only; primary (ink) = primary actions, switches, selection
+    QString primary, onPrimary, dangerSoft;
     const QString& chrome() const { return frame; }
     const QString& elevated() const { return tab; }
     const QString& card() const { return toolbar; }

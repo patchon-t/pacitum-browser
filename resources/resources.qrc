@@ -269,6 +269,8 @@
         <file>icons/ui/zoom-out.svg</file>
         <file>icons/ui/zoom-reset.svg</file>
         <file>icons/pacitum-icon.svg</file>
+        <file>brand/wordmark.svg</file>
+        <file>brand/next_project_themed.svg</file>
         <file>icons/pacitum-icon-16.png</file>
         <file>icons/pacitum-icon-32.png</file>
         <file>icons/pacitum-icon-48.png</file>
@@ -279,6 +281,7 @@
         <file>pages/newtab.html</file>
         <file>pages/welcome.html</file>
         <file>pages/logo.png</file>
+        <file>fonts/Rubik-VF.ttf</file>
         <file>fonts/Inter-Regular.ttf</file>
         <file>fonts/Inter-Medium.ttf</file>
         <file>fonts/Inter-SemiBold.ttf</file>

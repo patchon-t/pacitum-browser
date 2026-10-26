@@ -436,8 +436,9 @@ QProgressBar#DlBar[paused="true"]::chunk { background: @sec; }
 #DlPopFooter:hover { background: @surface; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
 )");
     const QString badBg = isDark() ? QStringLiteral("#2A2124") : QStringLiteral("#FDF2F2");   // 7% danger over toolbar
-    QString accInv = isDark() ? QStringLiteral("#0D9488") : QStringLiteral("#2DD4BF");
-    if (QColor(p.accent).name().compare(QStringLiteral("#2DD4BF"), Qt::CaseInsensitive) && QColor(p.accent).name().compare(QStringLiteral("#0D9488"), Qt::CaseInsensitive)) accInv = p.accent;
+    // accent on the inverse (ink) surface: the dark-theme red reads on light ink and vice versa
+    QString accInv = isDark() ? QStringLiteral("#D9141F") : QStringLiteral("#FF3B47");
+    if (QColor(p.accent).name().compare(QStringLiteral("#D9141F"), Qt::CaseInsensitive) && QColor(p.accent).name().compare(QStringLiteral("#FF3B47"), Qt::CaseInsensitive)) accInv = p.accent;
     const QList<QPair<QString, QString>> vars{
         {"@surfaceHover", p.surfaceHover}, {"@accentSoft", p.accentSoft}, {"@accentOnInverse", accInv}, {"@hoverBorder", rgba(p.textSecondary, 0.4)},
         {"@badBg", badBg}, {"@nameSize", compact ? "13px" : "14px"}, {"@page", p.page}, {"@toolbar", p.toolbar}, {"@surface", p.surface},

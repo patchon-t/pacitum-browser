@@ -6,6 +6,7 @@
 #include <QPainter>
 #include <QResizeEvent>
 #include <QDateTime>
+#include <QCursor>
 #include "BrowserWindow.h"
 #include "BrowserTab.h"
 #include "TabWidget.h"
@@ -85,6 +86,7 @@
 #include <QFileInfo>
 #include <QSaveFile>
 #include <QDateTime>
+#include <QCursor>
 #include <QWebEngineFullScreenRequest>
 #include <QtMath>
 #include <QDir>
@@ -366,7 +368,7 @@ void BrowserWindow::setupUI() {
 
 QToolButton* BrowserWindow::makeToolBtn(const QString& tip) {
     auto* b = new AnimatedToolButton(m_toolbar);
-    b->setFixedSize(36,36); b->setIconSize(QSize(18,18)); b->setRadius(18);   // 1.9: 36 px circles
+    b->setFixedSize(40,40); b->setIconSize(QSize(18,18)); b->setRadius(12);   // 2.0: 40 px, radius 12
     b->setToolTip(tip); b->setFocusPolicy(Qt::TabFocus);
     return b;
 }
@@ -374,7 +376,7 @@ QToolButton* BrowserWindow::makeToolBtn(const QString& tip) {
 void BrowserWindow::createToolbar() {
     m_toolbar = new QWidget(this); m_toolbar->setObjectName(QStringLiteral("NavToolbar"));
     m_toolbar->setAttribute(Qt::WA_StyledBackground, true);
-    m_toolbar->setFixedHeight(48);
+    m_toolbar->setFixedHeight(60);   // 2.0 toolbar
     auto* lay = new QHBoxLayout(m_toolbar); lay->setContentsMargins(8,0,8,0); lay->setSpacing(2);
     m_toolbar->installEventFilter(this);   // resize -> collapse buttons per spec §4.4
 
@@ -578,6 +580,7 @@ void BrowserWindow::updateStoreButton(const QString& url) {
 }
 
 void BrowserWindow::showExtensionsMenu() {
+    if (popupJustClosedBy(m_splitBtn)) return;   // second click: just closed
     // 1.8.5: Pacitum mini extensions (user scripts / styles) + split view controls.
     // 1.9.0: Chrome extensions first (Qt 6.11 build); the legacy build says where to get them.
     Pacitum::PopupMenu m(this);
@@ -667,7 +670,10 @@ void BrowserWindow::showExtensionsMenu() {
     }
     const QSize sz = m.sizeHint();
     QPoint anchor = m_splitBtn->mapToGlobal(QPoint(m_splitBtn->width(), m_splitBtn->height() + 6));
+    m_splitBtn->setDown(true);
     m.exec(QPoint(anchor.x() - sz.width(), anchor.y()));
+    notePopupClosed(m_splitBtn);
+    m_splitBtn->setDown(false);
 }
 
 // ---------------------------------------------------------------- 1.8.8 Google Drive sync
@@ -1158,10 +1164,11 @@ void BrowserWindow::refreshProfileAvatar() {
 }
 
 void BrowserWindow::showProfileSwitcher() {
+    if (popupJustClosedBy(m_profileBtn)) return;   // second click: just closed
     auto* sw = new ProfileSwitcher(this);
     connect(sw, &ProfileSwitcher::settingsRequested, this, &BrowserWindow::showSettings);
     connect(sw, &ProfileSwitcher::manageRequested, this, &BrowserWindow::showProfileManager);
-    connect(sw, &QObject::destroyed, m_profileBtn, [b = QPointer<QToolButton>(m_profileBtn)]{ if (b) b->setDown(false); });
+    connect(sw, &QObject::destroyed, m_profileBtn, [this, b = QPointer<QToolButton>(m_profileBtn)]{ if (b) { b->setDown(false); notePopupClosed(b); } });
     m_profileBtn->setDown(true);
     sw->showUnder(m_profileBtn);
 }
@@ -1226,10 +1233,21 @@ void BrowserWindow::flyToDownloads() {
     g->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
+bool BrowserWindow::popupJustClosedBy(QWidget* button) const {
+    // The press that closed the pop-up happened on its own button: Qt passes that press on to the
+    // button, which would open the pop-up again. Treat it as "close" (within 300 ms, pointer on it).
+    const qint64 t = m_popupClosedAt.value(button, 0);
+    return button && t && QDateTime::currentMSecsSinceEpoch() - t < 300
+        && button->rect().contains(button->mapFromGlobal(QCursor::pos()));
+}
+void BrowserWindow::notePopupClosed(QWidget* button) {
+    if (button) m_popupClosedAt.insert(button, QDateTime::currentMSecsSinceEpoch());
+}
+
 void BrowserWindow::toggleDownloadsPopup(bool autoClose) {
     if (!m_downloadsPopup) return;
     if (m_downloadsPopup->isVisible()) { m_downloadsPopup->hide(); return; }
-    if (QDateTime::currentMSecsSinceEpoch() - m_downloadsPopup->hiddenAt() < 250) return;   // click on the button just closed it
+    if (QDateTime::currentMSecsSinceEpoch() - m_downloadsPopup->hiddenAt() < 300) return;   // click on the button just closed it
     if (!m_downloadsBtn->isVisible()) m_downloadsBtn->show();
     m_downloadsBadge->clearAlert();
     m_downloadsPopup->showUnder(m_downloadsBtn, autoClose);
@@ -1304,6 +1322,7 @@ void BrowserWindow::onSettingChanged(const QString& key) {
     // homepage, startup/restore_session, download_path, ask_download_location, clear_on_exit are read when used.
 }
 void BrowserWindow::showMenu() {
+    if (popupJustClosedBy(m_menuBtn)) return;   // second click: just closed
     // ⋮ menu (spec §5.5, menu-*.png): 312 wide, r14, padding 6, rows 34 r8, icons 18 text-secondary.
     Pacitum::PopupMenu m(this);
     m.setObjectName(QStringLiteral("MainMenu"));
@@ -1439,10 +1458,11 @@ void BrowserWindow::showMenu() {
     }
     m.addSeparator();
     add(QStringLiteral("settings"), QStringLiteral("Settings"), QStringLiteral("Ctrl+,"), [this]{ showSettings(); });
-    add(QStringLiteral("help"), QStringLiteral("Help && about"), QString(), [this]{
-        QMessageBox::about(this, QStringLiteral("About Pacitum Browser"),
-            QStringLiteral("<b>Pacitum Browser</b> %1<br>A calm, fast web browser built on Qt %2 WebEngine.")
-                .arg(QCoreApplication::applicationVersion(), QString::fromLatin1(qVersion()))); });
+    add(QStringLiteral("help"), QStringLiteral("Help and about Pacitum"), QString(), [this]{
+        showSettings();   // 2.0: the About page (wordmark, version, NEXT PROJECT)
+        for (int i = 0; i < m_tabs->count(); ++i)
+            if (auto* sp = qobject_cast<SettingsPage*>(m_tabs->widget(i))) { sp->showSection(QStringLiteral("About Pacitum")); break; }
+    });
     add(QStringLiteral("exit"), QStringLiteral("Quit Pacitum"), QStringLiteral("Ctrl+Q"), [this]{ close(); });
     Q_UNUSED(pal);
 
@@ -1451,6 +1471,7 @@ void BrowserWindow::showMenu() {
     const QPoint tb = m_toolbar->mapToGlobal(QPoint(m_toolbar->width(), m_toolbar->height()));
     m_menuBtn->setDown(true);
     m.exec(QPoint(tb.x() - 8 - sz.width() + m.shadowMargin(), tb.y() + 6 - m.shadowMargin()));
+    notePopupClosed(m_menuBtn);
     m_menuBtn->setDown(false);
 }
 
@@ -1875,7 +1896,9 @@ void BrowserWindow::applyTheme(){
         auto* sh = QGuiApplication::styleHints();
         m_darkMode = sh ? sh->colorScheme() != Qt::ColorScheme::Light : true;
     }
-    m_theme->setAccent(m_accent.compare(QStringLiteral("#2DD4BF"), Qt::CaseInsensitive) == 0 ? QString() : m_accent);
+    const bool defaultAccent = m_accent.compare(QStringLiteral("#D9141F"), Qt::CaseInsensitive) == 0
+                            || m_accent.compare(QStringLiteral("#2DD4BF"), Qt::CaseInsensitive) == 0;   // 1.x default
+    m_theme->setAccent(defaultAccent ? QString() : m_accent);
     m_theme->setDarkMode(m_darkMode);
     const auto& p = m_theme->palette();
     qApp->setStyleSheet(m_theme->mainWindowStyle());
@@ -1902,7 +1925,7 @@ void BrowserWindow::applyTheme(){
                      {QStringLiteral("CHROME"), p.frame}, {QStringLiteral("ACCH"), p.accentHover}, {QStringLiteral("RING"), p.focusRing},
                      {QStringLiteral("WARN"), p.warning.isEmpty() ? QStringLiteral("#F59E0B") : p.warning},
                      // home blob 1: the accent / profile colour (spec §2.4 "Home")
-                     {QStringLiteral("PCOL"), QColor(m_accent).isValid() ? m_accent : QStringLiteral("#2DD4BF")},
+                     {QStringLiteral("PCOL"), QColor(m_theme->palette().accent).isValid() ? m_theme->palette().accent : QStringLiteral("#D9141F")},
                      {QStringLiteral("BLOBO"), m_darkMode ? QStringLiteral(".20") : QStringLiteral(".22")}});
     // Internal pages are re-served with the new tokens. The welcome flow is live-updated over its
     // web channel instead (a reload would lose the current step).
@@ -1929,7 +1952,7 @@ void BrowserWindow::loadSettings(){
     auto s=readSettings();
     m_themeSetting = s.value(QStringLiteral("theme")).toString(s.contains(QStringLiteral("dark_mode")) ? (s.value(QStringLiteral("dark_mode")).toBool() ? QStringLiteral("Dark") : QStringLiteral("Light")) : QStringLiteral("System"));
     m_darkMode = m_themeSetting == QStringLiteral("Dark");
-    m_accent = s.value(QStringLiteral("accent")).toString(QStringLiteral("#2DD4BF"));
+    m_accent = s.value(QStringLiteral("accent")).toString(QStringLiteral("#D9141F"));
     m_searchEngine = s.value(QStringLiteral("search_engine")).toString(QStringLiteral("Google"));
     {
         static const QMap<QString,QString> engines{

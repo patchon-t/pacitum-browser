@@ -270,10 +270,13 @@ int main(int argc, char *argv[]) {
     app.setWindowIcon(QIcon(QStringLiteral(":/icons/pacitum-icon-256.png")));
     {
         // Inter ships with the app (resources/fonts, SIL OFL) so every machine gets the design font.
+        // 2.0: Rubik (variable, SIL OFL) is the UI font; Inter stays as the fallback (Thai and others
+        // fall through to the system fonts).
+        QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Rubik-VF.ttf"));
         for (const char* w : {"Regular", "Medium", "SemiBold", "Bold"})
             QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Inter-%1.ttf").arg(QLatin1String(w)));
         QFont f = app.font();
-        f.setFamilies({QStringLiteral("Inter"), QStringLiteral("Segoe UI"), QStringLiteral("Cantarell"), f.family()});
+        f.setFamilies({QStringLiteral("Rubik"), QStringLiteral("Inter"), QStringLiteral("Segoe UI"), QStringLiteral("Cantarell"), f.family()});
         f.setPixelSize(13);
         app.setFont(f);
     }

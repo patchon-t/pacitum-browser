@@ -216,6 +216,11 @@ private:
     class DownloadsPopup* m_downloadsPopup = nullptr;
     class DownloadButtonBadge* m_downloadsBadge = nullptr;
     void toggleDownloadsPopup(bool autoClose);
+    // 2.0: a second click on the button whose pop-up is open closes it (the closing click used to
+    // reach the button again and reopen the pop-up, which blinked).
+    bool popupJustClosedBy(QWidget* button) const;
+    void notePopupClosed(QWidget* button);
+    QHash<QWidget*, qint64> m_popupClosedAt;
     void updateDownloadsButton();
     QIcon downloadsTabIcon() const;
     ThemeManager* m_theme = nullptr;

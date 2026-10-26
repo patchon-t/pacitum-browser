@@ -25,6 +25,8 @@
 #include <QCryptographicHash>
 #include <QSaveFile>
 #include <QTimer>
+#include <QCursor>
+#include <QDateTime>
 #include <functional>
 #include <memory>
 #ifdef PACITUM_CHROME_EXTENSIONS
@@ -496,6 +498,12 @@ public:
         });
         a->start(QAbstractAnimation::DeleteWhenStopped);
     }
+protected:
+    void hideEvent(QHideEvent* e) override {
+        // 2.0: remember when it closed, so a click on the same button closes instead of reopening
+        if (m_anchor) m_anchor->setProperty("_pmPopupClosedAt", QDateTime::currentMSecsSinceEpoch());
+        QWidget::hideEvent(e);
+    }
 private:
     void place() {
         if (!m_anchor) return;
@@ -513,6 +521,10 @@ private:
 }
 
 void ChromeExtensions::openPopup(const QString& id, QWidget* anchor) {
+    if (anchor) {   // second click on the button whose pop-up just closed: leave it closed
+        const qint64 t = anchor->property("_pmPopupClosedAt").toLongLong();
+        if (t && QDateTime::currentMSecsSinceEpoch() - t < 300 && anchor->rect().contains(anchor->mapFromGlobal(QCursor::pos()))) return;
+    }
     for (const auto& it : items()) {
         if (it.id != id) continue;
         if (!it.enabled) { emit message(tr("%1 is turned off").arg(it.name)); return; }

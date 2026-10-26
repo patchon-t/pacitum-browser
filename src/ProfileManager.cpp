@@ -55,13 +55,13 @@ QJsonObject ProfileInfo::toJson() const {
 ProfileInfo ProfileInfo::fromJson(const QJsonObject& o) {
     ProfileInfo p;
     p.id = o.value("id").toString(); p.name = o.value("name").toString(); p.email = o.value("email").toString();
-    p.colour = o.value("colour").toString(QStringLiteral("#2DD4BF")); p.avatar = o.value("avatar").toString(QStringLiteral("initial"));
+    p.colour = o.value("colour").toString(QStringLiteral("#D9141F")); p.avatar = o.value("avatar").toString(QStringLiteral("initial"));
     p.created = qint64(o.value("created").toDouble()); p.lastUsed = qint64(o.value("last_used").toDouble());
     return p;
 }
 
 const QStringList& ProfileManager::colours() {
-    static const QStringList c{"#2DD4BF", "#6366F1", "#EC4899", "#F43F5E", "#F59E0B", "#22C55E", "#0EA5E9", "#64748B"};
+    static const QStringList c{"#D9141F", "#2DD4BF", "#6366F1", "#EC4899", "#F43F5E", "#F59E0B", "#22C55E", "#0EA5E9", "#64748B"};
     return c;
 }
 const QStringList& ProfileManager::glyphs() {
@@ -228,7 +228,7 @@ bool ProfileManager::migrateLegacy(const QString& root, QString* log, const std:
     p.name = s.value("profile_name").toString().trimmed();
     if (p.name.isEmpty()) p.name = QStringLiteral("Default");
     const QString acc = s.value("accent").toString();
-    p.colour = colours().contains(acc, Qt::CaseInsensitive) ? acc.toUpper() : QStringLiteral("#2DD4BF");
+    p.colour = colours().contains(acc, Qt::CaseInsensitive) ? acc.toUpper() : QStringLiteral("#D9141F");
     p.created = p.lastUsed = QDateTime::currentMSecsSinceEpoch();
     QJsonObject out{{"version", 1}, {"profiles", QJsonArray{p.toJson()}}, {"last_used", p.id}, {"show_picker", true}};
     if (!files.isEmpty()) out["legacy_backup"] = QStringLiteral("pre-1.6 files in this folder were copied to profiles/default and left as a backup");

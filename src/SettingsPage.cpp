@@ -32,6 +32,10 @@
 #include <algorithm>
 
 #include "AppSettings.h"
+#include "ThemeManager.h"
+#include <QSvgRenderer>
+#include <QPainter>
+#include <QFile>
 #include "SyncGuide.h"
 #ifndef PACITUM_UPDATE_TRACK
 #define PACITUM_UPDATE_TRACK ""
@@ -190,14 +194,15 @@ QWidget* SettingsPage::appearancePage() {
 
     auto* sw = new QWidget(); auto* swl = new QHBoxLayout(sw); swl->setContentsMargins(0,0,0,0); swl->setSpacing(8);
     auto* sg = new QButtonGroup(sw);
-    const QString acc = m_s.value(QStringLiteral("accent")).toString(QStringLiteral("#2DD4BF"));
-    for (const QString& col : {QStringLiteral("#2DD4BF"), QStringLiteral("#6366F1"), QStringLiteral("#F43F5E"),
+    QString acc = m_s.value(QStringLiteral("accent")).toString(QStringLiteral("#D9141F"));
+    if (acc.compare(QStringLiteral("#2DD4BF"), Qt::CaseInsensitive) == 0) acc = QStringLiteral("#D9141F");   // 1.x default
+    for (const QString& col : {QStringLiteral("#D9141F"), QStringLiteral("#6366F1"), QStringLiteral("#F43F5E"),
                                QStringLiteral("#F59E0B"), QStringLiteral("#22C55E"), QStringLiteral("#64748B")}) {
         auto* b = new SwatchButton(col, sw); b->setChecked(col.compare(acc, Qt::CaseInsensitive) == 0);
         sg->addButton(b); swl->addWidget(b);
         connect(b, &SwatchButton::clicked, this, [this, col]{ write(QStringLiteral("accent"), col); emit settingChanged(QStringLiteral("accent")); });
     }
-    addRow(c, QStringLiteral("Accent color"), QStringLiteral("Used for focus rings, toggles and selection"), sw);
+    addRow(c, QStringLiteral("Accent color"), QStringLiteral("Used for the active tab, the cursor and other highlights"), sw);
 
     addRow(c, QStringLiteral("Show bookmarks bar"), QStringLiteral("Ctrl+Shift+B"), makeSwitch(QStringLiteral("show_bookmarks_bar"), true));
     addRow(c, QStringLiteral("Animations"), QStringLiteral("Tab, button and page transitions"), makeSwitch(QStringLiteral("animations"), true));
@@ -425,8 +430,32 @@ QWidget* SettingsPage::syncPage() {
     return page;
 }
 
+// 2.0 brand marks: SVGs whose letters are "currentColor", drawn in the theme's text colour.
+static QPixmap brandMark(const QString& file, int height, qreal dpr) {
+    QFile f(file);
+    if (!f.open(QIODevice::ReadOnly)) return {};
+    QByteArray svg = f.readAll();
+    svg.replace("currentColor", ThemeManager::current().text.toUtf8());
+    QSvgRenderer r(svg);
+    if (!r.isValid()) return {};
+    const QSize ds = r.defaultSize();
+    const int w = qMax(1, ds.width() * height / qMax(1, ds.height()));
+    QPixmap pm(QSize(w, height) * dpr);
+    pm.setDevicePixelRatio(dpr);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm); p.setRenderHint(QPainter::Antialiasing); r.render(&p, QRectF(0, 0, w, height)); p.end();
+    return pm;
+}
+
 QWidget* SettingsPage::aboutPage() {
     QVBoxLayout* l; QWidget* page = section(QStringLiteral("About Pacitum"), &l);
+    {   // 2.0: the PACITUM wordmark above the version
+        auto* wm = new QLabel(page);
+        wm->setPixmap(brandMark(QStringLiteral(":/brand/wordmark.svg"), 36, devicePixelRatioF()));
+        wm->setAccessibleName(QStringLiteral("Pacitum"));
+        wm->setContentsMargins(4, 4, 0, 8);
+        l->addWidget(wm);
+    }
     auto* c = card(l, QString());
     auto* logo = new QLabel(); logo->setPixmap(QIcon(QStringLiteral(":/icons/pacitum-icon-128.png")).pixmap(QSize(48,48), devicePixelRatioF()));
     addRow(c, QStringLiteral("Pacitum Browser %1").arg(QCoreApplication::applicationVersion()),
@@ -468,5 +497,15 @@ QWidget* SettingsPage::aboutPage() {
     auto* pc = card(l, QStringLiteral("Performance"));
     addRow(pc, QStringLiteral("Freeze background tabs"), QStringLiteral("Pauses pages you haven't looked at for 10 minutes (never tabs playing audio). They resume instantly when you return."),
            makeSwitch(QStringLiteral("freeze_background_tabs"), true));
+
+    {   // 2.0: made by NEXT PROJECT
+        auto* np = new QWidget(page); auto* nl = new QHBoxLayout(np); nl->setContentsMargins(6, 18, 0, 8); nl->setSpacing(10);
+        auto* by = new QLabel(QStringLiteral("A project by"), np); by->setObjectName(QStringLiteral("RowSub"));
+        auto* mark = new QLabel(np);
+        mark->setPixmap(brandMark(QStringLiteral(":/brand/next_project_themed.svg"), 16, devicePixelRatioF()));
+        mark->setAccessibleName(QStringLiteral("NEXT PROJECT"));
+        nl->addWidget(by); nl->addWidget(mark); nl->addStretch(1);
+        l->addWidget(np);
+    }
     return page;
 }

@@ -2,7 +2,17 @@
 # Pacitum Browser (Qt6 WebEngine)
 
 A calm, fast web browser written in C++17 on Qt 6 WebEngine.
-Version 1.9.1 and 1.8.12 (two editions from the same source):
+Version **2.0.0**: a complete redesign.
+
+**2.0 at a glance**
+- **New look**: warm neutrals, ink for actions and Pacitum red for the active tab and highlights, in light and dark. The design system is in [docs/design-system-2.0.md](docs/design-system-2.0.md).
+- **New logo**: a new app icon (Windows, macOS, Linux, installer) and the PACITUM wordmark on the new tab and About pages.
+- **Rubik** is the new interface font (bundled).
+- **Taller tabs** with a red bar on the active one, a 60 px toolbar, a bigger address bar, bolder icons.
+- **Pop-ups toggle**: a second click on Extensions, Downloads, Profile or ⋮ closes the pop-up instead of reopening it (it used to blink).
+- **About Pacitum** shows the wordmark and the NEXT PROJECT mark. ⋮ › Help and about Pacitum opens it.
+
+Earlier: 1.9.1 and 1.8.12 (two editions from the same source):
 - **Pacitum 1.9.x** is built with **Qt 6.11** (newer Chromium) and runs **Chrome extensions**: "Add to Pacitum" on a Chrome Web Store page, or add a `.crx` / `.zip` / unpacked folder from the puzzle menu. Pin an extension to the toolbar to open its pop-up; switch it off or remove it from the same menu. Before adding, Pacitum lists what the extension may do.
 - **Pacitum 1.8.x** is the **legacy edition** (Qt 6.8 LTS) for computers that can't run the Qt 6.11 build. It gets everything below, but not Chrome extensions, and its updater stays on 1.8.x. **1.8.12 is the last legacy release**: from 1.9.1 on, only the Qt 6.11 edition is built.
 - Both: **bookmark folders** (on the bookmarks bar, with a drop-down; right-click to make one or move a bookmark; drag a bookmark onto a folder; pick the folder right after pressing ☆). Folders sync.

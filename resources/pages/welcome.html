@@ -1,4 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>Welcome to Pacitum</title><style>
+@font-face{font-family:Rubik;font-style:normal;font-weight:300 900;font-display:swap;src:url(pacitum://fonts/Rubik-VF.ttf) format("truetype")}
 @font-face{font-family:Inter;font-style:normal;font-weight:400;font-display:swap;src:local("Inter Regular"),url(pacitum://fonts/Inter-Regular.ttf) format("truetype")}
 @font-face{font-family:Inter;font-style:normal;font-weight:500;font-display:swap;src:local("Inter Medium"),url(pacitum://fonts/Inter-Medium.ttf) format("truetype")}
 @font-face{font-family:Inter;font-style:normal;font-weight:600;font-display:swap;src:local("Inter SemiBold"),url(pacitum://fonts/Inter-SemiBold.ttf) format("truetype")}
@@ -6,7 +7,7 @@
 :root{--page:%PAGE%;--card:%TOOL%;--surf:%SURF%;--surfh:%SURFH%;--bord:%BORD%;--bord2:%BORD2%;--txt:%TXT%;--sec:%SEC%;--ter:%TER%;--acc:%ACC%;--accs:%ACCS%;--onacc:%ONACC%;--dan:%DANGER%;
 --ocub:cubic-bezier(.33,1,.68,1);--icub:cubic-bezier(.32,0,.67,0);--oback:cubic-bezier(.34,1.56,.64,1)}
 *{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
-body{font:13px/1.35 "Inter","Segoe UI",system-ui,sans-serif;color:var(--txt);background:var(--page);overflow:hidden auto;position:relative}
+body{font:13px/1.35 Rubik,"Inter","Segoe UI",system-ui,sans-serif;color:var(--txt);background:var(--page);overflow:hidden auto;position:relative}
 .glow{position:fixed;left:50%;top:-260px;width:1100px;height:520px;margin-left:-550px;background:radial-gradient(closest-side,var(--accs),transparent);pointer-events:none}
 .ind{position:relative;margin:40px auto 0;display:flex;flex-direction:column;align-items:center}
 .dots{display:flex;gap:8px;height:6px}
@@ -131,7 +132,7 @@ svg.i{width:16px;height:16px;flex:none}
 (function(){
 var ICONS={check:'%I_CHECK%',import:'%I_IMPORT%',def:'%I_DEFAULT%',theme:'%I_SYSTEM%'};
 var steps=[].slice.call(document.querySelectorAll('.step')),cur=0,busy=false,maxDone=0,fr=null,reduced=false;
-var state={source:null,sources:[],importing:false,results:null,isDefault:false,theme:'system',accent:'#2DD4BF',importChosen:false};
+var state={source:null,sources:[],importing:false,results:null,isDefault:false,theme:'system',accent:'#D9141F',importChosen:false};
 var dots=document.getElementById('dots');
 for(var i=0;i<4;i++){var d=document.createElement('button');d.className='dot';d.setAttribute('aria-label','Step '+(i+1));(function(n){d.onclick=function(){if(n<cur&&n<=maxDone)go(n);};})(i);dots.appendChild(d);}
 function paintInd(){[].forEach.call(dots.children,function(d,i){d.className='dot'+(i===cur?' cur':i<cur?' done':'');});
@@ -171,7 +172,7 @@ function setDef(isDef){state.isDefault=isDef;var b=document.getElementById('defB
  if(isDef){b.innerHTML='✓ Default';b.className='pill isdef';b.disabled=true;}}
 document.getElementById('defBtn').onclick=function(){if(fr)fr.requestDefaultBrowser();};
 // theme
-var ACC=['#2DD4BF','#6366F1','#F43F5E','#F59E0B','#22C55E','#64748B'];
+var ACC=['#D9141F','#6366F1','#F43F5E','#F59E0B','#22C55E','#64748B'];
 var acw=document.getElementById('accents');
 ACC.forEach(function(c,i){var b=document.createElement('button');b.className='sw'+(i===0?' sel':'');b.style.background=c;b.setAttribute('role','radio');b.setAttribute('aria-label','Accent '+c);
  b.onclick=function(){state.accent=c;[].forEach.call(acw.children,function(x){x.classList.toggle('sel',x===b);});if(fr)fr.setAccent(c);};acw.appendChild(b);});

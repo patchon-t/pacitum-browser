@@ -38,8 +38,8 @@ QColor mixc(const QColor& a, const QColor& b, qreal t) {
 constexpr int kMinStripTabs = 60;
 // 1.9 refresh: tabs hang from the bottom of the 42 px strip. The active tab is 34 px tall, runs into
 // the toolbar below (same colour) and has small outward "feet" so the two read as one surface.
-constexpr int kGap = 4, kTabH = 34, kTop = 8, kIconY = 9, kMaxW = 232, kMinW = 56, kPinW = 40, kPinSep = 9;
-constexpr qreal kTabRadius = 10, kFoot = 6;
+constexpr int kGap = 4, kTabH = 40, kTop = 10, kIconY = 12, kMaxW = 236, kMinW = 56, kPinW = 40, kPinSep = 9;
+constexpr qreal kTabRadius = 14.0, kFoot = 6;
 
 // Active tab outline: rounded top corners, square bottom with concave feet (body rect in bar coords).
 QPainterPath activeTabPath(const QRectF& b) {
@@ -169,6 +169,22 @@ void PacitumTabBar::paintEvent(QPaintEvent* e) {
         p.drawPath(activeTabPath(now));
     }
     QTabBar::paintEvent(e);
+    // 2.0: a short Pacitum-red bar centred on the active tab's top edge (follows the slide).
+    if (cur >= 0 && !m_vertical) {
+        const QRect r = tabRect(cur);
+        QRectF body = m_floating ? QRectF(r.x(), r.y() + kTop, (isTabPinned(cur) ? kPinW : r.width() - kGap), kTabH) : QRectF(r);
+        if (m_floating && m_slideT < 1.0) body = m_lastSelBody;
+        const qreal w = qMin<qreal>(28.0, body.width() - 16.0);
+        if (w > 4) {
+            QPainter p(this); p.setRenderHint(QPainter::Antialiasing);
+            p.setPen(Qt::NoPen); p.setBrush(qc(ThemeManager::current().accent));
+            QPainterPath bar;
+            const QRectF br(body.center().x() - w / 2, body.top(), w, 3.0);
+            bar.addRoundedRect(br.adjusted(0, -3, 0, 0), 3, 3);   // rounded only at the bottom
+            p.setClipRect(br);
+            p.drawPath(bar);
+        }
+    }
 }
 
 void PacitumTabBar::setVerticalMode(bool v) {

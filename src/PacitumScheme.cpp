@@ -51,7 +51,7 @@ void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
     }
     if (host == QStringLiteral("fonts")) {
         // Bundled Inter for the internal pages (pacitum://fonts/Inter-Regular.ttf). Fixed names only.
-        static const QStringList allowed{QStringLiteral("Inter-Regular.ttf"), QStringLiteral("Inter-Medium.ttf"),
+        static const QStringList allowed{QStringLiteral("Rubik-VF.ttf"), QStringLiteral("Inter-Regular.ttf"), QStringLiteral("Inter-Medium.ttf"),
                                          QStringLiteral("Inter-SemiBold.ttf"), QStringLiteral("Inter-Bold.ttf")};
         const QString name = job->requestUrl().path().mid(1);
         QFile f(QStringLiteral(":/fonts/") + name);
