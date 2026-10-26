@@ -238,6 +238,20 @@ void AddressBar::setUrl(const QString& url) {
     updateSecurityIcon(url);
 }
 
+void AddressBar::showTabUrl(const QString& url) {
+    m_currentUrl = url;
+    if (m_input->hasFocus()) {
+        setDisplayMode(false);
+        m_input->setText(isInternalNewTab(url) ? QString() : url);
+        m_input->setModified(false);
+        m_input->selectAll();
+    } else {
+        m_input->setModified(false);
+        showBlurred();
+    }
+    updateSecurityIcon(url);
+}
+
 void AddressBar::showBlurred() {
     const QString full = isInternalNewTab(m_currentUrl) ? QString() : m_currentUrl;
     if (full.isEmpty() || !m_theme) { setDisplayMode(false); m_input->setText(full); m_input->setCursorPosition(0); return; }

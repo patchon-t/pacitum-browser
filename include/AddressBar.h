@@ -26,6 +26,8 @@ public:
     explicit AddressBar(HistoryManager* hm = nullptr, QWidget* parent = nullptr);
     void applyTheme(ThemeManager* tm);
     void setUrl(const QString& url);
+    // Tab switch: the text belongs to the old tab, so replace it even while the field has focus.
+    void showTabUrl(const QString& url);
     QString url() const;
     QString currentUrl() const { return m_currentUrl; }   // the URL last set (not the display text)
     void focusUrl();

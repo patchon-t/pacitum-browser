@@ -1046,6 +1046,7 @@ void BrowserWindow::tabActivated(PacitumTabWidget* sender, int index) {
     for (auto* tw : {m_tabs, m_splitTabs}) if (tw) for (int i = 0; i < tw->count(); ++i)   // bubble → chip on tab switch (§1)
         if (auto* t = qobject_cast<BrowserTab*>(tw->widget(i)); t && t != w && t->permissions()) t->permissions()->collapse();
     if (auto* tab = qobject_cast<BrowserTab*>(w)) {
+        m_addressBar->showTabUrl(tab->currentUrl());
         updateAddressBar(tab->currentUrl());
         refreshPermissionUi(tab);
         if (tab->permissions()) QTimer::singleShot(0, tab->permissions(), [p = QPointer<PermissionController>(tab->permissions())]{ if (p) p->tabActivated(); });
@@ -1054,12 +1055,12 @@ void BrowserWindow::tabActivated(PacitumTabWidget* sender, int index) {
         setWindowTitle(tab->currentTitle() + QStringLiteral(" — Pacitum Browser"));
     } else if (qobject_cast<DownloadsPage*>(w)) {
         m_addressBar->setPermissionChips({});
-        m_addressBar->setUrl(QStringLiteral("pacitum://downloads"));
+        m_addressBar->showTabUrl(QStringLiteral("pacitum://downloads"));
         m_addressBar->setBookmarked(false);
         setWindowTitle(QStringLiteral("Downloads — Pacitum Browser"));
     } else if (qobject_cast<SettingsPage*>(w)) {
         m_addressBar->setPermissionChips({});
-        m_addressBar->setUrl(QStringLiteral("pacitum://settings"));
+        m_addressBar->showTabUrl(QStringLiteral("pacitum://settings"));
         m_addressBar->setBookmarked(false);
         setWindowTitle(QStringLiteral("Settings — Pacitum Browser"));
     }

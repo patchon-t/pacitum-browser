@@ -49,6 +49,8 @@ for T in Light Dark; do
   key ctrl+comma; shot 05-settings-$t 3
   # Settings nav sits on the left; focus it and jump to its last row (About Pacitum)
   focus; xdotool mousemove 140 330 click 1; sleep 0.5; xdotool key End; shot 06-about-$t 2
+  # scroll to the bottom of About (NEXT PROJECT mark)
+  xdotool mousemove 700 500; for i in $(seq 1 15); do xdotool click 5; sleep 0.05; done; shot 07-about-bottom-$t 1.5
   quit
 done
 kill $XVFB 2>/dev/null
