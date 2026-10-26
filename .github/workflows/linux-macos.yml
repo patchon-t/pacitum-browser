@@ -49,6 +49,17 @@ jobs:
           log="$HOME/.local/share/Pacitum/Pacitum Browser/startup.log"
           tail -n 40 "$log" || true
           grep -q "SMOKE OK" "$log"
+      - name: Showcase screenshots
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y --no-install-recommends xdotool imagemagick jq
+          bash .github/showcase.sh ./build/PacitumBrowser
+      - uses: actions/upload-artifact@v7.0.2
+        continue-on-error: true
+        with:
+          name: Pacitum-showcase
+          path: showcase/*.jpg
+          retention-days: 7
       - name: AppImage
         run: |
           ver=$(cat build/pacitum-version.txt)   # 1.9.x (Qt 6.11) or 1.8.x (legacy, Qt 6.8)
