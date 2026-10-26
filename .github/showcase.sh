@@ -22,12 +22,17 @@ launch() {   # launch [urls...]
   [ -z "${WIN:-}" ] && { echo "window never appeared"; return 1; }
   xdotool windowmove "$WIN" 0 0 windowsize "$WIN" $W $H
   sleep 6
+  focus
 }
 quit() { kill $PID 2>/dev/null; sleep 2; kill -9 $PID 2>/dev/null; pkill -9 -f QtWebEngineProcess 2>/dev/null; sleep 1; }
 shot() { sleep "${2:-1.5}"; import -window root -crop ${W}x${H}+0+0 -quality 84 "$OUT/$1.jpg"; echo "shot $1 ($(stat -c %s "$OUT/$1.jpg") bytes)"; }
-key() { xdotool key --window "$WIN" "$@"; }
+# Qt ignores synthetic (XSendEvent) keys, so focus the window and type through XTEST instead
+focus() { xdotool windowfocus --sync "$WIN" 2>/dev/null; xdotool mousemove 640 400; }
+key() { focus; xdotool key --clearmodifiers "$@"; }
 theme() {   # theme Light|Dark
   mkdir -p "$(dirname "$SET")"; [ -s "$SET" ] || echo '{}' > "$SET"
+  # fresh session each time (no restored tabs), settings kept
+  find "$(dirname "$SET")" -mindepth 1 -maxdepth 1 ! -name browser_settings.json -exec rm -rf {} + 2>/dev/null
   jq --arg t "$1" '.theme=$t | .first_run_done=true' "$SET" > "$SET.tmp" && mv "$SET.tmp" "$SET"
 }
 
@@ -43,7 +48,7 @@ for T in Light Dark; do
   key ctrl+shift+Tab; shot 04-website-$t 2
   key ctrl+comma; shot 05-settings-$t 3
   # Settings nav sits on the left; focus it and jump to its last row (About Pacitum)
-  xdotool mousemove --window "$WIN" 140 330 click 1; sleep 0.5; key End; shot 06-about-$t 2
+  focus; xdotool mousemove 140 330 click 1; sleep 0.5; xdotool key End; shot 06-about-$t 2
   quit
 done
 kill $XVFB 2>/dev/null
