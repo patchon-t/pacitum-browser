@@ -164,7 +164,11 @@ static void setupEnvironment() {
     QByteArray flags;
     if (qEnvironmentVariableIntValue("PACITUM_DISABLE_GPU")) flags += "--disable-gpu --disable-gpu-compositing";
 #ifdef Q_OS_WIN
-    flags += " --enable-features=OverlayScrollbar,ParallelDownloading --disable-features=DCompPresenter";
+    // 2.0.2: Chromium's own "is this window covered?" tracking (CalculateNativeWinOcclusion) hides and
+    // re-shows the page when other windows (our pop-ups, shadows, a screen recorder) overlap it; the page
+    // then flashes blank for a frame while its tiles are redrawn. Keep the page rendering at all times.
+    flags += " --enable-features=OverlayScrollbar,ParallelDownloading --disable-features=DCompPresenter,CalculateNativeWinOcclusion"
+             " --disable-backgrounding-occluded-windows";
 #else
     flags += " --enable-features=OverlayScrollbar,ParallelDownloading,VaapiVideoDecoder,VaapiVideoEncoder,WebRTCPipeWireCapturer";
 #endif

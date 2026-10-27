@@ -103,6 +103,7 @@ private:
     QHash<quint64, QVariantAnimation*> m_hoverAnim;
     quint64 m_hoverId = 0;
     QVariantAnimation* m_spin = nullptr;
+    QElapsedTimer m_spinTick;                 // spinner repaints are limited to ~30 a second
     bool m_spinSuspended = false;
     qreal m_spinAngle = 0;
     qreal m_spinV = 0;                        // shared spinner phase 0..1 (1600 ms loop)

@@ -267,6 +267,8 @@
     var b = e.target && e.target.closest ? e.target.closest('button,input[type=submit],input[type=button],[role=button]') : null;
     if (!b) return;
     var root = b.form || b.closest('form') || document;
+    // Buttons outside any <form> on a page with no password field (video sites, apps): nothing to save.
+    if (root === document && !document.querySelector('input[type=password]')) return;
     setTimeout(function () { capture(root); }, 0);
   }, true);
   document.addEventListener('keydown', function (e) {

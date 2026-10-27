@@ -107,7 +107,8 @@ private slots:
     void showPageQr();
     void togglePictureInPicture();
     void showTabOverview();
-    void captureActiveThumb();
+    void captureActiveThumb(bool force = false);
+    bool m_thumbsWanted = false;   // the tab overview has been used: keep its cards fresh
     void showNotice(const QString& text);
     void setupSync();
     void duplicateTab(int index);

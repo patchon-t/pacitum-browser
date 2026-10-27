@@ -396,7 +396,7 @@ void BrowserWindow::setupUI() {
     rowLay->addWidget(m_splitter, 1);
     mainLay->addWidget(m_contentRow, 1);
     m_thumbTimer.setSingleShot(true); m_thumbTimer.setInterval(2500);   // 2.0.1: off the tab-switch path (GPU read-back)
-    connect(&m_thumbTimer, &QTimer::timeout, this, &BrowserWindow::captureActiveThumb);
+    connect(&m_thumbTimer, &QTimer::timeout, this, [this]{ captureActiveThumb(false); });
 
     m_tabs = new PacitumTabWidget(m_verticalTabs, this);
     connect(m_tabs, &PacitumTabWidget::tabCloseRequested, this, &BrowserWindow::closeTab);
@@ -824,9 +824,12 @@ void BrowserWindow::togglePictureInPicture() {
     if (auto* t = activeTab()) t->togglePictureInPicture();
 }
 
-void BrowserWindow::captureActiveThumb() {
+void BrowserWindow::captureActiveThumb(bool force) {
     auto* t = activeTab();
     if (!t || !t->isVisible() || t->inPictureInPicture()) return;
+    // 2.0.2: grabbing a live web view reads the GPU texture back, which can make the page flash and costs
+    // a few ms. Not while it is still loading; try again a little later.
+    if (!force && t->isLoading()) { m_thumbTimer.start(1500); return; }
     QPixmap pm = t->captureView();
     if (pm.isNull()) return;
     if (pm.width() > 640) pm = pm.scaledToWidth(640, Qt::SmoothTransformation);   // small cache = fast 3D frames
@@ -836,7 +839,8 @@ void BrowserWindow::captureActiveThumb() {
 void BrowserWindow::showTabOverview() {
     if (findChild<TabOverview*>(QString(), Qt::FindDirectChildrenOnly)) return;   // already open
     if (m_tabs->count() < 2) { showNotice(QStringLiteral("Open more tabs to use the overview")); return; }
-    captureActiveThumb();
+    captureActiveThumb(true);
+    m_thumbsWanted = true;
     QList<TabOverview::Card> cards;
     for (int i = 0; i < m_tabs->count(); ++i) {
         QWidget* w = m_tabs->widget(i);
@@ -1173,7 +1177,7 @@ void BrowserWindow::onTabChanged(int index) {
 void BrowserWindow::tabActivated(PacitumTabWidget* sender, int index) {
     m_activeWidget = sender;
     if (m_splitter) m_splitter->setActivePane(sender);
-    m_thumbTimer.start();   // refresh this tab's 3D-overview card once it has painted
+    if (m_thumbsWanted) m_thumbTimer.start(2500);   // refresh this tab's 3D-overview card once it has painted
     QWidget* w = sender->widget(index);
     // Switching tabs while a page is fullscreen (Ctrl+Tab, a popup opening a tab): leave fullscreen
     // so the new tab is never shown without chrome.

@@ -154,6 +154,9 @@ void PacitumTabBar::enableFloatingTabs() {
     m_spin->setStartValue(0.0); m_spin->setEndValue(1.0); m_spin->setDuration(1600); m_spin->setLoopCount(-1);
     connect(m_spin, &QVariantAnimation::valueChanged, this, [this](const QVariant& v) {
         m_spinV = v.toReal(); m_spinAngle = m_spinV * 720.0;
+        // 2.0.2: every repaint of the window also re-composes the web view; 30 a second looks the same.
+        if (m_spinTick.isValid() && m_spinTick.elapsed() < 30) return;
+        m_spinTick.start();
         for (int i = 0; i < count(); ++i)                          // repaint only the 16 px favicon rects
             if (m_flags.value(idOf(i)).loading) { const QRect r = tabRect(i); update(QRect(r.x() + 10, r.y() + kTop + kIconY - 2, 20, 20)); }
     });
