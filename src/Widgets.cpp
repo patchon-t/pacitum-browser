@@ -20,6 +20,7 @@
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QGuiApplication>
+#include <QScreen>
 #include <QLibrary>
 #include <cstdlib>
 #include <QtMath>
@@ -337,7 +338,39 @@ PopupMenu::PopupMenu(QWidget* parent) : QMenu(parent) {
     if (!m_shadow) return;   // spec fallback: plain card with 1 px outline (app QSS), no shadow
     setWindowFlags(windowFlags() | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
     setAttribute(Qt::WA_TranslucentBackground);
-    setStyleSheet(QStringLiteral("QMenu{background:transparent;border:none;margin:%1px;padding:6px;}").arg(kShadow));
+    // Scoped by a property so the style never cascades onto plain child menus.
+    setProperty("pacitumPopup", true);
+    setStyleSheet(QStringLiteral("QMenu[pacitumPopup=\"true\"]{background:transparent;border:none;margin:%1px;padding:6px;}").arg(kShadow));
+}
+QMenu* addSubMenu(QMenu* parent, const QString& title, const QIcon& icon) {
+    if (auto* pm = qobject_cast<PopupMenu*>(parent); pm && pm->shadowMargin() > 0) {
+        auto* sm = new PopupMenu(parent);
+        sm->setTitle(title);
+        if (!icon.isNull()) sm->setIcon(icon);
+        parent->addMenu(sm);
+        return sm;
+    }
+    return icon.isNull() ? parent->addMenu(title) : parent->addMenu(icon, title);
+}
+void PopupMenu::showEvent(QShowEvent* e) {
+    QMenu::showEvent(e);
+    auto* pm = qobject_cast<QMenu*>(parentWidget());
+    if (!m_shadow || !pm || !menuAction() || actions().isEmpty()) return;
+    auto* ppm = qobject_cast<PopupMenu*>(pm);
+    const int pmInset = ppm ? ppm->shadowMargin() : 0;
+    const QRect ar = pm->actionGeometry(menuAction());
+    const QPoint itemTop = pm->mapToGlobal(QPoint(0, ar.top()));
+    const int pmLeft = pm->mapToGlobal(QPoint(pmInset, 0)).x();
+    const int pmRight = pm->mapToGlobal(QPoint(pm->width() - pmInset, 0)).x();
+    QScreen* sc = QGuiApplication::screenAt(itemTop);
+    const QRect avail = sc ? sc->availableGeometry() : QRect(0, 0, 1 << 20, 1 << 20);
+    const int gap = 4;
+    int x = pmRight + gap - kShadow;                                  // card to the right of the parent card
+    if (x + width() - kShadow > avail.right()) x = pmLeft - gap - width() + kShadow;   // no room: open to the left
+    int y = itemTop.y() - actionGeometry(actions().first()).top();    // first row level with the parent row
+    if (y + height() - kShadow > avail.bottom()) y = avail.bottom() - height() + kShadow;
+    if (y + kShadow < avail.top()) y = avail.top() - kShadow;
+    move(x, y);
 }
 void PopupMenu::paintEvent(QPaintEvent* e) {
     if (m_shadow) {

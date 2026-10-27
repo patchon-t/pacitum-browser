@@ -100,7 +100,7 @@ BookmarksBar::BookmarksBar(BookmarkManager* mgr, QWidget* parent) : QWidget(pare
     connect(m_other, &QPushButton::clicked, this, [this]{
         Pacitum::PopupMenu m(this);
         for (const QString& f : m_mgr->folders()) {
-            QMenu* sub = m.addMenu(m_theme ? m_theme->secondaryIcon(QStringLiteral("folder"), 14) : QIcon(), QString(f).replace(QLatin1Char('&'), QStringLiteral("&&")));
+            QMenu* sub = Pacitum::addSubMenu(&m, QString(f).replace(QLatin1Char('&'), QStringLiteral("&&")), m_theme ? m_theme->secondaryIcon(QStringLiteral("folder"), 14) : QIcon());
             addFolderMenu(sub, f);
         }
         if (!m_mgr->folders().isEmpty()) m.addSeparator();
@@ -205,7 +205,7 @@ void BookmarksBar::showContextMenu(const QPoint& pos, const QString& url, QWidge
     m.addAction(QStringLiteral("Open in new tab"), this, [this, url]{ emit urlActivatedInNewTab(url); });
     m.addSeparator();
     m.addAction(QStringLiteral("Edit…"), this, [this, url]{ editBookmark(url); });
-    QMenu* move = m.addMenu(QStringLiteral("Move to folder"));
+    QMenu* move = Pacitum::addSubMenu(&m, QStringLiteral("Move to folder"));
     QString current;
     for (const auto& b : m_mgr->allBookmarks()) if (b.url == url) current = b.folder;
     if (!current.isEmpty()) move->addAction(QStringLiteral("Bookmarks bar"), this, [this, url]{ m_mgr->moveToFolder(url, QString()); changed(); });

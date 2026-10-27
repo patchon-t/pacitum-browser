@@ -59,6 +59,20 @@ QPainterPath activeTabPath(const QRectF& b) {
     return path;
 }
 
+// 2.0: a short Pacitum-red bar centred on the active tab's top edge, rounded only at the bottom.
+void drawActiveBar(QPainter* p, const QRectF& body) {
+    const qreal w = qMin<qreal>(28.0, body.width() - 16.0);
+    if (w <= 4) return;
+    p->save(); p->setRenderHint(QPainter::Antialiasing);
+    p->setPen(Qt::NoPen); p->setBrush(qc(ThemeManager::current().accent));
+    QPainterPath bar;
+    const QRectF br(body.center().x() - w / 2, body.top(), w, 3.0);
+    bar.addRoundedRect(br.adjusted(0, -3, 0, 0), 3, 3);
+    p->setClipRect(br);
+    p->drawPath(bar);
+    p->restore();
+}
+
 class FloatingTabStyle : public QProxyStyle {
 public:
     using QProxyStyle::QProxyStyle;
@@ -133,6 +147,7 @@ void PacitumTabBar::enableFloatingTabs() {
     connect(m_slideAnim, &QVariantAnimation::valueChanged, this, [this](const QVariant& v){ m_slideT = v.toReal(); update(); });
     connect(m_slideAnim, &QVariantAnimation::finished, this, [this]{ m_slideT = 1.0; update(); });
     connect(this, &QTabBar::currentChanged, this, [this](int){ startSelectionSlide(); });
+    connect(this, &QTabBar::tabMoved, this, [this]{ markStructChange(); });
     m_spin = new QVariantAnimation(this);
     // animations-spec §6: one shared 0→1 loop (1600 ms) for all loading tabs; angle = v·720 (800 ms/turn),
     // arc span = 90 + 180·sin²(πv) (90→270→90, InOutSine-like halves).
@@ -143,9 +158,20 @@ void PacitumTabBar::enableFloatingTabs() {
             if (m_flags.value(idOf(i)).loading) { const QRect r = tabRect(i); update(QRect(r.x() + 10, r.y() + kTop + kIconY - 2, 20, 20)); }
     });
 }
+void PacitumTabBar::cancelSlide() {
+    if (m_slideAnim) m_slideAnim->stop();
+    m_slideT = 1.0; update();
+}
+void PacitumTabBar::markStructChange() {
+    m_structTimer.restart(); m_structSeen = true;
+    cancelSlide();
+}
 void PacitumTabBar::startSelectionSlide() {
     const int ms = Pacitum::motionMs(200);
-    if (!m_slideAnim || !animationsEnabled || ms == 0 || !isVisible() || m_lastSelBody.isNull() || m_vertical) {
+    // 2.0.1: the glide only plays for a plain switch. While tabs open, close, move or are dragged the
+    // target keeps moving, so the shape was left behind (blank white tab, floating red bar).
+    const bool busy = m_dragging || !m_progress.isEmpty() || (m_structSeen && !m_structTimer.hasExpired(320));
+    if (!m_slideAnim || !animationsEnabled || ms == 0 || !isVisible() || m_lastSelBody.isNull() || m_vertical || busy) {
         if (m_slideAnim) m_slideAnim->stop();
         m_slideT = 1.0; update(); return;
     }
@@ -158,6 +184,7 @@ void PacitumTabBar::startSelectionSlide() {
 
 void PacitumTabBar::paintEvent(QPaintEvent* e) {
     const int cur = currentIndex();
+    m_selPainted = false;
     if (m_floating && m_slideT < 1.0 && cur >= 0) {
         const QRect r = tabRect(cur);
         const qreal bw = isTabPinned(cur) ? kPinW : r.width() - kGap;
@@ -171,21 +198,12 @@ void PacitumTabBar::paintEvent(QPaintEvent* e) {
         p.drawPath(activeTabPath(now));
     }
     QTabBar::paintEvent(e);
-    // 2.0: a short Pacitum-red bar centred on the active tab's top edge (follows the slide).
-    if (cur >= 0 && !m_vertical) {
-        const QRect r = tabRect(cur);
-        QRectF body = m_floating ? QRectF(r.x(), r.y() + kTop, (isTabPinned(cur) ? kPinW : r.width() - kGap), kTabH) : QRectF(r);
-        if (m_floating && m_slideT < 1.0) body = m_lastSelBody;
-        const qreal w = qMin<qreal>(28.0, body.width() - 16.0);
-        if (w > 4) {
-            QPainter p(this); p.setRenderHint(QPainter::Antialiasing);
-            p.setPen(Qt::NoPen); p.setBrush(qc(ThemeManager::current().accent));
-            QPainterPath bar;
-            const QRectF br(body.center().x() - w / 2, body.top(), w, 3.0);
-            bar.addRoundedRect(br.adjusted(0, -3, 0, 0), 3, 3);   // rounded only at the bottom
-            p.setClipRect(br);
-            p.drawPath(bar);
-        }
+    // The red bar is part of the active tab itself (paintFloatingTab), so it also travels with a tab that
+    // is being dragged (Qt draws that as a separate snapshot above the strip). Only the gliding shape
+    // and the non-floating bar need it here.
+    if (cur >= 0 && !m_vertical && m_floating && m_slideT < 1.0) {
+        QPainter p(this);
+        drawActiveBar(&p, m_lastSelBody);
     }
 }
 
@@ -276,6 +294,7 @@ void PacitumTabBar::tabInserted(int index) {
         m_pinned = shifted;
     }
     if (!m_floating) return;
+    markStructChange();
     ensureId(index);
     updateCloseButtons();
 }
@@ -285,6 +304,7 @@ void PacitumTabBar::tabRemoved(int index) {
     for (int p : std::as_const(m_pinned)) { if (p < index) shifted.insert(p); else if (p > index) shifted.insert(p - 1); }
     m_pinned = shifted;
     if (m_floating) {
+        markStructChange();
         QSet<quint64> alive; for (int i = 0; i < count(); ++i) alive.insert(idOf(i));
         for (auto it = m_flags.begin(); it != m_flags.end();) it = alive.contains(it.key()) ? std::next(it) : m_flags.erase(it);
         updateSpinner(); updateCloseButtons();
@@ -341,8 +361,17 @@ void PacitumTabBar::setHoverIndex(int i) {
 }
 
 void PacitumTabBar::mouseMoveEvent(QMouseEvent* e) {
-    if (m_floating) setHoverIndex(tabAt(e->pos()));
+    if (m_floating) {
+        setHoverIndex(tabAt(e->pos()));
+        if (!m_dragging && (e->buttons() & Qt::LeftButton) && (e->pos() - m_pressPos).manhattanLength() > 6) { m_dragging = true; cancelSlide(); }
+    }
     QTabBar::mouseMoveEvent(e);
+}
+void PacitumTabBar::mouseReleaseEvent(QMouseEvent* e) {
+    const bool wasDragging = m_dragging;
+    m_dragging = false;
+    QTabBar::mouseReleaseEvent(e);
+    if (wasDragging) markStructChange();
 }
 void PacitumTabBar::leaveEvent(QEvent* e) {
     if (m_floating) {
@@ -451,9 +480,10 @@ void PacitumTabBar::paintFloatingTab(QPainter* p, const QStyleOptionTab& opt) co
         fill = qc(pal.tab);
         const QRectF shape(r.x(), r.y() + kTop, bodyW, kTabH + 1);
         if (m_slideT >= 1.0) {
-            m_lastSelBody = shape;
+            m_lastSelBody = shape; m_selPainted = true;
             p->setPen(Qt::NoPen); p->setBrush(fill);
             p->drawPath(activeTabPath(shape));
+            drawActiveBar(p, shape);
         }
     } else if (hov > 0.001) {
         fill = mixc(chrome, qc(pal.tabHover), hov);
@@ -593,6 +623,7 @@ void PacitumTabBar::animateOut(int index, std::function<void()> done) {
 }
 
 void PacitumTabBar::mousePressEvent(QMouseEvent* e) {
+    m_pressPos = e->pos(); m_dragging = false;
     if (e->button() == Qt::RightButton) {
         int idx = tabAt(e->pos());
         if (idx >= 0) emit tabRightClicked(idx, e->globalPosition().toPoint());

@@ -4,6 +4,10 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QSvgRenderer>
+#include <QIconEngine>
+#include <QPixmapCache>
+#include <QAtomicInt>
+#include <memory>
 #include <QGuiApplication>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -151,12 +155,47 @@ void ThemeManager::rebuild() {
     s_current = m_pal;
 }
 
+namespace {
+// 2.0.1 vector icon: the SVG is rendered at the exact device size that is asked for (any screen
+// scale, 125 % / 150 % included) instead of being rasterised once at a fixed size and then resampled,
+// which is what made the icons soft.
+class TintedSvgEngine : public QIconEngine {
+public:
+    TintedSvgEngine(const QByteArray& normal, const QByteArray& disabled)
+        : m_id(nextId()), m_normal(std::make_shared<QSvgRenderer>(normal)),
+          m_disabled(disabled.isEmpty() ? m_normal : std::make_shared<QSvgRenderer>(disabled)), m_hasDisabled(!disabled.isEmpty()) {}
+    QIconEngine* clone() const override { return new TintedSvgEngine(*this); }
+    QSize actualSize(const QSize& size, QIcon::Mode, QIcon::State) override { return size; }
+    void paint(QPainter* p, const QRect& rect, QIcon::Mode mode, QIcon::State) override {
+        p->save(); p->setRenderHint(QPainter::Antialiasing);
+        rendererFor(mode)->render(p, QRectF(rect));
+        p->restore();
+    }
+    QPixmap pixmap(const QSize& size, QIcon::Mode mode, QIcon::State) override {
+        if (size.isEmpty()) return {};
+        const QString key = QStringLiteral("pcsvg%1|%2x%3|%4").arg(m_id).arg(size.width()).arg(size.height()).arg(mode == QIcon::Disabled && m_hasDisabled);
+        QPixmap pm;
+        if (QPixmapCache::find(key, &pm)) return pm;
+        pm = QPixmap(size); pm.fill(Qt::transparent);
+        QPainter p(&pm); p.setRenderHint(QPainter::Antialiasing);
+        rendererFor(mode)->render(&p, QRectF(QPointF(0, 0), QSizeF(size)));
+        p.end();
+        QPixmapCache::insert(key, pm);
+        return pm;
+    }
+private:
+    static int nextId() { static QAtomicInt n; return n.fetchAndAddRelaxed(1); }
+    QSvgRenderer* rendererFor(QIcon::Mode mode) const { return (mode == QIcon::Disabled && m_hasDisabled ? m_disabled : m_normal).get(); }
+    int m_id;
+    std::shared_ptr<QSvgRenderer> m_normal, m_disabled;
+    bool m_hasDisabled;
+};
+}
+
 QIcon ThemeManager::icon(const QString& name, const QString& color, int size, const QString& disabledColor) {
-    // Tinted SVG icons are requested on every repaint/theme pass; render each variant once.
+    // Tinted SVG icons are requested on every repaint/theme pass; build each variant once.
     static QHash<QString, QIcon> cache;
-    const qreal cdpr = qMax<qreal>(1.0, qGuiApp ? qGuiApp->devicePixelRatio() : 1.0);
-    const QString key = name + QLatin1Char('|') + color + QLatin1Char('|') + QString::number(size) + QLatin1Char('|') + disabledColor
-                      + QLatin1Char('|') + QString::number(cdpr);
+    const QString key = name + QLatin1Char('|') + color + QLatin1Char('|') + disabledColor;
     if (auto it = cache.constFind(key); it != cache.constEnd()) return *it;
     if (cache.size() > 2000) cache.clear();
     QIcon made = renderIcon(name, color, size, disabledColor);
@@ -164,24 +203,12 @@ QIcon ThemeManager::icon(const QString& name, const QString& color, int size, co
     return made;
 }
 
-QIcon ThemeManager::renderIcon(const QString& name, const QString& color, int size, const QString& disabledColor) {
+QIcon ThemeManager::renderIcon(const QString& name, const QString& color, int /*size*/, const QString& disabledColor) {
     QFile f(QStringLiteral(":/icons/ui/%1.svg").arg(name));
     if (!f.open(QIODevice::ReadOnly)) return {};
     const QByteArray src = f.readAll();
-    auto render = [&](const QString& col) {
-        QByteArray svg = src; svg.replace("currentColor", col.toUtf8());
-        QSvgRenderer r(svg);
-        const qreal dpr = qMax<qreal>(1.0, qGuiApp ? qGuiApp->devicePixelRatio() : 1.0);
-        const int px = qRound(size * qMax<qreal>(dpr, 2.0));
-        QPixmap pm(px, px); pm.fill(Qt::transparent);
-        QPainter p(&pm); p.setRenderHint(QPainter::Antialiasing); r.render(&p); p.end();
-        return pm;
-    };
-    QIcon ic;
-    ic.addPixmap(render(color), QIcon::Normal);
-    ic.addPixmap(render(color), QIcon::Active);
-    if (!disabledColor.isEmpty()) ic.addPixmap(render(disabledColor), QIcon::Disabled);
-    return ic;
+    auto tint = [&](const QString& col) { QByteArray svg = src; svg.replace("currentColor", col.toUtf8()); return svg; };
+    return QIcon(new TintedSvgEngine(tint(color), disabledColor.isEmpty() ? QByteArray() : tint(disabledColor)));
 }
 
 QString ThemeManager::mainWindowStyle() const {

@@ -157,7 +157,11 @@ public:
 protected:
     bool m_shadow = false;
     void paintEvent(QPaintEvent* e) override;
+    void showEvent(QShowEvent* e) override;   // sub-menus: sit beside the parent card, level with the item
 };
+// Sub-menu that looks like its parent (shadow card, same radius). A plain QMenu::addMenu() sub-menu
+// of a PopupMenu used to inherit the "transparent" style and was drawn solid black.
+QMenu* addSubMenu(QMenu* parent, const QString& title, const QIcon& icon = QIcon());
 // 16 px accent spinner arc (2 px stroke) for loading tabs.
 QIcon spinnerIcon(int angle, const QString& color);
 // Fade-in for every QMenu popup (installed once on qApp).

@@ -683,7 +683,7 @@ void BrowserWindow::showExtensionsMenu() {
             QString label = e.name;
             if (!e.enabled) label += QStringLiteral("  (off)");
             else if (!e.error.isEmpty()) label += QStringLiteral("  (error)");
-            QMenu* sub = m.addMenu(e.icon, label.replace(QLatin1Char('&'), QStringLiteral("&&")));
+            QMenu* sub = Pacitum::addSubMenu(&m, label.replace(QLatin1Char('&'), QStringLiteral("&&")), e.icon);
             sub->setToolTipsVisible(true);
             if (!e.description.isEmpty()) { auto* d = sub->addAction(e.description.left(90)); d->setEnabled(false); }
             if (!e.error.isEmpty()) { auto* er = sub->addAction(QStringLiteral("Error: ") + e.error.left(80)); er->setEnabled(false); }
@@ -726,7 +726,7 @@ void BrowserWindow::showExtensionsMenu() {
                              em->extensions().isEmpty() ? QStringLiteral("No user scripts") : QStringLiteral("User scripts and styles"));
     head->setEnabled(false);
     for (const PacitumExtension& e : em->extensions()) {
-        QMenu* sub = m.addMenu(QStringLiteral("%1  %2").arg(e.name, e.enabled ? QString() : QStringLiteral("(off)")).trimmed().replace(QLatin1Char('&'), QStringLiteral("&&")));
+        QMenu* sub = Pacitum::addSubMenu(&m, QStringLiteral("%1  %2").arg(e.name, e.enabled ? QString() : QStringLiteral("(off)")).trimmed().replace(QLatin1Char('&'), QStringLiteral("&&")));
         sub->setToolTipsVisible(true);
         auto* info = sub->addAction(QStringLiteral("Version %1 · runs on %2").arg(e.version, e.sites.join(QStringLiteral(", "))).left(90));
         info->setEnabled(false);
@@ -1598,8 +1598,9 @@ void BrowserWindow::showMenu() {
         return a;
     };
     auto sub = [&](const QString& text) {
-        auto* sm = m.addMenu(text);
+        auto* sm = Pacitum::addSubMenu(&m, text);
         sm->setObjectName(QStringLiteral("MainSubMenu"));
+        sm->setMinimumWidth(250 + 2 * m.shadowMargin());
         return sm;
     };
 
@@ -1706,7 +1707,7 @@ void BrowserWindow::showMenu() {
         add(mt, QStringLiteral("Reader mode"), QStringLiteral("Ctrl+Shift+R"), [this]{ toggleReaderMode(); });
         add(mt, QStringLiteral("Copy link"), QString(), [this]{ copyCurrentUrl(); });
         {
-            auto* tr = mt->addMenu(QStringLiteral("Translate page"));
+            auto* tr = Pacitum::addSubMenu(mt, QStringLiteral("Translate page"));
             const QString ui = QLocale::system().name().section(QLatin1Char('_'), 0, 0).toLower();
             struct Lang { const char* code; const char* name; };
             const Lang langs[] = {{"en", "English"}, {"th", "Thai"}, {"es", "Spanish"}, {"fr", "French"}, {"de", "German"}, {"pt", "Portuguese"},

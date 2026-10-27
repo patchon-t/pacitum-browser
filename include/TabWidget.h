@@ -10,6 +10,7 @@
 #include <functional>
 #include <QAbstractButton>
 #include <QVariantAnimation>
+#include <QElapsedTimer>
 
 class AnimatedToolButton;
 
@@ -69,6 +70,7 @@ protected:
     void mousePressEvent(QMouseEvent* e) override;
     void mouseDoubleClickEvent(QMouseEvent* e) override;
     void mouseMoveEvent(QMouseEvent* e) override;
+    void mouseReleaseEvent(QMouseEvent* e) override;
     void leaveEvent(QEvent* e) override;
     void tabInserted(int index) override;
     void tabRemoved(int index) override;
@@ -77,6 +79,13 @@ protected:
 
 private:
     void startSelectionSlide();
+    void cancelSlide();                       // snap the active shape to its tab
+    void markStructChange();                  // open / close / move: no glide for a moment
+    QElapsedTimer m_structTimer;
+    bool m_structSeen = false;
+    bool m_dragging = false;                  // a tab is being dragged
+    QPoint m_pressPos;
+    mutable bool m_selPainted = false;        // the active tab was painted in this paint event
     QVariantAnimation* m_slideAnim = nullptr;
     QRectF m_slideFrom;
     qreal m_slideT = 1.0;                     // 1 = no slide running
