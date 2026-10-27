@@ -213,10 +213,18 @@ QMenu QToolButton { background: transparent; border: none; border-radius: 15px; 
 QMenu QToolButton:hover { background: @surfaceHover; }
 QMenu QToolButton:pressed { background: @pressed; }
 QMenu QLabel { background: transparent; }
-#MenuProfile { background: transparent; border-radius: 8px; }
+#MenuProfile { background: transparent; border-radius: 12px; }
 #MenuProfile:hover { background: @surface; }
-#MenuProfileName { font-weight: 600; font-size: 13px; }
-#MenuProfileSub { color: @textSecondary; font-size: 12px; }
+#MenuProfileName { font-weight: 500; font-size: 14.5px; }
+#MenuProfileSub { color: @textSecondary; font-size: 12.5px; }
+#MenuProfileSwitch { color: @textSecondary; font-size: 12.5px; font-weight: 500; }
+#MainMenu { border: 1px solid @border; border-radius: 18px; padding: 8px; }
+#MainMenu::item, #MainSubMenu::item { height: 38px; padding: 0 12px; border-radius: 10px; font-size: 14px; }
+#MainMenu::separator { margin: 6px 8px; }
+#MainMenu QLabel { font-size: 14px; }
+#MenuZoomPct { font-weight: 500; }
+#MenuFootText { color: @textSecondary; font-size: 12.5px; }
+#MenuExit { font-size: 12.5px; font-weight: 500; min-height: 30px; padding: 0 12px; border-radius: 10px; }
 #MenuAvatar { border-radius: 18px; color: @onPrimary; font-weight: 600; font-size: 14px; background: @primary; }
 #MenuTiles { background: transparent; }
 #MenuTiles QToolButton { background: transparent; border: none; border-radius: 10px; padding: 6px 0 4px 0; font-size: 12px; color: @text; }
@@ -347,6 +355,8 @@ QTabBar::close-button:hover { background: %8; }
 QString ThemeManager::addressBarStyle() const {
     const auto& p = m_pal;
     QString s = QStringLiteral(R"(
+#OmniTabHint { background: @omnibox; color: @text; border: 1px solid @border; border-radius: 7px; padding: 2px 8px; font-size: 12px; font-weight: 600; }
+
 #Omnibox { background: @omnibox; border: 1px solid transparent; border-radius: 14px; }
 #Omnibox:hover { background: @omniboxHover; border: 1px solid transparent; }
 #Omnibox[focused="true"] { background: @toolbar; border: 2px solid @focusRing; }

@@ -62,36 +62,56 @@ enum { KindSearch = 0, KindHistory = 1, KindUrl = 2 };
 class OmniDelegate : public QStyledItemDelegate {
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
-    QColor text, sub, hover, selected; QIcon search, history, globe;
-    QSize sizeHint(const QStyleOptionViewItem& o, const QModelIndex&) const override { return {o.rect.width(), 36}; }
+    QColor text, sub, hover, selected, field, accent, onAccent; QIcon search, history, globe; QString engine;
+    // 2.0.1 (design "Omnibox typing hint"): 56 px rows, icon in a soft square, typed part in bold,
+    // the address or "Search <engine>" after it, the kind on the right and an "Enter" badge on the
+    // row Enter opens.
+    QSize sizeHint(const QStyleOptionViewItem& o, const QModelIndex&) const override { return {o.rect.width(), 56}; }
     void paint(QPainter* p, const QStyleOptionViewItem& o, const QModelIndex& i) const override {
         p->save();
         p->setRenderHint(QPainter::Antialiasing);
-        const QRectF r = QRectF(o.rect).adjusted(2, 1, -2, -1);
-        if (o.state & QStyle::State_Selected) { p->setPen(Qt::NoPen); p->setBrush(selected); p->drawRoundedRect(r, 10, 10); }
-        else if (o.state & QStyle::State_MouseOver) { p->setPen(Qt::NoPen); p->setBrush(hover); p->drawRoundedRect(r, 10, 10); }
+        const QRectF r = QRectF(o.rect).adjusted(4, 2, -4, -2);
+        const bool sel = o.state & QStyle::State_Selected;
+        if (sel) { p->setPen(Qt::NoPen); p->setBrush(selected); p->drawRoundedRect(r, 12, 12); }
+        else if (o.state & QStyle::State_MouseOver) { p->setPen(Qt::NoPen); p->setBrush(hover); p->drawRoundedRect(r, 12, 12); }
         const int kind = i.data(RoleKind).toInt();
+        const QRectF box(r.left() + 10, r.center().y() - 15, 30, 30);
+        p->setPen(Qt::NoPen); p->setBrush(field); p->drawRoundedRect(box, 9, 9);
         const QIcon& ic = kind == KindSearch ? search : kind == KindHistory ? history : globe;
-        ic.paint(p, QRect(int(r.left()) + 12, int(r.center().y()) - 8, 16, 16));
-        QRectF tr = r.adjusted(40, 0, -12, 0);
+        ic.paint(p, QRect(int(box.left()) + 7, int(box.top()) + 7, 16, 16));
+        // right side: kind label, Enter badge
+        QFont f = o.font; f.setPixelSize(14); QFont b = f; b.setWeight(QFont::DemiBold);
+        QFont small = o.font; small.setPixelSize(12);
+        qreal right = r.right() - 12;
+        if (sel) {
+            QFont bf = small; bf.setWeight(QFont::DemiBold);
+            const QFontMetricsF bm(bf);
+            const QRectF badge(right - bm.horizontalAdvance(QStringLiteral("Enter")) - 20, r.center().y() - 11, bm.horizontalAdvance(QStringLiteral("Enter")) + 20, 22);
+            p->setPen(Qt::NoPen); p->setBrush(accent); p->drawRoundedRect(badge, 7, 7);
+            p->setPen(onAccent); p->setFont(bf); p->drawText(badge, Qt::AlignCenter, QStringLiteral("Enter"));
+            right = badge.left() - 14;
+        }
+        const QString kindLabel = kind == KindSearch ? QStringLiteral("Search") : kind == KindHistory ? QStringLiteral("History") : QStringLiteral("Address");
+        p->setFont(small); p->setPen(sub);
+        const qreal kw = QFontMetricsF(small).horizontalAdvance(kindLabel);
+        p->drawText(QRectF(right - kw, r.top(), kw, r.height()), Qt::AlignVCenter | Qt::AlignRight, kindLabel);
+        right -= kw + 18;
+        QRectF tr(box.right() + 14, r.top(), qMax<qreal>(0, right - box.right() - 14), r.height());
         const QString main = i.data(Qt::DisplayRole).toString(), q = i.data(RoleQuery).toString();
-        QFont f = o.font; QFont b = f; b.setWeight(QFont::DemiBold);
-        p->setPen(text);
-        auto draw = [&](const QString& s, const QFont& font){
+        auto draw = [&](const QString& s, const QFont& font, const QColor& c){
             if (s.isEmpty() || tr.width() <= 0) return;
-            p->setFont(font);
+            p->setFont(font); p->setPen(c);
             const QFontMetricsF fm(font);
             const QString e = fm.elidedText(s, Qt::ElideRight, tr.width());
             p->drawText(tr, Qt::AlignVCenter | Qt::AlignLeft, e);
             tr.setLeft(tr.left() + fm.horizontalAdvance(e));
         };
-        if (kind == KindSearch && !q.isEmpty() && main.startsWith(q, Qt::CaseInsensitive)) {
-            draw(main.left(q.size()), f); draw(main.mid(q.size()), b);   // "google" + **search console**
-        } else draw(main, f);
-        const QString s2 = i.data(RoleSub).toString();
-        if (!s2.isEmpty() && tr.width() > 60) {
-            p->setPen(sub); draw(QStringLiteral("  —  "), f); draw(s2, f);
-        }
+        const int at = q.isEmpty() ? -1 : main.indexOf(q, 0, Qt::CaseInsensitive);
+        if (at >= 0) { draw(main.left(at), f, text); draw(main.mid(at, q.size()), b, text); draw(main.mid(at + q.size()), f, text); }
+        else draw(main, f, text);
+        QString s2 = i.data(RoleSub).toString();
+        if (kind == KindSearch && s2.isEmpty()) s2 = QStringLiteral("Search ") + engine;
+        if (!s2.isEmpty() && tr.width() > 60) { tr.setLeft(tr.left() + 12); draw(s2, small, sub); }
         p->restore();
     }
 };
@@ -174,6 +194,13 @@ AddressBar::AddressBar(HistoryManager* hm, QWidget* parent) : QFrame(parent), m_
     connect(m_star, &QToolButton::clicked, this, &AddressBar::starClicked);
     m_permRight = new QHBoxLayout(); m_permRight->setContentsMargins(0, 0, 0, 0); m_permRight->setSpacing(4);
     layout->addLayout(m_permRight);
+    // 2.0.1 (design): "Tab to accept" while the rest of an address is suggested in grey.
+    m_tabHint = new QLabel(QStringLiteral("Tab to accept"), this);
+    m_tabHint->setObjectName(QStringLiteral("OmniTabHint"));
+    m_tabHint->hide();
+    connect(m_input, &QLineEdit::selectionChanged, this, [this]{ m_tabHint->setVisible(m_input->hasFocus() && inlineHintActive()); });
+    connect(m_input, &QLineEdit::textChanged, this, [this]{ m_tabHint->setVisible(m_input->hasFocus() && inlineHintActive()); });
+    layout->addWidget(m_tabHint);
     layout->addWidget(m_star);
 
     m_completer = new QCompleter(this);
@@ -217,12 +244,14 @@ void AddressBar::applyTheme(ThemeManager* tm) {
     setStyleSheet(tm->addressBarStyle());
     const auto& p = tm->palette();
     m_completer->popup()->setStyleSheet(QStringLiteral(
-        "QAbstractItemView{background:%1;color:%2;border:1px solid %3;border-radius:14px;padding:0px;outline:0;}"
-        "QAbstractItemView::item{padding:0px;border-radius:10px;}"
-        "QAbstractItemView::item:hover{background:%4;color:%2;}"
-        "QAbstractItemView::item:selected{background:%5;color:%2;}").arg(p.toolbar, p.text, p.borderStrong, p.surface, p.accentSoft));
-    m_delegate->text = QColor(p.text); m_delegate->sub = QColor(p.textTertiary.isEmpty() ? p.textSecondary : p.textTertiary);
-    m_delegate->hover = cssColor(p.surface); m_delegate->selected = cssColor(p.accentSoft);
+        "QAbstractItemView{background:%1;color:%2;border:1px solid %3;border-radius:18px;padding:6px;outline:0;}"
+        "QAbstractItemView::item{padding:0px;border-radius:12px;}"
+        "QAbstractItemView::item:hover{background:transparent;color:%2;}"
+        "QAbstractItemView::item:selected{background:transparent;color:%2;}").arg(p.toolbar, p.text, p.border));
+    m_delegate->text = QColor(p.text); m_delegate->sub = QColor(p.textSecondary);
+    m_delegate->hover = cssColor(p.surface); m_delegate->selected = cssColor(p.surface);
+    m_delegate->field = QColor(p.omnibox); m_delegate->accent = QColor(p.accent); m_delegate->onAccent = QColor(p.onAccent);
+    m_delegate->engine = m_engine;
     m_delegate->search = ThemeManager::icon(QStringLiteral("search"), p.textSecondary, 16);
     m_delegate->history = ThemeManager::icon(QStringLiteral("history"), p.textSecondary, 16);
     m_delegate->globe = ThemeManager::icon(QStringLiteral("globe"), p.textSecondary, 16);
@@ -230,6 +259,8 @@ void AddressBar::applyTheme(ThemeManager* tm) {
     updateStar();
     if (!m_input->hasFocus()) showBlurred();
 }
+
+void AddressBar::setSearchEngine(const QString& name) { m_engine = name; if (m_delegate) m_delegate->engine = name; }
 
 void AddressBar::setUrl(const QString& url) {
     m_currentUrl = url;

@@ -269,6 +269,8 @@ private:
     void attachInternalChannel(class BrowserTab* tab, const QString& url);
     int importBookmarksFile(const QString& path, int* found = nullptr);   // -1: unreadable
     void restartBrowser();
+    void printPage();
+    void savePageAs();
     void openWelcome();
     void endWelcome();
     void writeSetting(const QString& key, const QJsonValue& value);
@@ -295,4 +297,6 @@ private:
 
     struct ClosedTab { QString url; QString title; };
     QVector<ClosedTab> m_recentlyClosed;
+    QVector<ClosedTab> m_lastSession;     // 2.0.1 new tab › "Where you left off" (tabs from last time)
+    qint64 m_lastSessionAt = 0;
 };

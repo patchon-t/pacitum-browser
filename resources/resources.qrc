@@ -14,6 +14,7 @@
         <file>icons/ui/accessibility.svg</file>
         <file>icons/ui/ad-blocked.svg</file>
         <file>icons/ui/add.svg</file>
+        <file>icons/ui/minus.svg</file>
         <file>icons/ui/address.svg</file>
         <file>icons/ui/ai-assistant.svg</file>
         <file>icons/ui/annotate.svg</file>
@@ -272,6 +273,7 @@
         <file>brand/wordmark.svg</file>
         <file>brand/next_project_themed.svg</file>
         <file>brand/wordmark_stacked.svg</file>
+        <file>brand/wordmark_paths.svgfrag</file>
         <file>icons/pacitum-icon-16.png</file>
         <file>icons/pacitum-icon-32.png</file>
         <file>icons/pacitum-icon-48.png</file>

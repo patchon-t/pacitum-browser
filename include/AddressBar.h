@@ -40,7 +40,7 @@ public:
     void setSuggestionsEnabled(bool e) { m_suggest = e; }
     void setInlineHints(bool on) { m_inlineHints = on; }   // 2.0.1 Settings › Typing hints
     // 1.8.10: keyword suggestions from the search engine ("Google", "Bing", "DuckDuckGo", "Yahoo", "Brave")
-    void setSearchEngine(const QString& name) { m_engine = name; }
+    void setSearchEngine(const QString& name);
     void setOnlineSuggestions(bool on) { m_online = on; }
     // 1.7.5 permission chips (permissions-spec §1/§4/§5/§6/§9)
     void setPermissionChips(const QList<OmniChip>& chips);
@@ -98,6 +98,7 @@ private:
     void rebuildPopup();                   // history rows + engine rows -> model, show/hide popup
     QStandardItemModel* m_model = nullptr; // reused for every refresh
     OmniDelegate* m_delegate = nullptr;
+    class QLabel* m_tabHint = nullptr;
     QString m_query;                       // what the popup was built for
     QString m_hintUrl;                     // typed text + inline hint (first row, what Enter opens)
     QStringList m_engineRows;              // keyword suggestions for m_query

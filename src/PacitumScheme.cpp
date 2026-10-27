@@ -79,6 +79,10 @@ void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
         const auto& vars = m_ntpVars.isEmpty() ? m_vars : m_ntpVars;
         for (auto it = vars.cbegin(); it != vars.cend(); ++it) html.replace(QLatin1Char('%') + it.key() + QLatin1Char('%'), it.value());
         html.replace(QStringLiteral("%SEARCH%"), m_search);
+        {   // 2.0.1 new tab page: the PACITUM wordmark (dark letters follow the text colour)
+            QFile wm(QStringLiteral(":/brand/wordmark_paths.svgfrag"));
+            html.replace(QStringLiteral("%WORDMARK%"), wm.open(QIODevice::ReadOnly) ? QString::fromUtf8(wm.readAll()) : QString());
+        }
         html.replace(QStringLiteral("%DATA%"), data);   // last: user data is never re-scanned for tokens
         QFile logo(QStringLiteral(":/pages/logo.png"));
         if (logo.open(QIODevice::ReadOnly))
