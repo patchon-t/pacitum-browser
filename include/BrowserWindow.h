@@ -108,7 +108,6 @@ private slots:
     void togglePictureInPicture();
     void showTabOverview();
     void captureActiveThumb(bool force = false);
-    bool m_thumbsWanted = false;   // the tab overview has been used: keep its cards fresh
     void showNotice(const QString& text);
     void setupSync();
     void duplicateTab(int index);
@@ -289,6 +288,7 @@ private:
     QWidget* m_contentRow = nullptr;
     QHash<QObject*, QPixmap> m_thumbs;   // last snapshot per tab (3D tab overview), ~640 px wide
     QTimer m_thumbTimer;
+    bool m_thumbsWanted = false;   // the tab overview has been used: keep its cards fresh
     PacitumTabWidget* m_tabs = nullptr;
     PacitumTabWidget* m_splitTabs = nullptr;
     PacitumTabWidget* m_activeWidget = nullptr;
