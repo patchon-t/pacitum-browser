@@ -168,6 +168,10 @@ if(TARGET Qt6::Bluetooth)
 endif()
 if(WIN32)
     target_link_libraries(PacitumBrowser PRIVATE user32 dwmapi shell32 psapi setupapi ole32 crypt32 credui advapi32 windowsapp)
+    if(MSVC)
+        # Windows Hello (C++/WinRT) needs C++20 coroutines; C++17 pulls in the removed <experimental/coroutine>.
+        set_source_files_properties(src/Passwords.cpp PROPERTIES COMPILE_OPTIONS "/std:c++20")
+    endif()
 endif()
 
 # 1.8.9: Windows install helper. Runs from a copy in the temp folder (Qt Core/Gui/Widgets only), shows
