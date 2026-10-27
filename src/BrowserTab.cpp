@@ -66,7 +66,12 @@ class PacitumPage : public QWebEnginePage {
 public:
     using QWebEnginePage::QWebEnginePage;
     QPointer<PermissionController> perms;
+    QPointer<PasswordAgent> forms;   // 2.0.1 passwords / autofill helper
 protected:
+    void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level, const QString& message, int line, const QString& source) override {
+        if (forms && forms->handleConsole(message)) return;
+        QWebEnginePage::javaScriptConsoleMessage(level, message, line, source);
+    }
     QWebEnginePage* createWindow(WebWindowType type) override {
         if (perms && !perms->allowPopup(type)) return new PopupSink(profile(), perms);
         if (!BrowserTab::s_popupFactory) return nullptr;
@@ -97,6 +102,7 @@ protected:
 #include <QPushButton>
 #include <QToolButton>
 #include "ThemeManager.h"
+#include "Passwords.h"
 #include "Widgets.h"
 #include "Motion.h"
 
@@ -133,6 +139,12 @@ BrowserTab::BrowserTab(const QString& url, bool privateMode, const QString& sear
     m_perms = new PermissionController(this, m_view, m_page);
     static_cast<PacitumPage*>(m_page)->perms = m_perms;
     m_page->setUrlRequestInterceptor(new Pacitum::GoogleSignInInterceptor(m_page));
+    {   // 2.0.1: saved passwords, addresses and cards
+        auto* agent = new PasswordAgent(m_page, m_private, this);
+        static_cast<PacitumPage*>(m_page)->forms = agent;
+        connect(agent, &PasswordAgent::offerSave, this, &BrowserTab::passwordOffer);
+        connect(agent, &PasswordAgent::offerSaveAddress, this, &BrowserTab::addressOffer);
+    }
 
     applyWebSettings();
 

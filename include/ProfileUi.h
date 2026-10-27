@@ -11,8 +11,13 @@ class QCheckBox;
 class QHBoxLayout;
 class QVBoxLayout;
 class QAbstractButton;
+class QKeyEvent;
+class QMouseEvent;
+class QPaintEvent;
 
-// home-profile-spec §2.1: "Who's browsing?" picker window (startup and "Manage profiles").
+// 2.0.1 profile picker (design: "Profile picker"): ink panel with the wordmark on the left,
+// a list of profiles on the right, "Show at startup" and "Open as <name>" at the bottom.
+// Used at startup and for "Manage profiles".
 class ProfilePicker : public QWidget {
     Q_OBJECT
 public:
@@ -24,13 +29,21 @@ signals:
     void chosen(const QString& id);   // id or "guest"
 protected:
     void closeEvent(QCloseEvent* e) override;
+    void keyPressEvent(QKeyEvent* e) override;
+    void mousePressEvent(QMouseEvent* e) override;
+    void mouseMoveEvent(QMouseEvent* e) override;
+    void paintEvent(QPaintEvent* e) override;
 private:
     void rebuild();
-    QWidget* card(const ProfileInfo& p, bool add);
+    void select(const QString& id);
+    void openSelected();
     Mode m_mode;
-    QHBoxLayout* m_cards = nullptr;
-    QCheckBox* m_startup = nullptr;
+    QVBoxLayout* m_list = nullptr;
+    QAbstractButton* m_open = nullptr;
+    QAbstractButton* m_manage = nullptr;
+    QString m_selected;
     bool m_editAll = false;
+    QPoint m_dragFrom;
 };
 
 // §2.3 add / edit profile (live preview on the left).

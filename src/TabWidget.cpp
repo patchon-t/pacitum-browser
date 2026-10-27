@@ -38,7 +38,9 @@ QColor mixc(const QColor& a, const QColor& b, qreal t) {
 constexpr int kMinStripTabs = 60;
 // 1.9 refresh: tabs hang from the bottom of the 42 px strip. The active tab is 34 px tall, runs into
 // the toolbar below (same colour) and has small outward "feet" so the two read as one surface.
-constexpr int kGap = 4, kTabH = 40, kTop = 10, kIconY = 12, kMaxW = 236, kMinW = 56, kPinW = 40, kPinSep = 9;
+constexpr int kGap = 4, kTabH = 40, kTop = 10, kIconY = 12, kMinW = 56, kPinW = 40, kPinSep = 9;
+int s_tabMaxW = 236;   // 2.0.1 Settings › Tab size: Comfortable 236, Compact 176
+#define kMaxW s_tabMaxW
 constexpr qreal kTabRadius = 14.0, kFoot = 6;
 
 // Active tab outline: rounded top corners, square bottom with concave feet (body rect in bar coords).
@@ -876,3 +878,5 @@ void PacitumTabWidget::closeOtherTabs(int index) {
 void PacitumTabWidget::closeTabsToRight(int index) {
     for (int i=count()-1;i>index;--i) emit tabCloseRequested(i);
 }
+
+void PacitumTabBar::setCompact(bool on) { s_tabMaxW = on ? 176 : 236; }

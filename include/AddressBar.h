@@ -38,6 +38,7 @@ public:
     void progressFinished(bool ok);
     void syncProgress(bool loading, int value);   // tab switch: jump to that tab's state
     void setSuggestionsEnabled(bool e) { m_suggest = e; }
+    void setInlineHints(bool on) { m_inlineHints = on; }   // 2.0.1 Settings › Typing hints
     // 1.8.10: keyword suggestions from the search engine ("Google", "Bing", "DuckDuckGo", "Yahoo", "Brave")
     void setSearchEngine(const QString& name) { m_engine = name; }
     void setOnlineSuggestions(bool on) { m_online = on; }
@@ -107,6 +108,7 @@ private:
     bool m_online = true;
     bool m_navigating = false;             // moving through the list with the arrow keys
     bool m_editing = false;                // focused for typing (survives the list / window switches)
-    bool m_noInline = false;               // true after Backspace/Delete: don't re-add a hint
+    bool m_noInline = false;
+    bool m_inlineHints = true;               // true after Backspace/Delete: don't re-add a hint
     bool m_composing = false;              // IME preedit active: never rewrite the text
 };

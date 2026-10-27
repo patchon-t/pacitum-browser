@@ -35,6 +35,60 @@ static PacitumPalette lightPalette() {
     return p;
 }
 
+// 2.0.1 themes from the design's Themes artboard. Each row: strip, toolbar, page, card, text,
+// muted, field, border, accent, onAccent.
+namespace {
+struct ThemeDef { const char* id; const char* name; bool dark; const char *strip, *toolbar, *bg, *card, *text, *muted, *field, *border, *accent, *onAccent; };
+const ThemeDef kThemes[] = {
+    {"light", "Pacitum Light", false, "#E8E2DE", "#FFFFFF", "#F7F4F1", "#FFFFFF", "#151112", "#6E6561", "#F1ECE8", "#E2DBD6", "#D9141F", "#FFFFFF"},
+    {"dark", "Pacitum Dark", true, "#0E0B0C", "#1B1617", "#141011", "#1B1617", "#F6F1EF", "#A89E9B", "#262021", "#322B2C", "#FF3B47", "#141011"},
+    {"midnight", "Midnight", true, "#0B1230", "#16204A", "#0A1028", "#141D44", "#EEF2FF", "#A5B0D6", "#22305F", "#22305F", "#5A9BFF", "#0A1028"},
+    {"forest", "Forest", false, "#1E3A2C", "#F3F7F4", "#E8EFE9", "#FFFFFF", "#0F1F17", "#56695E", "#E1E9E3", "#D6E0D9", "#1F8F5F", "#FFFFFF"},
+    {"sakura", "Sakura", false, "#F3D3DA", "#FFF8F9", "#FCEFF2", "#FFFFFF", "#2A1418", "#85565F", "#F7E3E8", "#F0D9DF", "#D6336C", "#FFFFFF"},
+    {"sand", "Sand", false, "#E6D8C1", "#FBF7F0", "#F3ECDF", "#FFFDF9", "#2B2117", "#76664F", "#EEE4D3", "#E6DAC6", "#C2410C", "#FFFFFF"},
+    {"graphite", "Graphite", true, "#1F2026", "#2E2F36", "#24252B", "#2E2F36", "#F2F2F4", "#A8A9B3", "#3B3C44", "#3B3C44", "#FF7A45", "#1F2026"},
+    {"contrast", "High contrast", true, "#000000", "#000000", "#000000", "#000000", "#FFFFFF", "#FFFFFF", "#1A1A1A", "#FFFFFF", "#FFD400", "#000000"},
+};
+QString mixHex(const QString& a, const QString& b, qreal t) {
+    const QColor x(a), y(b);
+    return QColor::fromRgbF(x.redF() + (y.redF() - x.redF()) * t, x.greenF() + (y.greenF() - x.greenF()) * t, x.blueF() + (y.blueF() - x.blueF()) * t).name().toUpper();
+}
+// Custom theme: strings live here so the ThemeDef can point at them.
+struct CustomStore { bool set = false; QByteArray name, strip, toolbar, bg, card, text, muted, field, border, accent, onAccent; ThemeDef def{}; };
+CustomStore& custom() { static CustomStore c; return c; }
+const ThemeDef* findTheme(const QString& id) {
+    for (const auto& t : kThemes) if (id == QLatin1String(t.id)) return &t;
+    if (id == QLatin1String("custom") && custom().set) return &custom().def;
+    return nullptr;
+}
+}
+
+void ThemeManager::setCustomTheme(const QString& name, const QString& strip, const QString& toolbar, const QString& bg, const QString& accent, bool dark) {
+    auto& c = custom();
+    auto ok = [](const QString& h, const char* fb) { return QColor(h).isValid() ? QColor(h).name().toUpper().toLatin1() : QByteArray(fb); };
+    c.name = (name.trimmed().isEmpty() ? QStringLiteral("My theme") : name.trimmed().left(40)).toUtf8();
+    c.strip = ok(strip, "#E8E2DE"); c.toolbar = ok(toolbar, "#FFFFFF"); c.bg = ok(bg, "#F7F4F1"); c.accent = ok(accent, "#D9141F");
+    c.card = c.toolbar;
+    c.text = dark ? QByteArray("#F6F1EF") : QByteArray("#151112");
+    c.muted = mixHex(QString::fromLatin1(c.text), QString::fromLatin1(c.bg), 0.42).toLatin1();
+    c.field = mixHex(QString::fromLatin1(c.bg), QString::fromLatin1(c.text), 0.05).toLatin1();
+    c.border = mixHex(QString::fromLatin1(c.bg), QString::fromLatin1(c.text), 0.11).toLatin1();
+    c.onAccent = QColor(QString::fromLatin1(c.accent)).lightness() > 150 ? QByteArray("#151112") : QByteArray("#FFFFFF");
+    c.def = ThemeDef{"custom", c.name.constData(), dark, c.strip.constData(), c.toolbar.constData(), c.bg.constData(), c.card.constData(), c.text.constData(),
+                     c.muted.constData(), c.field.constData(), c.border.constData(), c.accent.constData(), c.onAccent.constData()};
+    c.set = true;
+}
+
+QStringList ThemeManager::themeIds() { QStringList l; for (const auto& t : kThemes) l << QString::fromLatin1(t.id); if (custom().set) l << QStringLiteral("custom"); return l; }
+bool ThemeManager::themeIsDark(const QString& id) { const auto* t = findTheme(id); return t && t->dark; }
+QString ThemeManager::themeName(const QString& id) { const auto* t = findTheme(id); return t ? QString::fromUtf8(t->name) : QString(); }
+QString ThemeManager::themeAccent(const QString& id) { const auto* t = findTheme(id); return t ? QString::fromLatin1(t->accent) : QStringLiteral("#D9141F"); }
+void ThemeManager::setThemeId(const QString& id) {
+    m_themeId = findTheme(id) ? id : QString();
+    if (const auto* t = findTheme(m_themeId)) m_darkMode = t->dark;
+    rebuild();
+}
+
 namespace Pacitum {
 static int s_reduceOverride = -1;
 void setReducedMotion(bool on) { s_reduceOverride = on ? 1 : 0; }
@@ -56,13 +110,33 @@ int motionMs(int ms) { return reducedMotion() ? 0 : ms; }
 
 static PacitumPalette s_current = darkPalette();
 const PacitumPalette& ThemeManager::current() { return s_current; }
+void ThemeManager::restoreCurrent(const PacitumPalette& p) { s_current = p; }
 
 ThemeManager::ThemeManager(bool darkMode) : m_darkMode(darkMode) { rebuild(); }
 
 void ThemeManager::setDarkMode(bool enabled) { m_darkMode = enabled; rebuild(); }
 
 void ThemeManager::rebuild() {
-    m_pal = m_darkMode ? darkPalette() : lightPalette();
+    const ThemeDef* t = m_private ? nullptr : findTheme(m_themeId);
+    const bool dark = m_private ? true : t ? t->dark : m_darkMode;   // design: private windows are always Pacitum Dark
+    m_darkMode = dark;
+    m_pal = dark ? darkPalette() : lightPalette();
+    if (t && QLatin1String(t->id) != QLatin1String("light") && QLatin1String(t->id) != QLatin1String("dark")) {
+        const QString text = QString::fromLatin1(t->text), muted = QString::fromLatin1(t->muted), bg = QString::fromLatin1(t->bg);
+        m_pal.frame = QString::fromLatin1(t->strip); m_pal.tab = QString::fromLatin1(t->toolbar); m_pal.toolbar = QString::fromLatin1(t->toolbar);
+        m_pal.page = bg; m_pal.text = text; m_pal.textSecondary = muted;
+        m_pal.surface = QString::fromLatin1(t->field); m_pal.tabHover = m_pal.surface;
+        m_pal.surfaceHover = QString::fromLatin1(t->border); m_pal.pressed = m_pal.surfaceHover; m_pal.border = QString::fromLatin1(t->border);
+        m_pal.borderStrong = mixHex(m_pal.border, text, 0.18);
+        m_pal.textTertiary = mixHex(muted, bg, 0.3); m_pal.disabled = mixHex(muted, bg, 0.5);
+        m_pal.omnibox = QString::fromLatin1(t->field); m_pal.omniboxHover = mixHex(m_pal.omnibox, text, 0.05);
+        m_pal.accent = QString::fromLatin1(t->accent); m_pal.onAccent = QString::fromLatin1(t->onAccent);
+        const QColor ac(m_pal.accent);
+        m_pal.accentSoft = QStringLiteral("rgba(%1,%2,%3,%4)").arg(ac.red()).arg(ac.green()).arg(ac.blue()).arg(dark ? 0.16 : 0.10);
+        m_pal.accentHover = (dark ? ac.lighter(115) : ac.darker(115)).name(); m_pal.accentPressed = (dark ? ac.darker(110) : ac.darker(135)).name();
+        m_pal.focusRing = text; m_pal.primary = text; m_pal.onPrimary = bg;
+        if (QLatin1String(t->id) == QLatin1String("contrast")) { m_pal.focusRing = m_pal.accent; m_pal.textTertiary = text; m_pal.disabled = QStringLiteral("#9A9A9A"); }
+    }
     if (!m_accentOverride.isEmpty()) {
         QColor c(m_accentOverride);
         if (c.isValid()) {
@@ -73,7 +147,7 @@ void ThemeManager::rebuild() {
             m_pal.onAccent = c.lightness() > 140 ? QStringLiteral("#151112") : QStringLiteral("#FFFFFF");
         }
     }
-    if (m_private) m_pal.frame = m_darkMode ? QStringLiteral("#16121C") : QStringLiteral("#E6E1EC");
+    if (m_private) m_pal.frame = QStringLiteral("#16121C");
     s_current = m_pal;
 }
 

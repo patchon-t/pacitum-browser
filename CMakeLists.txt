@@ -45,7 +45,8 @@ set(SOURCES
     src/AdBlocker.cpp
     src/SessionManager.cpp
     src/ZoomController.cpp
-    src/SettingsPage.cpp
+    src/Passwords.cpp
+    src/SettingsBridge.cpp
     src/WebProfile.cpp
     src/ProfileManager.cpp
     src/ProfileUi.cpp
@@ -90,7 +91,8 @@ set(HEADERS
     include/AdBlocker.h
     include/SessionManager.h
     include/ZoomController.h
-    include/SettingsPage.h
+    include/Passwords.h
+    include/SettingsBridge.h
     include/WebProfile.h
     include/ProfileManager.h
     include/ProfileUi.h
@@ -163,7 +165,7 @@ if(TARGET Qt6::Bluetooth)
     target_compile_definitions(PacitumBrowser PRIVATE PACITUM_HAVE_BLUETOOTH)
 endif()
 if(WIN32)
-    target_link_libraries(PacitumBrowser PRIVATE user32 dwmapi shell32 psapi setupapi ole32)
+    target_link_libraries(PacitumBrowser PRIVATE user32 dwmapi shell32 psapi setupapi ole32 crypt32 credui advapi32 windowsapp)
 endif()
 
 # 1.8.9: Windows install helper. Runs from a copy in the temp folder (Qt Core/Gui/Widgets only), shows

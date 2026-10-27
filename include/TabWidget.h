@@ -32,6 +32,7 @@ protected:
 class PacitumTabBar : public QTabBar {
     Q_OBJECT
 public:
+    static void setCompact(bool on);   // 2.0.1 Settings › Tab size
     void setSpinnerSuspended(bool on);   // pause the loading-spinner animation while the window is minimized/hidden
     // Pacitum 1.5 floating-tab look (custom painted; used for the window's tab strip).
     void enableFloatingTabs();

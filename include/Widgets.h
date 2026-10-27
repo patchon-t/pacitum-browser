@@ -71,7 +71,7 @@ class ToggleSwitch : public QAbstractButton {
     Q_OBJECT
 public:
     explicit ToggleSwitch(QWidget* parent = nullptr);
-    QSize sizeHint() const override { return {40, 22}; }
+    QSize sizeHint() const override { return {40, 24}; }
 protected:
     void paintEvent(QPaintEvent* e) override;
     void checkStateSet() override;

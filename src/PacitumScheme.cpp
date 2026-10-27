@@ -8,6 +8,7 @@
 #include <QUrlQuery>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QRegularExpression>
 
 void PacitumSchemeHandler::registerScheme() {
     QWebEngineUrlScheme s("pacitum");
@@ -75,7 +76,8 @@ void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
         html.replace(QStringLiteral("%ICONS%"), QString::fromUtf8(QJsonDocument(js).toJson(QJsonDocument::Compact)).replace(QStringLiteral("</"), QStringLiteral("<\\/")));
         QString data = m_homeData ? m_homeData() : QStringLiteral("{}");
         data.replace(QStringLiteral("</"), QStringLiteral("<\\/"));
-        for (auto it = m_vars.cbegin(); it != m_vars.cend(); ++it) html.replace(QLatin1Char('%') + it.key() + QLatin1Char('%'), it.value());
+        const auto& vars = m_ntpVars.isEmpty() ? m_vars : m_ntpVars;
+        for (auto it = vars.cbegin(); it != vars.cend(); ++it) html.replace(QLatin1Char('%') + it.key() + QLatin1Char('%'), it.value());
         html.replace(QStringLiteral("%SEARCH%"), m_search);
         html.replace(QStringLiteral("%DATA%"), data);   // last: user data is never re-scanned for tokens
         QFile logo(QStringLiteral(":/pages/logo.png"));
@@ -101,6 +103,21 @@ void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
         QFile logo(QStringLiteral(":/pages/logo.png"));
         if (logo.open(QIODevice::ReadOnly))
             html.replace(QStringLiteral("qrc:/pages/logo.png"), QStringLiteral("data:image/png;base64,") + QString::fromLatin1(logo.readAll().toBase64()));
+        body = html.toUtf8();
+    } else if (host == QStringLiteral("settings")) {
+        // 2.0.1 Settings (design: "Settings · all sections"). Talks to SettingsBridge over QWebChannel.
+        QFile f(QStringLiteral(":/pages/settings.html"));
+        if (!f.open(QIODevice::ReadOnly)) { job->fail(QWebEngineUrlRequestJob::UrlNotFound); return; }
+        QString html = QString::fromUtf8(f.readAll());
+        for (auto it = m_vars.cbegin(); it != m_vars.cend(); ++it) html.replace(QLatin1Char('%') + it.key() + QLatin1Char('%'), it.value());
+        QFile wc(QStringLiteral(":/qtwebchannel/qwebchannel.js"));
+        html.replace(QStringLiteral("%QWEBCHANNEL%"), wc.open(QIODevice::ReadOnly) ? QString::fromUtf8(wc.readAll()) : QString());
+        QFile np(QStringLiteral(":/brand/next_project_themed.svg"));
+        QString mark = np.open(QIODevice::ReadOnly) ? QString::fromUtf8(np.readAll()) : QString();
+        mark.replace(QRegularExpression(QStringLiteral("<\\?xml[^>]*>")), QString());
+        mark.replace(QRegularExpression(QStringLiteral("<svg width=\"[0-9.]+\" height=\"[0-9.]+\"")), QStringLiteral("<svg"));
+        mark.replace(QStringLiteral("<svg "), QStringLiteral("<svg class=\"mark\" style=\"height:16px;width:auto\" role=\"img\" aria-label=\"NEXT PROJECT\" "));
+        html.replace(QStringLiteral("%NEXT_MARK%"), mark);
         body = html.toUtf8();
     } else {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);

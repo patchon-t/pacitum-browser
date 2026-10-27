@@ -87,7 +87,7 @@ private slots:
     void goHome();
     void toggleBookmark();
     void showDownloads();
-    void showSettings();
+    void showSettings(const QString& section = QString());
     void showMenu();
     void toggleDarkMode();
     void toggleBookmarksBar();
@@ -260,6 +260,15 @@ private:
     // First-run welcome flow (firstrun-spec.md)
     FirstRunBridge* m_firstRun = nullptr;
     QWebChannel* m_firstRunChannel = nullptr;
+    // 2.0.1 Settings page (pacitum://settings)
+    class SettingsBridge* m_settingsBridge = nullptr;
+    FirstRunBridge* m_importer = nullptr;   // Settings › Import
+    bool m_backgroundClose = false;         // downloads finished after the window was closed
+    QWebChannel* m_settingsChannel = nullptr;
+    void setupSettingsBridge();
+    void attachInternalChannel(class BrowserTab* tab, const QString& url);
+    int importBookmarksFile(const QString& path, int* found = nullptr);   // -1: unreadable
+    void restartBrowser();
     void openWelcome();
     void endWelcome();
     void writeSetting(const QString& key, const QJsonValue& value);

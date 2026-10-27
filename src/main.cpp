@@ -233,6 +233,7 @@ int main(int argc, char *argv[]) {
     }
     installLogging();
     bool smoke = false;
+    bool restarted = false;
     bool stress = false;
     bool resizeTest = false;
     bool perf = false, handoffTest = false;
@@ -248,6 +249,7 @@ int main(int argc, char *argv[]) {
         if (qstrcmp(argv[i], "--permissions-test") == 0) permTest = true;
         if (qstrcmp(argv[i], "--extensions-test") == 0) extTest = true;
         if (qstrcmp(argv[i], "--guest") == 0) guest = true;
+        if (qstrcmp(argv[i], "--restarted") == 0) restarted = true;
         if (qstrcmp(argv[i], "--profile-picker") == 0) forcePicker = true;
         if (qstrncmp(argv[i], "--profile-directory=", 20) == 0) profileArg = QString::fromLocal8Bit(argv[i] + 20);
         if (qstrncmp(argv[i], "--profile=", 10) == 0) profileArg = QString::fromLocal8Bit(argv[i] + 10);
@@ -319,15 +321,21 @@ int main(int argc, char *argv[]) {
         if (guest) pm->activateGuest();
         else {
             QString id = profileArg.isEmpty() || !pm->contains(profileArg) ? pm->lastUsed() : profileArg;
-            // Already open in another process: hand the URLs over (it opens a window) and exit.
-            if (pm->handOff(id, urlArgs)) { openLog("handoff.log"); pacitumLog(QStringLiteral("profile %1 already running; handed off").arg(id)); return 0; }
-            if (!pm->activate(id)) {
-                QThread::msleep(800);
-                if (pm->handOff(id, urlArgs)) { openLog("handoff.log"); return 0; }
-                openLog("handoff.log");   // never truncate the running instance's startup.log
-                pacitumLog(QStringLiteral("profile %1 is locked by another process").arg(id));
-                QMessageBox::warning(nullptr, QStringLiteral("Pacitum Browser"), QStringLiteral("This profile is already open in another Pacitum window."));
-                return 6;
+            if (restarted) {   // 2.0.1 Settings › Restart: wait (up to 10 s) for the old process to let go of the profile
+                bool ok = false;
+                for (int i = 0; i < 50 && !(ok = pm->activate(id)); ++i) QThread::msleep(200);
+                if (!ok) { openLog("handoff.log"); pacitumLog(QStringLiteral("restart: profile %1 still locked").arg(id)); return 6; }
+            } else {
+                // Already open in another process: hand the URLs over (it opens a window) and exit.
+                if (pm->handOff(id, urlArgs)) { openLog("handoff.log"); pacitumLog(QStringLiteral("profile %1 already running; handed off").arg(id)); return 0; }
+                if (!pm->activate(id)) {
+                    QThread::msleep(800);
+                    if (pm->handOff(id, urlArgs)) { openLog("handoff.log"); return 0; }
+                    openLog("handoff.log");   // never truncate the running instance's startup.log
+                    pacitumLog(QStringLiteral("profile %1 is locked by another process").arg(id));
+                    QMessageBox::warning(nullptr, QStringLiteral("Pacitum Browser"), QStringLiteral("This profile is already open in another Pacitum window."));
+                    return 6;
+                }
             }
         }
     }
@@ -336,6 +344,15 @@ int main(int argc, char *argv[]) {
         const auto o = AppSettings::read();
         Pacitum::webPrefs().javascript = o.value(QStringLiteral("javascript_enabled")).toBool(true);
         Pacitum::webPrefs().popups = o.value(QStringLiteral("popups_allowed")).toBool(false);
+        // 2.0.1 Settings › System › Use graphics acceleration (read before Chromium starts)
+        if (o.value(QStringLiteral("caret_browsing")).toBool(false)) {   // Accessibility › text cursor (F7)
+            QByteArray f = qgetenv("QTWEBENGINE_CHROMIUM_FLAGS");
+            if (!f.contains("--enable-caret-browsing")) qputenv("QTWEBENGINE_CHROMIUM_FLAGS", (f + " --enable-caret-browsing").trimmed());
+        }
+        if (!o.value(QStringLiteral("gpu_acceleration")).toBool(true)) {
+            QByteArray f = qgetenv("QTWEBENGINE_CHROMIUM_FLAGS");
+            if (!f.contains("--disable-gpu")) qputenv("QTWEBENGINE_CHROMIUM_FLAGS", (f + " --disable-gpu --disable-gpu-compositing").trimmed());
+        }
     }
 
     // Persistent profile storage (mirrors main.py:82)

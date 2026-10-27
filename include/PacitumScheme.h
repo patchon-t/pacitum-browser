@@ -16,6 +16,7 @@ public:
     static QString newTabUrl() { return QStringLiteral("pacitum://newtab"); }
 
     void setThemeVars(const QMap<QString, QString>& vars) { m_vars = vars; }
+    void setNewTabVars(const QMap<QString, QString>& vars) { m_ntpVars = vars; }   // empty = same as the rest
     void setSearchBase(const QString& s) { m_search = s; }
     void requestStarted(QWebEngineUrlRequestJob* job) override;
     // 1.6 home page: per-request JSON (profile name, recent pages, downloads, engine, theme) and
@@ -26,7 +27,7 @@ signals:
 
 private:
     using QWebEngineUrlSchemeHandler::QWebEngineUrlSchemeHandler;
-    QMap<QString, QString> m_vars;
+    QMap<QString, QString> m_vars, m_ntpVars;
     std::function<QString()> m_homeData;
     QString m_search = QStringLiteral("https://www.google.com/search?q=");
 };

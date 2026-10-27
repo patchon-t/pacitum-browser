@@ -192,7 +192,8 @@ void FirstRunBridge::startImport(const QString& source, const QStringList& types
 
 void FirstRunBridge::waitForImport() { if (m_future.isValid() && !m_future.isFinished()) m_future.waitForFinished(); }
 
-bool FirstRunBridge::isDefaultBrowser() const {
+bool FirstRunBridge::isDefaultBrowser() const { return isDefaultBrowserStatic(); }
+bool FirstRunBridge::isDefaultBrowserStatic() {
 #ifdef Q_OS_WIN
     QSettings uc(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice"), QSettings::NativeFormat);
     return uc.value(QStringLiteral("ProgId")).toString().contains(QStringLiteral("Pacitum"), Qt::CaseInsensitive);
@@ -202,15 +203,18 @@ bool FirstRunBridge::isDefaultBrowser() const {
 }
 
 void FirstRunBridge::requestDefaultBrowser() {
+    requestDefaultBrowserStatic();
+    // Re-check a few times while the user is in Settings.
+    for (int ms : {3000, 8000, 15000, 30000})
+        QTimer::singleShot(ms, this, [this]{ emit defaultBrowserChanged(isDefaultBrowser()); });
+}
+void FirstRunBridge::requestDefaultBrowserStatic() {
 #ifdef Q_OS_WIN
     // Windows 10/11 only allow the user to change it: open Settings → Default apps for Pacitum.
     QDesktopServices::openUrl(QUrl(QStringLiteral("ms-settings:defaultapps?registeredAppUser=Pacitum%20Browser")));
 #else
     QDesktopServices::openUrl(QUrl(QStringLiteral("settings://default-apps")));
 #endif
-    // Re-check a few times while the user is in Settings.
-    for (int ms : {3000, 8000, 15000, 30000})
-        QTimer::singleShot(ms, this, [this]{ emit defaultBrowserChanged(isDefaultBrowser()); });
 }
 
 void FirstRunBridge::setTheme(const QString& mode) { if (m_hooks.setTheme) m_hooks.setTheme(mode); emit themeChanged(palette()); }

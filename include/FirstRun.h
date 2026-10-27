@@ -39,6 +39,8 @@ public:
     // import freed the manager under the worker -> crash).
     void waitForImport();
 
+    static bool isDefaultBrowserStatic();
+    static void requestDefaultBrowserStatic();   // opens the OS default-apps settings
     static bool isFirstRunDone();          // browser_settings.json "first_run_done"
     static void markFirstRunDone();
 

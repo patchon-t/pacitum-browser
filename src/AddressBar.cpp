@@ -433,6 +433,7 @@ void AddressBar::updateSuggestions() {
         m_query = query;
         fetchSearchSuggestions(query);
     }
+    if (!m_inlineHints) bestHint.clear();
     m_hintUrl = bestHint.isEmpty() ? QString() : typed + bestHint;
     rebuildPopup();
 

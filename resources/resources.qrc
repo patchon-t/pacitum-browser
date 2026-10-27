@@ -271,6 +271,7 @@
         <file>icons/pacitum-icon.svg</file>
         <file>brand/wordmark.svg</file>
         <file>brand/next_project_themed.svg</file>
+        <file>brand/wordmark_stacked.svg</file>
         <file>icons/pacitum-icon-16.png</file>
         <file>icons/pacitum-icon-32.png</file>
         <file>icons/pacitum-icon-48.png</file>
@@ -280,6 +281,8 @@
         <file>icons/pacitum-icon-512.png</file>
         <file>pages/newtab.html</file>
         <file>pages/welcome.html</file>
+        <file>forms/agent.js</file>
+        <file>pages/settings.html</file>
         <file>pages/logo.png</file>
         <file>fonts/Rubik-VF.ttf</file>
         <file>fonts/Inter-Regular.ttf</file>

@@ -1,4 +1,13 @@
 #include "WebProfile.h"
+#include "AppSettings.h"
+#include <QWebEngineCookieStore>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QHostAddress>
+#include <QSet>
+#include <QMutexLocker>
+#include <QMutex>
+#include <atomic>
 #include "PacitumScheme.h"
 #include "ExtensionManager.h"
 #include <QWebEngineProfile>
@@ -95,7 +104,78 @@ bool isGoogleSignInBlocked(const QUrl& u) {
 }
 
 GoogleSignInInterceptor::GoogleSignInInterceptor(QObject* parent) : QWebEngineUrlRequestInterceptor(parent) {}
+namespace {
+std::atomic<bool> s_httpsOnly{true};
+QMutex s_httpMx;
+QSet<QString> s_httpOk, s_upgraded;
+bool isLocalHost(const QString& h) {
+    if (h.isEmpty() || h == QLatin1String("localhost") || h.endsWith(QLatin1String(".localhost")) || h.endsWith(QLatin1String(".local"))
+        || h.endsWith(QLatin1String(".lan")) || h.endsWith(QLatin1String(".internal")) || !h.contains(QLatin1Char('.'))) return true;
+    QHostAddress a; if (a.setAddress(h)) return true;   // IP addresses: routers, printers, dev servers
+    return false;
+}
+}
+void setHttpsOnly(bool on) { s_httpsOnly = on; }
+bool httpsOnly() { return s_httpsOnly; }
+void allowHttp(const QString& host) { QMutexLocker l(&s_httpMx); s_httpOk.insert(host.toLower()); }
+bool httpAllowed(const QString& host) { QMutexLocker l(&s_httpMx); return s_httpOk.contains(host.toLower()); }
+bool wasUpgraded(const QString& host) { QMutexLocker l(&s_httpMx); return s_upgraded.contains(host.toLower()); }
+void setSafeBrowsing(const QString&) {}
+
+void applyProfilePrefs(QWebEngineProfile* profile, bool privateProfile) {
+    if (!profile) return;
+    const QJsonObject o = AppSettings::read();
+    // Languages: Accept-Language and spell check follow Settings › Languages.
+    QStringList langs;
+    for (const auto& v : o.value(QStringLiteral("languages")).toArray()) langs << v.toString();
+    if (langs.isEmpty()) profile->setHttpAcceptLanguage(acceptLanguage());
+    else {
+        QStringList out; double q = 1.0;
+        for (int i = 0; i < langs.size() && i < 8; ++i) {
+            if (i == 0) out << langs[i];
+            else { q = qMax(0.1, 1.0 - 0.1 * i); out << QStringLiteral("%1;q=%2").arg(langs[i]).arg(q, 0, 'f', 1); }
+        }
+        profile->setHttpAcceptLanguage(out.join(QLatin1Char(',')));
+    }
+    const bool spell = o.value(QStringLiteral("spellcheck")).toBool(true);
+    QStringList dicts;
+    for (const QString& l : langs.isEmpty() ? QStringList{QLocale::system().name()} : langs) {
+        QString d = l; d.replace(QLatin1Char('_'), QLatin1Char('-'));
+        if (d == QLatin1String("en")) d = QStringLiteral("en-US");
+        dicts << d;
+    }
+    profile->setSpellCheckLanguages(dicts);
+    profile->setSpellCheckEnabled(spell);
+    // Cookies: block third-party everywhere, in private tabs only, or allow all.
+    const QString mode = o.value(QStringLiteral("cookie_mode")).toString(QStringLiteral("third"));
+    const bool blockThird = mode == QLatin1String("third") || (mode == QLatin1String("private") && privateProfile);
+    if (auto* cs = profile->cookieStore())
+        cs->setCookieFilter([blockThird](const QWebEngineCookieStore::FilterRequest& r){ return !(blockThird && r.thirdParty); });
+    // Fonts
+    auto* ws = profile->settings();
+    ws->setFontSize(QWebEngineSettings::DefaultFontSize, o.value(QStringLiteral("default_font_size")).toInt(16));
+    ws->setFontSize(QWebEngineSettings::MinimumFontSize, o.value(QStringLiteral("min_font_size")).toInt(0));
+    ws->setFontSize(QWebEngineSettings::MinimumLogicalFontSize, qMax(6, o.value(QStringLiteral("min_font_size")).toInt(0)));
+    ws->setAttribute(QWebEngineSettings::SpatialNavigationEnabled, false);
+    s_httpsOnly = o.value(QStringLiteral("https_only")).toBool(true);
+}
+
 void GoogleSignInInterceptor::interceptRequest(QWebEngineUrlRequestInfo& info) {
+    // 2.0.1 "Always use secure connections": upgrade top-level http:// navigations to https://.
+    if (s_httpsOnly && info.resourceType() == QWebEngineUrlRequestInfo::ResourceTypeMainFrame
+        && info.requestUrl().scheme() == QLatin1String("http") && info.requestMethod() == "GET") {
+        const QString host = info.requestUrl().host().toLower();
+        if (!isLocalHost(host)) {
+            bool ok;
+            { QMutexLocker l(&s_httpMx); ok = s_httpOk.contains(host); if (!ok) s_upgraded.insert(host); }
+            if (!ok) {
+                QUrl u = info.requestUrl(); u.setScheme(QStringLiteral("https"));
+                if (u.port() == 80) u.setPort(-1);
+                info.redirect(u);
+                return;
+            }
+        }
+    }
     // Google sign-in pages must see the honest, unmodified QtWebEngine user agent (Google's embedded-browser policy).
     if (isGoogleSignInHost(info.requestUrl().host()) || isGoogleSignInHost(info.firstPartyUrl().host()))
         if (!defaultUaStore().isEmpty()) info.setHttpHeader("User-Agent", defaultUaStore().toUtf8());
@@ -121,6 +201,7 @@ void configureProfile(QWebEngineProfile* profile, bool persistent) {
         profile->scripts()->insert(sc);
     }
     profile->setHttpAcceptLanguage(acceptLanguage());
+    applyProfilePrefs(profile, !persistent);   // 2.0.1 languages, spell check, cookies, fonts
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     if (auto* ch = profile->clientHints()) {
         const QString full = QString::fromLatin1(qWebEngineChromiumVersion());
