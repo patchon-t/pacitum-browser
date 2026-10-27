@@ -2,6 +2,7 @@
 #include <QString>
 #include <QColor>
 #include <QIcon>
+#include <QStringList>
 
 // Pacitum design tokens (design-spec-1.5.md §1).
 // Legacy names kept for existing callers: frame = chrome, tab = elevated, toolbar = card.
@@ -11,6 +12,8 @@ struct PacitumPalette {
     // 1.5 additions
     QString omnibox, omniboxHover, pressed, borderStrong, textTertiary,
             accentHover, accentPressed, focusRing, warning;
+    // 2.0: red accent = indicators only; primary (ink) = primary actions, switches, selection
+    QString primary, onPrimary, dangerSoft;
     const QString& chrome() const { return frame; }
     const QString& elevated() const { return tab; }
     const QString& card() const { return toolbar; }
@@ -30,10 +33,21 @@ public:
 
     void setDarkMode(bool enabled);
     bool isDarkMode() const { return m_darkMode; }
+    // 2.0.1 themes (design "Settings · Themes"): light, dark, midnight, forest, sakura, sand,
+    // graphite, contrast. Empty or unknown = light/dark from setDarkMode().
+    void setThemeId(const QString& id);
+    QString themeId() const { return m_themeId; }
+    static QStringList themeIds();
+    static bool themeIsDark(const QString& id);
+    static QString themeName(const QString& id);
+    static QString themeAccent(const QString& id);   // the colour that comes with the theme
+    // "Make your own theme": {name, strip, toolbar, bg, accent, dark}. Adds the "custom" theme id.
+    static void setCustomTheme(const QString& name, const QString& strip, const QString& toolbar, const QString& bg, const QString& accent, bool dark);
     void setPrivate(bool p) { m_private = p; }
     void setAccent(const QString& accent) { m_accentOverride = accent; }
     const PacitumPalette& palette() const { return m_pal; }
     static const PacitumPalette& current();   // palette of the most recently applied theme
+    static void restoreCurrent(const PacitumPalette& p);   // after building a throw-away palette
 
     QString mainWindowStyle() const;
     QString tabWidgetStyle(bool vertical) const;
@@ -61,5 +75,6 @@ private:
     bool m_darkMode;
     bool m_private = false;
     QString m_accentOverride;
+    QString m_themeId;
     PacitumPalette m_pal;
 };

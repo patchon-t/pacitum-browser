@@ -1,3 +1,5 @@
+#include <atomic>
+#include <QDate>
 #include "AdBlocker.h"
 
 const QSet<QString> AdBlocker::s_hosts = {
@@ -41,10 +43,20 @@ void AdBlocker::interceptRequest(QWebEngineUrlRequestInfo &info) {
     if (!m_enabled) return;
     const QString host = info.requestUrl().host().toLower();
     if (host.isEmpty()) return;
-    if (hostBlocked(s_hosts, host)) { info.block(true); return; }
+    if (hostBlocked(s_hosts, host)) { info.block(true); AdBlocker::noteBlocked(); return; }
     // URL patterns only for what a page loads by itself: a page you open (address bar, link) is never
     // blocked for words like "sponsored" in its address.
     if (info.resourceType() == QWebEngineUrlRequestInfo::ResourceTypeMainFrame) return;
     const QString url = info.requestUrl().toString().toLower();
-    for (auto &p : s_patterns) if (url.contains(p)) { info.block(true); return; }
+    for (auto &p : s_patterns) if (url.contains(p)) { info.block(true); AdBlocker::noteBlocked(); return; }
 }
+
+// 2.0.1 new tab page: "N trackers blocked today" (network thread increments, UI reads).
+static std::atomic<int> s_blocked{0};
+static std::atomic<qint64> s_blockedDay{0};
+void AdBlocker::noteBlocked() {
+    const qint64 day = QDate::currentDate().toJulianDay();
+    if (s_blockedDay.exchange(day) != day) s_blocked = 0;
+    ++s_blocked;
+}
+int AdBlocker::blockedToday() { return s_blockedDay.load() == QDate::currentDate().toJulianDay() ? s_blocked.load() : 0; }

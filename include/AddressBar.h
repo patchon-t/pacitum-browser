@@ -26,6 +26,8 @@ public:
     explicit AddressBar(HistoryManager* hm = nullptr, QWidget* parent = nullptr);
     void applyTheme(ThemeManager* tm);
     void setUrl(const QString& url);
+    // Tab switch: the text belongs to the old tab, so replace it even while the field has focus.
+    void showTabUrl(const QString& url);
     QString url() const;
     QString currentUrl() const { return m_currentUrl; }   // the URL last set (not the display text)
     void focusUrl();
@@ -36,8 +38,9 @@ public:
     void progressFinished(bool ok);
     void syncProgress(bool loading, int value);   // tab switch: jump to that tab's state
     void setSuggestionsEnabled(bool e) { m_suggest = e; }
+    void setInlineHints(bool on) { m_inlineHints = on; }   // 2.0.1 Settings › Typing hints
     // 1.8.10: keyword suggestions from the search engine ("Google", "Bing", "DuckDuckGo", "Yahoo", "Brave")
-    void setSearchEngine(const QString& name) { m_engine = name; }
+    void setSearchEngine(const QString& name);
     void setOnlineSuggestions(bool on) { m_online = on; }
     // 1.7.5 permission chips (permissions-spec §1/§4/§5/§6/§9)
     void setPermissionChips(const QList<OmniChip>& chips);
@@ -95,6 +98,7 @@ private:
     void rebuildPopup();                   // history rows + engine rows -> model, show/hide popup
     QStandardItemModel* m_model = nullptr; // reused for every refresh
     OmniDelegate* m_delegate = nullptr;
+    class QLabel* m_tabHint = nullptr;
     QString m_query;                       // what the popup was built for
     QString m_hintUrl;                     // typed text + inline hint (first row, what Enter opens)
     QStringList m_engineRows;              // keyword suggestions for m_query
@@ -105,6 +109,7 @@ private:
     bool m_online = true;
     bool m_navigating = false;             // moving through the list with the arrow keys
     bool m_editing = false;                // focused for typing (survives the list / window switches)
-    bool m_noInline = false;               // true after Backspace/Delete: don't re-add a hint
+    bool m_noInline = false;
+    bool m_inlineHints = true;               // true after Backspace/Delete: don't re-add a hint
     bool m_composing = false;              // IME preedit active: never rewrite the text
 };

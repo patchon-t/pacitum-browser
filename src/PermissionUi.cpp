@@ -59,6 +59,7 @@ void announce(QWidget* w, const QString& text) {
 
 // shadow-popup approximation: stacked translucent rounded rects (9-slice equivalent, cheap)
 static void paintCard(QPainter& p, const QRectF& card, qreal radius) {
+    radius = qMax<qreal>(radius, 20);   // 2.0.1 design: 20 px cards
     const auto& pal = ThemeManager::current();
     p.setRenderHint(QPainter::Antialiasing);
     for (int i = 10; i >= 1; --i) {
@@ -74,14 +75,14 @@ static constexpr int kShadow = 14;
 static QString pillStyle() {
     const auto& p = ThemeManager::current();
     return QStringLiteral(
-        "QPushButton{background:%1;color:%2;border:none;border-radius:18px;min-height:36px;font-size:13px;font-weight:500;padding:0 14px;}"
+        "QPushButton{background:%1;color:%2;border:none;border-radius:12px;min-height:38px;font-size:13.5px;font-weight:600;padding:0 14px;}"
         "QPushButton:hover{background:%3;} QPushButton:pressed{background:%4;}"
         "QPushButton:focus{outline:none;border:2px solid %5;}"
         "QPushButton:disabled{color:%6;}"
         "QPushButton[guard=\"true\"]{color:%6;}"
         "QPushButton[primary=\"true\"]{background:%7;color:%8;} QPushButton[primary=\"true\"]:hover{background:%9;}"
         "QPushButton[primary=\"true\"]:disabled{background:%1;color:%6;}")
-        .arg(p.surface, p.text, p.surfaceHover, p.pressed, p.focusRing, p.disabled, p.accent, p.onAccent, p.accentHover);
+        .arg(p.omnibox, p.text, p.surfaceHover, p.pressed, p.focusRing, p.disabled, p.primary, p.onPrimary, QColor(p.primary).lightness() > 128 ? QColor(p.primary).darker(112).name() : QColor(p.primary).lighter(160).name());
 }
 
 // ------------------------------------------------------------------ Bubble
@@ -98,7 +99,7 @@ Bubble::Bubble(QWidget* window) : QWidget(window, Qt::Tool | Qt::FramelessWindow
     auto* head = new QHBoxLayout(); head->setSpacing(10);
     m_favicon = new QLabel(this); m_favicon->setFixedSize(20, 20);
     m_question = new QLabel(this); m_question->setTextFormat(Qt::RichText); m_question->setWordWrap(true);
-    m_question->setStyleSheet(QStringLiteral("color:%1;font-size:13px;").arg(pal.text));
+    m_question->setStyleSheet(QStringLiteral("color:%1;font-size:12.5px;").arg(pal.textSecondary));
     m_close = new QToolButton(this); m_close->setFixedSize(34, 34); m_close->setAutoRaise(true);
     m_close->setIcon(ThemeManager::icon(QStringLiteral("close"), pal.textSecondary, 16)); m_close->setIconSize(QSize(16, 16));
     m_close->setAccessibleName(QStringLiteral("Close"));
@@ -132,12 +133,13 @@ void Bubble::addCapability(const QString& glyph, const QString& label, const QSt
     auto* row = new QWidget(this); auto* l = new QHBoxLayout(row); l->setContentsMargins(0, 0, 0, 0); l->setSpacing(12);
     auto* tile = new QLabel(row); tile->setFixedSize(32, 32); tile->setAlignment(Qt::AlignCenter);
     const QString tint = warning ? pal.warning : pal.accent;
-    tile->setStyleSheet(QStringLiteral("background:%1;border-radius:10px;").arg(warning ? rgba(pal.warning, 0.16) : pal.accentSoft));
-    tile->setPixmap(glyphPixmap(glyph, tint, 18, devicePixelRatioF()));
+    tile->setStyleSheet(QStringLiteral("background:%1;border-radius:10px;").arg(warning ? rgba(pal.warning, 0.16) : pal.omnibox));
+    tile->setPixmap(glyphPixmap(glyph, warning ? tint : pal.text, 18, devicePixelRatioF()));
     auto* texts = new QVBoxLayout(); texts->setSpacing(1);
-    auto* t = new QLabel(label, row); t->setWordWrap(true); t->setStyleSheet(QStringLiteral("color:%1;font-size:13px;").arg(pal.text));
+    auto* t = new QLabel(label, row); t->setWordWrap(true); t->setStyleSheet(QStringLiteral("color:%1;font-size:15px;font-weight:600;").arg(pal.text));
     texts->addWidget(t);
-    if (!detail.isEmpty()) { auto* d = new QLabel(detail, row); d->setWordWrap(true); d->setStyleSheet(QStringLiteral("color:%1;font-size:12px;").arg(pal.textSecondary)); texts->addWidget(d); }
+    if (!detail.isEmpty()) { auto* d = new QLabel(detail, row); d->setWordWrap(true); d->setStyleSheet(QStringLiteral("color:%1;font-size:12.5px;").arg(pal.textSecondary)); texts->addWidget(d); }
+    if (detail.isEmpty()) l->setAlignment(Qt::AlignVCenter);
     l->addWidget(tile, 0, Qt::AlignTop); l->addLayout(texts, 1);
     m_body->addWidget(row);
 }
@@ -161,11 +163,15 @@ void Bubble::addNote(const QString& text, bool warning) {
 void Bubble::setActions(const QList<Action>& actions, bool row, const QString& focusId) {
     delete m_actionsBox->layout();
     qDeleteAll(m_buttons); m_buttons.clear();
-    QBoxLayout* l = row ? static_cast<QBoxLayout*>(new QHBoxLayout(m_actionsBox)) : new QVBoxLayout(m_actionsBox);
+    // 2.0.1 design: a primary action spans the card; the other choices share one row below it.
+    // Row prompts (two choices) split the width evenly.
+    auto* l = new QVBoxLayout(m_actionsBox);
     l->setContentsMargins(0, 0, 0, 0); l->setSpacing(6);
-    if (row) l->addStretch(1);
+    QHBoxLayout* pairRow = nullptr;
+    int secondary = 0; for (const auto& a : actions) if (!a.primary) ++secondary;
     for (const auto& a : actions) {
         auto* b = new QPushButton(a.text, m_actionsBox);
+        b->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         b->setProperty("actionId", a.id);
         b->setProperty("primary", a.primary);
         b->setEnabled(a.enabled);
@@ -184,7 +190,10 @@ void Bubble::setActions(const QList<Action>& actions, bool row, const QString& f
             }
             emit action(b->property("actionId").toString());
         });
-        l->addWidget(b, row ? 0 : 0);
+        if (row || (!a.primary && secondary >= 2)) {
+            if (!pairRow) { pairRow = new QHBoxLayout; pairRow->setSpacing(6); l->addLayout(pairRow); }
+            pairRow->addWidget(b, 1);
+        } else l->addWidget(b);
         m_buttons << b;
         if (a.id == focusId) b->setFocus();
     }

@@ -68,7 +68,7 @@ private:
     QVariantAnimation m_anim;
     QPoint m_target;
     bool m_closing = false;
-    int m_width = 340;
+    int m_width = 300;
     QString m_a11y;
 };
 

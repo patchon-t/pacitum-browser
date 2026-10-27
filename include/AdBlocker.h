@@ -11,6 +11,8 @@ public:
     bool isEnabled() const { return m_enabled; }
     void setDoNotTrack(bool d) { m_dnt = d; }
     void interceptRequest(QWebEngineUrlRequestInfo &info) override;
+    static void noteBlocked();
+    static int blockedToday();
 private:
     bool m_enabled;
     bool m_dnt = false;

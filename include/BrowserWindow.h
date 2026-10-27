@@ -87,7 +87,7 @@ private slots:
     void goHome();
     void toggleBookmark();
     void showDownloads();
-    void showSettings();
+    void showSettings(const QString& section = QString());
     void showMenu();
     void toggleDarkMode();
     void toggleBookmarksBar();
@@ -107,7 +107,7 @@ private slots:
     void showPageQr();
     void togglePictureInPicture();
     void showTabOverview();
-    void captureActiveThumb();
+    void captureActiveThumb(bool force = false);
     void showNotice(const QString& text);
     void setupSync();
     void duplicateTab(int index);
@@ -216,6 +216,11 @@ private:
     class DownloadsPopup* m_downloadsPopup = nullptr;
     class DownloadButtonBadge* m_downloadsBadge = nullptr;
     void toggleDownloadsPopup(bool autoClose);
+    // 2.0: a second click on the button whose pop-up is open closes it (the closing click used to
+    // reach the button again and reopen the pop-up, which blinked).
+    bool popupJustClosedBy(QWidget* button) const;
+    void notePopupClosed(QWidget* button);
+    QHash<QWidget*, qint64> m_popupClosedAt;
     void updateDownloadsButton();
     QIcon downloadsTabIcon() const;
     ThemeManager* m_theme = nullptr;
@@ -255,6 +260,18 @@ private:
     // First-run welcome flow (firstrun-spec.md)
     FirstRunBridge* m_firstRun = nullptr;
     QWebChannel* m_firstRunChannel = nullptr;
+    // 2.0.1 Settings page (pacitum://settings)
+    class SettingsBridge* m_settingsBridge = nullptr;
+    FirstRunBridge* m_importer = nullptr;   // Settings › Import
+    bool m_backgroundClose = false;         // downloads finished after the window was closed
+    QWebChannel* m_settingsChannel = nullptr;
+    void setupSettingsBridge();
+    void attachInternalChannel(class BrowserTab* tab, const QString& url);
+    int importBookmarksFile(const QString& path, int* found = nullptr);   // -1: unreadable
+    void restartBrowser();
+    void printPage();
+    BrowserTab* openPopupWindow();
+    void savePageAs();
     void openWelcome();
     void endWelcome();
     void writeSetting(const QString& key, const QJsonValue& value);
@@ -271,6 +288,7 @@ private:
     QWidget* m_contentRow = nullptr;
     QHash<QObject*, QPixmap> m_thumbs;   // last snapshot per tab (3D tab overview), ~640 px wide
     QTimer m_thumbTimer;
+    bool m_thumbsWanted = false;   // the tab overview has been used: keep its cards fresh
     PacitumTabWidget* m_tabs = nullptr;
     PacitumTabWidget* m_splitTabs = nullptr;
     PacitumTabWidget* m_activeWidget = nullptr;
@@ -281,4 +299,6 @@ private:
 
     struct ClosedTab { QString url; QString title; };
     QVector<ClosedTab> m_recentlyClosed;
+    QVector<ClosedTab> m_lastSession;     // 2.0.1 new tab › "Where you left off" (tabs from last time)
+    qint64 m_lastSessionAt = 0;
 };

@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Extensions</title>
+<meta name="color-scheme" content="light dark">
+<style>
+@font-face{font-family:Rubik;src:url(pacitum://fonts/Rubik-VF.ttf) format("truetype");font-weight:300 900}
+:root{--page:%PAGE%;--card:%TOOL%;--text:%TXT%;--sec:%SEC%;--border:%BORD%;--border2:%BORD2%;--field:%FIELD%;--surface:%SURF%;--surfh:%SURFH%;
+--accent:%ACC%;--onacc:%ONACC%;--primary:%PRIMARY%;--onprimary:%ONPRIMARY%;--danger:%DANGER%;--dangersoft:%DANGERSOFT%;--sec2:color-mix(in srgb,var(--text) 72%,var(--page))}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--page);color:var(--text);font:14px Rubik,"Segoe UI","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+a{color:inherit;text-decoration:none}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+::selection{background:var(--primary);color:var(--onprimary)}
+input{caret-color:var(--accent)}
+input::placeholder{color:var(--sec);opacity:1}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:"JetBrains Mono",Consolas,"Cascadia Mono",monospace}
+.app{height:100vh;overflow-y:auto}
+.list{display:flex;gap:48px;padding:40px 56px 40px;min-height:100%}
+nav{width:230px;flex:none;display:flex;flex-direction:column;gap:2px}
+h1{margin:0 0 18px 12px;font-size:26px;font-weight:600;letter-spacing:-.01em}
+.nrow{position:relative;height:42px;display:flex;align-items:center;gap:12px;padding:0 12px;border:0;border-radius:12px;background:transparent;font-size:14.5px;text-align:left;width:100%;transition:background .15s}
+.nrow:hover{background:var(--surface)}
+.nrow[aria-current=page]{background:var(--card);font-weight:500}
+.nrow[aria-current=page]::before{content:"";position:absolute;left:0;top:50%;margin-top:-10px;width:4px;height:20px;border-radius:0 4px 4px 0;background:var(--accent)}
+.nrow .c{font-size:12.5px;color:var(--sec)}
+.div{height:1px;background:var(--border);margin:12px}
+.sw{width:40px;height:24px;border:0;border-radius:12px;background:var(--border2);display:flex;align-items:center;padding:3px;justify-content:flex-start;flex:none;transition:background .15s}
+.sw[aria-checked=true]{background:var(--primary);justify-content:flex-end}
+.sw span{width:18px;height:18px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.more{margin-top:auto;height:42px;display:flex;align-items:center;gap:8px;padding:0 12px;border-radius:12px;font-size:14px;font-weight:500}
+.more:hover{background:var(--surface)}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.top{display:flex;align-items:center;gap:8px}
+.search{flex:1;height:44px;display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--card);border:1px solid var(--border);border-radius:14px}
+.search:focus-within{outline:2px solid var(--primary);outline-offset:2px}
+.search input{flex:1;border:0;outline:0;background:transparent;font-size:15px}
+.ob{height:44px;padding:0 16px;border:1px solid var(--border);border-radius:14px;background:var(--card);font-size:14px;font-weight:500}
+.ob:hover{background:var(--surface)}
+.table{background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden}
+.th,.tr{display:grid;grid-template-columns:40px minmax(0,1fr) 170px 150px 44px;gap:18px;align-items:center;padding:0 20px}
+.th{height:40px;font-size:12px;font-weight:500;color:var(--sec);border-bottom:1px solid var(--border)}
+.tr{min-height:76px;padding:12px 20px;border-bottom:1px solid var(--border);transition:opacity .15s}
+.tr:last-child{border-bottom:0}
+.tr.off{opacity:.6}
+.ic{width:40px;height:40px;border-radius:12px;color:#FFFFFF;font-weight:600;font-size:17px;display:flex;align-items:center;justify-content:center;background-size:cover;background-position:center}
+.nm{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.nm b{font-size:15px;font-weight:500}
+.v{font-size:12.5px;color:var(--sec)}
+.tag{font-size:12px;color:var(--sec)}
+.bad{font-size:12px;font-weight:500;color:var(--danger);background:var(--dangersoft);border-radius:6px;padding:1px 7px}
+.ds{font-size:13px;line-height:1.4;color:var(--sec)}
+.acc{font-size:13px;color:var(--sec)}
+.acts{display:flex;gap:2px;justify-content:flex-end}
+.lk{height:34px;display:flex;align-items:center;padding:0 12px;border:0;border-radius:10px;background:transparent;font-size:13px;font-weight:500}
+.lk:hover{background:var(--surface)}
+.lk.mut{color:var(--sec)}
+.empty{padding:56px 20px;text-align:center;color:var(--sec);font-size:14px;line-height:1.5}
+/* detail */
+.detail{max-width:1160px;margin:0 auto;padding:36px 56px 48px}
+.back{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:500;color:var(--sec2);padding:6px 8px;margin-left:-8px;border-radius:10px;border:0;background:transparent}
+.back:hover{background:var(--surface)}
+.hd{display:flex;align-items:flex-start;gap:20px;margin-top:22px;padding-bottom:26px;border-bottom:1px solid var(--border)}
+.big{width:64px;height:64px;border-radius:18px;font-size:26px}
+.hd h2{margin:0;font-size:30px;font-weight:600;letter-spacing:-.02em;display:inline}
+.hd .ver{font-size:14px;color:var(--sec);margin-left:10px}
+.hd p{margin:8px 0 0;font-size:15px;line-height:1.55;color:var(--sec2);max-width:640px}
+.hdr{display:flex;align-items:center;gap:22px;margin-left:auto;flex:none;padding-top:14px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:72px;margin-top:28px}
+h3{margin:0 0 8px;font-size:16px;font-weight:600}
+.lead{font-size:14px;color:var(--sec2);margin:0 0 16px}
+.radio{display:flex;align-items:flex-start;gap:14px;width:100%;padding:10px 12px;border:0;border-radius:12px;background:transparent;text-align:left}
+.radio:hover:not([disabled]){background:var(--surface)}
+.radio[disabled]{cursor:default;opacity:.55}
+.dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--border2);flex:none;margin-top:1px}
+.radio[aria-checked=true] .dot{border:6px solid var(--primary)}
+.rt b{display:block;font-size:14.5px;font-weight:600}
+.rt span{font-size:13px;color:var(--sec)}
+.srow{display:flex;align-items:center;gap:16px;padding:16px 12px}
+.srow .rt{flex:1}
+.prow{padding:12px 0;border-bottom:1px solid var(--border);font-size:14.5px}
+.kv{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px}
+.kv span:first-child{color:var(--sec)}
+.kv span:last-child{font-weight:500}
+.rm{margin-top:24px;height:42px;padding:0 18px;border:1px solid color-mix(in srgb,var(--danger) 35%,var(--border));border-radius:12px;background:transparent;color:var(--danger);font-weight:600;font-size:14px}
+.rm:hover{background:var(--dangersoft)}
+.note{font-size:12.5px;color:var(--sec);padding:6px 12px 0}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--primary);color:var(--onprimary);padding:10px 16px;border-radius:12px;font-size:13.5px;font-weight:500;transition:.2s;pointer-events:none;z-index:60}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.scrim{position:fixed;inset:0;background:rgba(10,8,9,.38);display:flex;align-items:center;justify-content:center;z-index:50}
+.sheet{width:min(460px,calc(100vw - 32px));background:var(--card);border-radius:22px;box-shadow:0 0 0 1px var(--border),0 24px 64px rgba(0,0,0,.28);padding:24px;display:flex;flex-direction:column;gap:12px}
+.sheet h4{margin:0;font-size:19px;font-weight:600}
+.sa{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.btn{height:40px;padding:0 16px;border:0;border-radius:12px;background:var(--field);font-weight:600;font-size:13.5px}
+.btn.red{background:var(--accent);color:var(--onacc)}
+@media (max-width:900px){.list{flex-direction:column;padding:24px}nav{width:auto}.cols{grid-template-columns:1fr;gap:32px}.th,.tr{grid-template-columns:40px minmax(0,1fr) 120px 44px}.th span:nth-child(3),.tr .acc{display:none}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div id="layer"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script>%QWEBCHANNEL%</script>
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ico = (d, s = 16, w = 2.3) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+let bridge = null, D = null;
+const st = { tab: 'all', q: '', id: '', shortcuts: false };
+const COLORS = ['#151112', '#2F5FD0', '#4B3FBF', '#1F7A57', '#D9141F', '#B8470F', '#0E7490', '#5C5450'];
+function color(id) { let n = 0; for (const ch of id) n = (n * 31 + ch.charCodeAt(0)) | 0; return COLORS[Math.abs(n) % COLORS.length]; }
+function call(name, args) { return new Promise((res) => bridge ? bridge.act(name, args || {}, res) : res(null)); }
+function toast(t) { if (!t) return; const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2600); }
+function sv(k, d) { const v = D && D.s ? D.s[k] : undefined; return v === undefined || v === null ? d : v; }
+function accessText(a) {
+  if (a === 'all') return 'All sites';
+  if (a === 'click') return 'Current tab, on click';
+  if (a && a.startsWith('some:')) { const n = +a.slice(5); return n === 1 ? '1 site' : n + ' sites'; }
+  return 'No site access';
+}
+function iconHtml(e, cls) {
+  return e.icon ? `<span class="ic ${cls || ''}" style="background-image:url('${e.icon}');background-color:transparent"></span>`
+                : `<span class="ic ${cls || ''}" style="background:${color(e.id)}">${esc((e.name || '?').charAt(0).toUpperCase())}</span>`;
+}
+function size(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
+
+function listView() {
+  const all = D.extensions;
+  const on = all.filter((e) => e.enabled).length;
+  const tabs = [['all', 'All extensions', all.length], ['on', 'Turned on', on], ['off', 'Turned off', all.length - on]];
+  const q = st.q.toLowerCase();
+  const shown = all.filter((e) => (st.tab === 'all' || (st.tab === 'on' ? e.enabled : !e.enabled)) && (!q || e.name.toLowerCase().includes(q) || (e.desc || '').toLowerCase().includes(q)));
+  const dev = !!sv('ext_dev_mode', false);
+  const shortcuts = all.filter((e) => e.commands && e.commands.length);
+  const rows = st.shortcuts ? (shortcuts.length ? shortcuts.map((e) => `<div class="tr" style="grid-template-columns:40px minmax(0,1fr)">${iconHtml(e)}<div><div class="nm"><b>${esc(e.name)}</b></div>
+      ${e.commands.map((c) => `<div class="ds" style="display:flex;justify-content:space-between;gap:12px;padding:3px 0"><span>${esc(c.name)}</span><span class="mono">${esc(c.key || 'Not set')}</span></div>`).join('')}</div></div>`).join('')
+      : '<div class="empty">None of your extensions have keyboard shortcuts.</div>')
+    : shown.map((e) => `<div class="tr${e.enabled ? '' : ' off'}">
+      ${iconHtml(e)}
+      <div style="min-width:0;display:flex;flex-direction:column;gap:3px">
+        <div class="nm"><b>${esc(e.name)}</b><span class="v num">${esc(e.version)}</span>${e.pinned ? '<span class="tag">Pinned</span>' : ''}${e.kind === 'script' ? '<span class="tag">User script</span>' : ''}${e.error ? '<span class="bad">Needs attention</span>' : ''}</div>
+        <span class="ds">${esc(e.error || e.desc || '')}</span></div>
+      <span class="acc">${accessText(e.access)}</span>
+      <div class="acts"><button class="lk" data-a="detail" data-v="${esc(e.id)}">Details</button><button class="lk mut" data-a="askRemove" data-v="${esc(e.id)}">Remove</button></div>
+      <button class="sw" role="switch" aria-checked="${!!e.enabled}" aria-label="Turn ${esc(e.name)} on or off" data-a="toggle" data-v="${esc(e.id)}"><span></span></button></div>`).join('');
+  const emptyText = !all.length ? 'No extensions yet. Get some from the Chrome Web Store, or turn on Developer mode to load your own.'
+    : st.tab === 'on' ? 'No extensions are turned on. Turn one on from All extensions.' : st.tab === 'off' ? 'Everything is turned on. Nothing is switched off.' : `No extensions match “${esc(st.q)}”.`;
+  return `<div class="list"><nav aria-label="Extension sections"><h1>Extensions</h1>
+      ${tabs.map((t) => `<button class="nrow" aria-current="${!st.shortcuts && st.tab === t[0] ? 'page' : 'false'}" data-a="tab" data-v="${t[0]}"><span style="flex:1">${t[1]}</span><span class="c num">${t[2]}</span></button>`).join('')}
+      <button class="nrow" aria-current="${st.shortcuts ? 'page' : 'false'}" data-a="shortcuts"><span style="flex:1">Keyboard shortcuts</span></button>
+      <div class="div"></div>
+      <button class="nrow" data-a="dev" role="switch" aria-checked="${dev}"><span style="flex:1">Developer mode</span><span class="sw" aria-checked="${dev}"><span></span></span></button>
+      ${D.chromeExtensions ? `<a class="more" href="#" data-a="store">Get more extensions<span style="color:var(--sec);display:flex">${ico('M7 17L17 7M9 7h8v8', 14)}</span></a>` : ''}
+    </nav>
+    <div class="main">
+      <div class="top"><label class="search" for="q">${ico('M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20', 16, 2.4)}<input id="q" placeholder="Search installed extensions" value="${esc(st.q)}" autocomplete="off"></label>
+        ${dev ? `<button class="ob" data-a="loadUnpacked">Load unpacked</button>${D.chromeExtensions ? '<button class="ob" data-a="addFile">Add .crx or .zip</button>' : ''}<button class="ob" data-a="reload">Reload</button>` : ''}</div>
+      <div class="table">${st.shortcuts ? '' : '<div class="th"><span></span><span>Extension</span><span>Site access</span><span></span><span></span></div>'}
+        ${rows || `<div class="empty">${emptyText}</div>`}</div>
+    </div></div>`;
+}
+
+function detailView(e) {
+  const a = e.access;
+  const opts = [['click', 'When I click it', `${e.name} only runs after you click its icon in the toolbar.`],
+                ['some', 'On sites I choose', a.startsWith('some:') ? `${e.name} runs on ${accessText(a).toLowerCase()} it asks for.` : `${e.name} runs on sites you have added.`],
+                ['all', 'On all sites', `${e.name} runs on every page you open.`]];
+  const cur = a === 'all' ? 'all' : a.startsWith('some:') ? 'some' : 'click';
+  const upd = e.updated ? new Date(e.updated).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  return `<div class="detail">
+    <button class="back" data-a="list">${ico('M15 6l-6 6 6 6', 14, 2.4)}All extensions</button>
+    <div class="hd">${iconHtml(e, 'big')}
+      <div style="min-width:0"><h2>${esc(e.name)}</h2><span class="ver num">Version ${esc(e.version)}</span><p>${esc(e.desc || '')}</p>${e.error ? `<p style="color:var(--danger)">${esc(e.error)}</p>` : ''}</div>
+      <div class="hdr">${e.options ? `<button class="ob" style="height:40px" data-a="options" data-v="${esc(e.options)}">Extension options</button>` : ''}
+        <span style="font-weight:600">${e.enabled ? 'On' : 'Off'}</span><button class="sw" role="switch" aria-checked="${!!e.enabled}" aria-label="Turn ${esc(e.name)} on or off" data-a="toggle" data-v="${esc(e.id)}"><span></span></button></div></div>
+    <div class="cols"><div>
+      <h3>Site access</h3><p class="lead">Choose where ${esc(e.name)} is allowed to read and change pages.</p>
+      ${opts.map((o) => `<button class="radio" role="radio" aria-checked="${cur === o[0]}" disabled><span class="dot"></span><span class="rt"><b>${o[1]}</b><span>${esc(o[2])}</span></span></button>`).join('')}
+      <div class="note">Set by the extension. ${e.kind === 'script' ? 'Edit its manifest.json to change the sites.' : 'Pacitum can’t limit Chrome extensions to fewer sites yet.'}</div>
+      <div class="div" style="margin:20px 0"></div>
+      ${e.kind === 'chrome' ? `<div class="srow"><span class="rt"><b>Pin to toolbar</b><span>Show the ${esc(e.name)} button next to the address bar.</span></span>
+        <button class="sw" role="switch" aria-checked="${!!e.pinned}" aria-label="Pin to toolbar" data-a="pin" data-v="${esc(e.id)}"><span></span></button></div>` : ''}
+      <div class="srow"><span class="rt"><b>Allow in private tabs</b><span>Extensions don’t run in private tabs, so nothing they do is kept.</span></span>
+        <button class="sw" role="switch" aria-checked="false" disabled aria-label="Allow in private tabs"><span></span></button></div>
+      <div class="srow"><span class="rt"><b>Files</b><span class="mono" style="font-size:12px">${esc(e.path)}</span></span><button class="ob" style="height:36px" data-a="folder" data-v="${esc(e.path)}">Show folder</button></div>
+    </div><div>
+      <h3>Permissions</h3>
+      ${(e.permissions && e.permissions.length ? e.permissions : ['No special permissions']).map((p) => `<div class="prow">${esc(p)}</div>`).join('')}
+      <h3 style="margin-top:32px">Details</h3>
+      <div class="kv"><span>Version</span><span class="num">${esc(e.version)}</span></div>
+      <div class="kv"><span>Size</span><span class="num">${size(e.size || 0)}</span></div>
+      ${upd ? `<div class="kv"><span>Updated</span><span>${esc(upd)}</span></div>` : ''}
+      <div class="kv"><span>Source</span><span>${esc(e.source)}</span></div>
+      <div class="kv"><span>ID</span><span class="mono" style="font-size:13px">${esc(e.id)}</span></div>
+      <button class="rm" data-a="askRemove" data-v="${esc(e.id)}">Remove extension</button>
+    </div></div></div>`;
+}
+
+function render() {
+  if (!D) return;
+  const e = st.id ? D.extensions.find((x) => x.id === st.id) : null;
+  if (st.id && !e) st.id = '';
+  const focus = document.activeElement && document.activeElement.id === 'q';
+  $('#app').innerHTML = e ? detailView(e) : listView();
+  document.title = e ? e.name : 'Extensions';
+  if (focus) { const i = $('#q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+}
+function open(id) {
+  st.id = id || '';
+  try { history.replaceState(null, '', 'pacitum://extensions' + (id ? '/' + id : '')); } catch (x) {}
+  render(); $('#app').scrollTop = 0;
+}
+function applyPalette(p) {
+  if (!p) return;
+  const r = document.documentElement.style;
+  for (const k of ['page', 'card', 'text', 'sec', 'border', 'border2', 'field', 'surface', 'surfh', 'accent', 'onacc', 'primary', 'onprimary', 'danger', 'dangersoft']) if (p[k]) r.setProperty('--' + k, p[k]);
+}
+function ext(id) { return D.extensions.find((x) => x.id === id); }
+document.addEventListener('click', async (ev) => {
+  const el = ev.target.closest('[data-a]'); if (!el || el.disabled) return;
+  if (el.tagName === 'A') ev.preventDefault();
+  const a = el.dataset.a, v = el.dataset.v;
+  switch (a) {
+    case 'tab': st.tab = v; st.shortcuts = false; render(); break;
+    case 'shortcuts': st.shortcuts = true; render(); break;
+    case 'dev': D.s.ext_dev_mode = !sv('ext_dev_mode', false); bridge.set('ext_dev_mode', D.s.ext_dev_mode); render(); break;
+    case 'store': call('openUrl', { url: 'https://chromewebstore.google.com/' }); break;
+    case 'detail': open(v); break;
+    case 'list': open(''); break;
+    case 'toggle': { const e = ext(v); e.enabled = !e.enabled; render(); call('extToggle', { id: v, kind: e.kind, on: e.enabled }); break; }
+    case 'pin': { const e = ext(v); e.pinned = !e.pinned; render(); call('extPin', { id: v, kind: e.kind, on: e.pinned }); break; }
+    case 'options': call('extOptions', { url: v }); break;
+    case 'folder': call('extFolder', { path: v }); break;
+    case 'loadUnpacked': toast(await call('extLoadUnpacked')); break;
+    case 'addFile': toast(await call('extAddFile')); break;
+    case 'reload': toast(await call('extReload')); break;
+    case 'askRemove': { const e = ext(v); if (!e) break;
+      $('#layer').innerHTML = `<div class="scrim" data-a="close"><div class="sheet" role="dialog" aria-modal="true"><h4>Remove ${esc(e.name)}?</h4>
+        <span style="color:var(--sec2)">It is removed from Pacitum together with its data. You can add it again later.</span>
+        <div class="sa"><button class="btn" data-a="close">Cancel</button><button class="btn red" data-a="remove" data-v="${esc(e.id)}">Remove</button></div></div></div>`;
+      break; }
+    case 'remove': { const e = ext(v); $('#layer').innerHTML = ''; if (e) { await call('extRemove', { id: v, kind: e.kind }); toast(e.name + ' removed'); if (st.id === v) open(''); } break; }
+    case 'close': if (ev.target === el || el.tagName === 'BUTTON') $('#layer').innerHTML = ''; break;
+  }
+});
+document.addEventListener('input', (ev) => { if (ev.target.id === 'q') { st.q = ev.target.value; render(); } });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { if ($('#layer').innerHTML) $('#layer').innerHTML = ''; else if (st.id) open(''); } });
+function refresh() { bridge.state((s) => { D = s; applyPalette(D.palette); render(); }); }
+if (window.qt && qt.webChannelTransport) {
+  new QWebChannel(qt.webChannelTransport, (ch) => {
+    bridge = ch.objects.settings;
+    bridge.changed.connect(refresh);
+    bridge.toast.connect(toast);
+    st.id = location.pathname.replace(/^\/+/, '').split('/')[0] || '';
+    refresh();
+  });
+} else $('#app').innerHTML = '<div class="detail"><h2>Extensions</h2><p>This page only works inside Pacitum.</p></div>';
+</script>
+</body>
+</html>

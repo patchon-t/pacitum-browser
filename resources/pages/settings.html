@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<meta name="color-scheme" content="light dark">
+<style>
+@font-face{font-family:Rubik;src:url(pacitum://fonts/Rubik-VF.ttf) format("truetype");font-weight:300 900}
+:root{--page:%PAGE%;--card:%TOOL%;--text:%TXT%;--sec:%SEC%;--ter:%TER%;--border:%BORD%;--border2:%BORD2%;--field:%FIELD%;
+--surface:%SURF%;--surfh:%SURFH%;--accent:%ACC%;--onacc:%ONACC%;--primary:%PRIMARY%;--onprimary:%ONPRIMARY%;--danger:%DANGER%;
+--dangersoft:%DANGERSOFT%;--ok:%SECURE%;--warn:%WARN%;--sec2:color-mix(in srgb,var(--text) 72%,var(--page));
+--chev:color-mix(in srgb,var(--sec) 75%,var(--page));--warnbg:color-mix(in srgb,#FF9F1A 16%,var(--card));--warnfg:color-mix(in srgb,#8A4B00 82%,var(--text))}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--page);color:var(--text);font:14px Rubik,"Segoe UI","Helvetica Neue",Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+::selection{background:var(--primary);color:var(--onprimary)}
+input,textarea{caret-color:var(--accent)}
+input::placeholder,textarea::placeholder{color:var(--sec);opacity:1}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+body.ring :focus{outline:2px solid var(--primary);outline-offset:2px}
+.app{display:flex;height:100vh}
+nav{width:280px;flex:none;display:flex;flex-direction:column;gap:2px;padding:24px 16px;overflow-y:auto}
+.ntitle{font-weight:600;font-size:26px;letter-spacing:-.02em;padding:0 12px 14px}
+.nsearch{height:40px;display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:0 12px;background:var(--card);border-radius:13px;box-shadow:0 0 0 1px var(--border);flex:none}
+.nsearch input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:14px}
+.nrow{position:relative;height:40px;flex:none;display:flex;align-items:center;gap:12px;padding:0 12px;border:0;border-radius:12px;background:transparent;font-size:14px;font-weight:400;text-align:left;transition:background .15s}
+.nrow:hover{background:var(--surface)}
+.nrow[aria-current=page]{background:var(--card);box-shadow:0 0 0 1px var(--border);font-weight:600}
+.nrow[aria-current=page]::before{content:"";position:absolute;left:0;top:50%;margin-top:-10px;width:4px;height:20px;border-radius:0 4px 4px 0;background:var(--accent)}
+.nrow svg{flex:none;stroke:var(--sec2)}
+.nrow[aria-current=page] svg{stroke:var(--text)}
+.nrow .l{flex:1}
+.badge{font-size:11.5px;font-weight:600;color:var(--warnfg);background:var(--warnbg);border-radius:7px;padding:2px 7px}
+.nempty{padding:8px 12px;color:var(--sec);font-size:13px}
+main{flex:1;min-width:0;overflow-y:auto;padding:32px 56px 48px 24px;scroll-behavior:smooth}
+.col{max-width:920px;display:flex;flex-direction:column;gap:18px;animation:in .22s cubic-bezier(.2,.8,.2,1)}
+body.still .col{animation:none}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+h1{margin:0;font-weight:600;font-size:30px;letter-spacing:-.02em}
+h2{margin:10px 4px 0;font-weight:600;font-size:15px;color:var(--sec2)}
+.card{display:flex;flex-direction:column;padding:4px 22px;background:var(--card);border-radius:20px;box-shadow:0 0 0 1px var(--border)}
+.box{display:flex;flex-direction:column;gap:12px;padding:18px 22px;background:var(--card);border-radius:20px;box-shadow:0 0 0 1px var(--border)}
+.hero{display:flex;align-items:center;gap:18px;padding:22px;background:var(--card);border-radius:22px;box-shadow:0 0 0 1px var(--border)}
+.row{display:flex;align-items:center;gap:16px;min-height:62px;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:0}
+.row.s{min-height:54px}
+.tx{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.t{font-size:15px;font-weight:600}
+.d{font-size:13px;color:var(--sec)}
+.mono{font-family:"JetBrains Mono",Consolas,"Cascadia Mono",monospace}
+.btn{height:36px;padding:0 14px;border:0;border-radius:11px;background:var(--field);font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:8px;flex:none;transition:background .15s,filter .15s}
+.btn:hover{background:var(--surfh)}
+.btn.lg{height:40px;border-radius:12px;padding:0 16px}
+.btn.out{background:var(--card);box-shadow:0 0 0 1px var(--border)}
+.btn.out:hover{background:var(--surface)}
+.btn.ink{background:var(--primary);color:var(--onprimary)}
+.btn.ink:hover{filter:brightness(1.15)}
+.btn.red{background:var(--accent);color:var(--onacc)}
+.btn.red:hover{filter:brightness(1.08)}
+.btn.danger{background:var(--dangersoft);color:var(--danger)}
+.btn.danger:hover{filter:brightness(.97)}
+.btn[disabled]{opacity:.5;cursor:default}
+.ib{width:32px;height:32px;border:0;border-radius:10px;background:var(--card);display:flex;align-items:center;justify-content:center;flex:none}
+.ib:hover{background:var(--surface)}
+.ib.f{background:var(--field)}
+.ib.f:hover{background:var(--surfh)}
+.sw{width:40px;height:24px;border:0;border-radius:12px;background:var(--border2);display:flex;align-items:center;padding:3px;justify-content:flex-start;flex:none;transition:background .15s}
+.sw[aria-checked=true]{background:var(--primary);justify-content:flex-end}
+.sw span{width:18px;height:18px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.sw[disabled]{opacity:.45;cursor:default}
+.seg{display:grid;gap:4px;padding:4px;background:var(--field);border-radius:14px}
+.seg button{height:38px;border:0;border-radius:11px;background:transparent;font-size:13.5px;font-weight:500;transition:background .15s}
+.seg button[aria-checked=true]{background:var(--card);box-shadow:0 0 0 1px var(--border);font-weight:600}
+.seg.sm{border-radius:13px;width:240px}.seg.sm button{height:32px;border-radius:10px;font-size:13px}
+.radio{min-height:50px;display:flex;align-items:center;gap:12px;padding:8px 10px;border:0;border-radius:13px;background:transparent;text-align:left;width:100%;transition:background .15s}
+.radio:hover{background:var(--surface)}
+.radio[aria-checked=true]{background:var(--page)}
+.radio .dot{width:20px;height:20px;border-radius:7px;border:2px solid var(--border2);flex:none;background:transparent}
+.radio[aria-checked=true] .dot{border:6px solid var(--primary);background:#FFFFFF}
+.sel{height:38px;padding:0 34px 0 12px;border:0;border-radius:11px;background:var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%236E6561' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;font-size:14px;appearance:none;-webkit-appearance:none;cursor:pointer}
+.sel:hover{background-color:var(--surfh)}
+.field{height:42px;display:flex;align-items:center;gap:8px;padding:0 6px 0 12px;background:var(--page);border-radius:12px}
+.field>span{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lab{font-size:12.5px;font-weight:600;color:var(--sec)}
+.chev{stroke:var(--chev)}
+.pill{font-size:11.5px;font-weight:600;color:var(--warnfg);background:var(--warnbg);border-radius:7px;padding:2px 7px}
+.av{border-radius:11px;color:#FFFFFF;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none;background-size:cover;background-position:center}
+.pwitem{display:flex;align-items:center;gap:12px;height:58px;padding:0 10px;border:0;border-radius:14px;background:transparent;text-align:left;width:100%;transition:background .15s}
+.pwitem:hover{background:var(--surface)}
+.pwitem[aria-current=true]{background:var(--page)}
+.empty{padding:22px 12px;font-size:13.5px;color:var(--sec);line-height:1.5}
+.swatch{width:30px;height:30px;border:0;border-radius:10px;flex:none}
+.swatch[aria-pressed=true]{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--ring)}
+.tcard{display:flex;flex-direction:column;gap:10px;padding:8px 8px 12px;border:0;border-radius:16px;background:var(--page);text-align:left;box-shadow:0 0 0 1px transparent;transition:box-shadow .15s}
+.tcard[aria-pressed=true]{box-shadow:0 0 0 2px var(--primary)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.th{display:flex;flex-direction:column;gap:10px;padding:8px 8px 12px;border:0;border-radius:18px;background:var(--card);text-align:left;position:relative;box-shadow:0 0 0 1px var(--border);transition:box-shadow .15s}
+.th[aria-pressed=true]{box-shadow:0 0 0 2px var(--accent)}
+.th .pv{height:104px;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:inset 0 0 0 1px rgba(127,127,127,.18)}
+.th .ck{width:20px;height:20px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+/* sheets */
+.scrim{position:fixed;inset:0;background:rgba(10,8,9,.38);display:flex;align-items:center;justify-content:center;z-index:50;animation:fade .16s ease-out}
+.sheet{width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;background:var(--card);border-radius:22px;box-shadow:0 0 0 1px var(--border),0 24px 64px rgba(0,0,0,.28);padding:24px;display:flex;flex-direction:column;gap:14px;animation:pop .2s cubic-bezier(.2,.9,.3,1.15)}
+body.still .scrim,body.still .sheet{animation:none}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+.sheet h3{margin:0;font-size:20px;font-weight:600}
+.sheet .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.in{height:42px;width:100%;padding:0 12px;border:0;border-radius:12px;background:var(--page);font-size:14px;outline:0;box-shadow:inset 0 0 0 1px transparent}
+.in:focus{box-shadow:inset 0 0 0 2px var(--primary)}
+textarea.in{height:80px;padding:10px 12px;resize:vertical}
+.fl{display:flex;flex-direction:column;gap:6px}
+.chk{display:flex;align-items:center;gap:12px;min-height:44px;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--primary)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--primary);color:var(--onprimary);padding:10px 16px;border-radius:12px;font-size:13.5px;font-weight:500;transition:.2s;pointer-events:none;z-index:60;max-width:80vw}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.mark{color:var(--text)}
+.ok{color:var(--ok)}
+.warn{color:var(--warnfg)}
+@media (max-width:820px){nav{width:220px}main{padding:24px 20px 40px 8px}.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav id="nav" aria-label="Settings sections"></nav>
+  <main id="main"><div id="content"></div></main>
+</div>
+<div id="layer"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script>%QWEBCHANNEL%</script>
+<script>
+'use strict';
+// ------------------------------------------------------------------ helpers
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ico = (d, size = 18, sw = 2, cls = '') => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="${cls}"><path d="${d}"/></svg>`;
+const CHEV = ico('M9 6l6 6-6 6', 14, 2.4, 'chev');
+const EXT = ico('M14 4h6v6M20 4l-8 8M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4', 14, 2.4, 'chev');
+const X = ico('M6 6l12 12M18 6L6 18', 12, 2.6);
+const PLUS = ico('M12 5v14M5 12h14', 14, 2.6);
+
+let bridge = null, D = null;
+const st = { section: 'you', q: '', pwQ: '', sel: '', shown: {}, copied: '', resetAsk: false, restartNeeded: false };
+
+function call(name, args) { return new Promise((res) => { if (!bridge) return res(null); bridge.act(name, args || {}, res); }); }
+function setKey(k, v) { D.s[k] = v; if (bridge) bridge.set(k, v); render(); }
+function sv(k, def) { const v = D && D.s ? D.s[k] : undefined; return v === undefined || v === null ? def : v; }
+function toast(t) { if (!t) return; const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2600); }
+function sw(key, def, label, opts) {
+  const on = typeof key === 'boolean' ? key : !!sv(key, def);
+  const dis = opts && opts.disabled ? ' disabled' : '';
+  const act = opts && opts.act ? opts.act : `sw:${key}:${def ? 1 : 0}`;
+  return `<button class="sw" role="switch" aria-checked="${on}" aria-label="${esc(label)}" data-a="${act}"${dis}><span></span></button>`;
+}
+function row(title, desc, control, cls = '') {
+  return `<div class="row ${cls}"><span class="tx"><span class="t">${title}</span>${desc ? `<span class="d">${desc}</span>` : ''}</span>${control || ''}</div>`;
+}
+function seg(key, def, opts, cls = '', cols) {
+  const cur = sv(key, def);
+  return `<div class="seg ${cls}" role="radiogroup" style="grid-template-columns:repeat(${cols || opts.length},minmax(0,1fr))">${opts.map((o) =>
+    `<button role="radio" aria-checked="${cur === o[0]}" data-a="set:${key}" data-v="${esc(o[0])}">${esc(o[1])}</button>`).join('')}</div>`;
+}
+function select(key, def, opts, label) {
+  const cur = String(sv(key, def));
+  return `<select class="sel" aria-label="${esc(label)}" data-c="set:${key}">${opts.map((o) => `<option value="${esc(o[0])}"${String(o[0]) === cur ? ' selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`;
+}
+const isWin = () => D && D.os === 'windows';
+const osName = () => (D && D.os === 'mac' ? 'macOS' : D && D.os === 'linux' ? 'your system' : 'Windows');
+
+// ------------------------------------------------------------------ sections
+const NAV = [
+  { id: 'you', label: 'You and Pacitum', d: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20c1.4-3.6 4.2-5.5 7.5-5.5s6.1 1.9 7.5 5.5', k: 'profile name picture import bookmarks sync google account picker' },
+  { id: 'passwords', label: 'Passwords', d: 'M14.5 9.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zM13.2 12.7L20 19.5M17 16.5l2-2', k: 'password sign in login save autofill pin hello export import check' },
+  { id: 'autofill', label: 'Addresses and payments', d: 'M3.5 6.5h17v11h-17zM3.5 10h17M7 14.5h4', k: 'address card payment credit autofill phone email' },
+  { id: 'privacy', label: 'Privacy and security', d: 'M12 3.5l7 3v5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9v-5z', k: 'clear history cookies cache safe browsing https trackers ads site permissions camera microphone location notifications pop-ups do not track' },
+  { id: 'appearance', label: 'Appearance', d: 'M12 20.5a8.5 8.5 0 1 1 8.5-8.5c0 2.2-1.8 3-3.5 3h-1.8a1.7 1.7 0 0 0-1.2 2.9c.9.9.3 2.6-2 2.6zM7.5 11h.01M10 7.5h.01M14.5 7.5h.01', k: 'theme dark light accent colour color tab size font zoom bookmarks bar home button' },
+  { id: 'search', label: 'Search and address bar', d: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20', k: 'search engine google bing duckduckgo brave yahoo suggestions typing hints shortcuts keyword' },
+  { id: 'default', label: 'Default browser', d: 'M3.5 5h17v14h-17zM3.5 9h17', k: 'default browser links' },
+  { id: 'startup', label: 'On startup', d: 'M12 3.5v8M7 6.5a7 7 0 1 0 10 0', k: 'startup start continue where you left off pages home page' },
+  { id: 'downloads', label: 'Downloads', d: 'M12 4v11M7 10l5 5 5-5M5 20h14', k: 'downloads folder location ask save' },
+  { id: 'languages', label: 'Languages', d: 'M4 5.5h10M9 3.5v2M6 5.5c1 4 4 7 8 8.5M12 5.5c-1 4-4 7-8 8.5M13 20l4-9 4 9M14.5 17h5', k: 'language translate spell check' },
+  { id: 'access', label: 'Accessibility', d: 'M12 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 8.5l7 1.5 7-1.5M12 10v4.5l-3 6M12 14.5l3 6', k: 'accessibility focus ring motion animations caret cursor font size minimum' },
+  { id: 'system', label: 'System and performance', d: 'M7 7h10v10H7zM10 3.5v3.5M14 3.5v3.5M10 17v3.5M14 17v3.5M3.5 10H7M3.5 14H7M17 10h3.5M17 14h3.5', k: 'memory saver sleep tabs graphics acceleration gpu background proxy performance' },
+  { id: 'reset', label: 'Reset settings', d: 'M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5', k: 'reset restore defaults' },
+  { id: 'about', label: 'About Pacitum', d: 'M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zM12 11v5.5M12 7.5v.5', k: 'about version update updates licences source github user agent' },
+  { id: 'themes', label: 'Themes', d: 'M12 20.5a8.5 8.5 0 1 1 8.5-8.5c0 2.2-1.8 3-3.5 3h-1.8a1.7 1.7 0 0 0-1.2 2.9c.9.9.3 2.6-2 2.6zM7.5 11h.01M10 7.5h.01M14.5 7.5h.01', k: 'themes midnight forest sakura sand graphite high contrast custom colours new tab', chev: true }
+];
+
+function renderNav() {
+  const q = st.q.trim().toLowerCase();
+  const issues = D ? D.passwords.filter((p) => p.issue).length : 0;
+  const items = NAV.filter((n) => !q || n.label.toLowerCase().includes(q) || n.k.includes(q));
+  const focusSearch = document.activeElement && document.activeElement.id === 'set-search';
+  $('#nav').innerHTML = `<span class="ntitle">Settings</span>
+    <label class="nsearch" for="set-search">${ico('M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20', 15, 2.4, 'chev')}
+      <input id="set-search" placeholder="Search settings" value="${esc(st.q)}" data-i="navq" autocomplete="off"></label>
+    ${items.map((n) => `<button class="nrow" data-a="go:${n.id}" aria-current="${st.section === n.id ? 'page' : 'false'}">${ico(n.d, 18, 2)}<span class="l">${n.label}</span>${
+      n.id === 'passwords' && issues ? `<span class="badge">${issues}</span>` : ''}${n.chev ? CHEV : ''}</button>`).join('')}
+    ${items.length ? '' : `<span class="nempty">No settings match “${esc(st.q)}”.</span>`}`;
+  if (focusSearch) { const i = $('#set-search'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+}
+
+// ---------------------------------------------------------------- You and Pacitum
+function secYou() {
+  const p = D.profile, sy = D.sync;
+  const av = p.photo ? `<span class="av" style="width:64px;height:64px;border-radius:20px;background-image:url('${p.photo}')"></span>`
+                     : `<span class="av" style="width:64px;height:64px;border-radius:20px;background:${esc(p.colour || 'var(--accent)')};font-size:28px">${esc(p.initial)}</span>`;
+  const tabs = p.tabs === 1 ? '1 tab open' : `${p.tabs} tabs open`;
+  const syncLine = sy.signedIn ? `Syncing as ${esc(sy.email || 'your Google account')}${sy.last ? ` · last synced ${esc(sy.last)}` : ''}` : (sy.hasClient ? 'Not signed in' : 'Needs a one-time setup first');
+  return `<h1>You and Pacitum</h1>
+  <div class="hero">${av}
+    <span class="tx" style="gap:3px"><span style="font-weight:600;font-size:20px">${esc(p.name || 'Profile')}</span><span class="d" style="font-size:13.5px">${p.guest ? 'Guest · nothing is saved' : `${esc(p.email || 'Personal profile')} · ${tabs}`}</span></span>
+    <button class="btn lg" style="height:38px;border-radius:12px" data-a="act:manageProfiles">Manage profiles</button></div>
+  <div class="card">
+    ${row('Profile name and picture', `${esc(p.name)} · <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${esc(p.colour)};vertical-align:-1px"></span>`, `<button class="btn" data-a="act:editProfile">Edit</button>`)}
+    ${row('Import bookmarks and settings', 'From Chrome, Edge, Firefox or an HTML file', `<button class="btn" data-a="sheet:import">Import</button>`)}
+    ${row('Show profile picker when Pacitum starts', 'Pick who is browsing each time', sw(D.picker, true, 'Show profile picker at startup', { act: 'picker' }))}
+  </div>
+  <h2>Sync with Google</h2>
+  <div class="card">
+    ${row('Google account', esc(syncLine) + (sy.status ? `<br>${esc(sy.status)}` : ''), sy.signedIn
+      ? `<div style="display:flex;gap:8px"><button class="btn" data-a="sync:now"${sy.busy ? ' disabled' : ''}>Sync now</button><button class="btn" data-a="sync:signOut">Sign out</button></div>`
+      : `<button class="btn ink lg" style="height:38px" data-a="sync:signIn"${sy.busy ? ' disabled' : ''}>${sy.hasClient ? 'Sign in with Google' : 'Set up sync'}</button>`)}
+    ${sy.signedIn ? row('Profile photo', 'Use your Google account picture for this profile', `<button class="btn" data-a="sync:photo">Use Google photo</button>`) : ''}
+    ${row('Bookmarks', 'Added and deleted bookmarks follow you', sw(!!sy.bookmarks, true, 'Sync bookmarks', { act: 'sync.bookmarks' }))}
+    ${row('Settings', 'Theme, accent, search engine, home page and privacy switches', sw(!!sy.settings, true, 'Sync settings', { act: 'sync.settings' }))}
+    ${row('Notes', 'The Notes side panel', sw(!!sy.notes, true, 'Sync notes', { act: 'sync.notes' }))}
+    ${row('History', 'Your 500 most recent pages', sw(!!sy.history, true, 'Sync history', { act: 'sync.history' }))}
+    ${row('Setup and advanced', 'Step-by-step guide and your own Google OAuth client', `<div style="display:flex;gap:8px"><button class="btn" data-a="sync:guide">Open guide</button><button class="btn" data-a="sheet:syncAdvanced">Advanced</button></div>`)}
+  </div>`;
+}
+
+// ---------------------------------------------------------------- Passwords
+function pwCheckText() {
+  const c = D.pwCheck, n = D.passwords.length;
+  if (!n) return 'No saved passwords yet. Pacitum offers to save one when you sign in to a site.';
+  if (!c.at) return 'Check your saved passwords for ones that are weak or used on more than one site.';
+  const when = new Date(c.at), today = new Date();
+  const time = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const day = when.toDateString() === today.toDateString() ? `today at ${time}` : `${when.toLocaleDateString()} at ${time}`;
+  const parts = [];
+  if (c.reused) parts.push(`${c.reused} password${c.reused === 1 ? ' is' : 's are'} reused`);
+  if (c.weak) parts.push(`${c.weak} ${c.weak === 1 ? 'is' : 'are'} weak`);
+  return (parts.length ? parts.join(' and ') + '.' : 'No problems found.') + ` Checked ${day}.`;
+}
+function secPasswords() {
+  const q = st.pwQ.toLowerCase();
+  const list = D.passwords.slice().sort((a, b) => a.site.localeCompare(b.site));
+  const shown = list.filter((p) => !q || p.site.toLowerCase().includes(q) || p.user.toLowerCase().includes(q));
+  if (!list.find((p) => p.id === st.sel)) st.sel = list.length ? list[0].id : '';
+  const sel = list.find((p) => p.id === st.sel);
+  const issueLong = { Weak: 'This password is easy to guess.', Reused: 'You use this password on more than one site.' };
+  const pin = !!sv('passwords_pin', true) && isWin();
+  const revealed = sel && st.shown[sel.id] != null;
+  const detail = sel ? `<div class="box" style="gap:14px;padding:20px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="av" style="width:48px;height:48px;border-radius:15px;background:${esc(sel.color)};font-size:20px">${esc(sel.letter)}</span>
+        <span class="tx"><span style="font-weight:600;font-size:18px;overflow:hidden;text-overflow:ellipsis">${esc(sel.site)}</span><a href="#" data-a="open" data-v="${esc(sel.url)}" style="font-size:12.5px;color:var(--sec2)">Open site</a></span>
+      </div>
+      <div class="fl"><span class="lab">Username</span>
+        <div class="field"><span>${esc(sel.user || '(none)')}</span><button class="ib" aria-label="Copy username" data-a="copyUser">${ico('M8 8h12v12H8zM16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2', 14, 2.2)}</button></div></div>
+      <div class="fl"><span class="lab">Password</span>
+        <div class="field" style="gap:6px"><span class="mono" style="letter-spacing:.04em">${revealed ? esc(st.shown[sel.id]) : '••••••••••••'}</span>
+          <button class="ib" aria-label="${revealed ? 'Hide password' : 'Show password'}" data-a="reveal">${ico(revealed ? 'M3 3l18 18M10.6 6.6A9.6 9.6 0 0 1 12 6.5c3.7 0 6.8 1.9 9 5.5-.7 1.1-1.5 2.1-2.4 2.9M6.3 8.1C5 9.1 3.9 10.4 3 12c2.2 3.6 5.3 5.5 9 5.5 1.4 0 2.7-.3 3.9-.8M9.9 9.9a2.6 2.6 0 0 0 3.7 3.7' : 'M3 12c2.2-3.6 5.3-5.5 9-5.5s6.8 1.9 9 5.5c-2.2 3.6-5.3 5.5-9 5.5S5.2 15.6 3 12zM12 14.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2z', 15, 2.2)}</button>
+          <button class="ib" style="width:auto;padding:0 10px;font-size:12.5px;font-weight:600" data-a="copyPw">${st.copied === sel.id ? 'Copied' : 'Copy'}</button></div>
+        ${pin ? `<span style="font-size:12px;color:var(--sec)">Pacitum asks for your Windows PIN before showing a password.</span>` : ''}</div>
+      ${sel.issue ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--warnbg);color:var(--warnfg);font-size:13px">
+          ${ico('M12 4l9 16H3zM12 10v4M12 17.5v.5', 15, 2.4)}<span style="flex:1">${issueLong[sel.issue]}</span><a href="#" data-a="open" data-v="${esc(sel.url)}" style="font-weight:600">Change</a></div>` : ''}
+      <div class="fl"><span class="lab">Note</span><span style="min-height:42px;padding:11px 12px;background:var(--page);border-radius:12px;font-size:14px;color:var(--sec2);white-space:pre-wrap">${esc(sel.note || 'No note')}</span></div>
+      <div class="grid2" style="gap:8px"><button class="btn" style="height:42px;border-radius:13px;justify-content:center" data-a="sheet:pwEdit">Edit</button>
+        <button class="btn danger" style="height:42px;border-radius:13px;justify-content:center" data-a="sheet:pwDelete">Delete</button></div>
+    </div>` : '';
+  return `<div style="display:flex;align-items:center;gap:10px">
+      <h1 style="flex:1">Passwords</h1>
+      <button class="btn out lg" data-a="pwImport">Import</button>
+      <button class="btn out lg" data-a="pwExport"${D.passwords.length ? '' : ' disabled'}>Export</button>
+      <button class="btn ink lg" data-a="sheet:pwAdd">${PLUS}Add password</button></div>
+    <div class="box" style="flex-direction:row;align-items:center;gap:16px;padding:16px 18px">
+      <span style="width:44px;height:44px;border-radius:14px;background:var(--warnbg);display:flex;align-items:center;justify-content:center;flex:none;color:var(--warnfg)">${ico('M12 3.5l7 3v5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9v-5zM12 8.5v4M12 15.5v.5', 22, 2)}</span>
+      <span class="tx"><span style="font-weight:600;font-size:16px">Password check</span><span style="font-size:13.5px;color:var(--sec2)">${esc(pwCheckText())}</span></span>
+      <button class="btn lg" style="height:38px" data-a="pwCheck"${D.passwords.length ? '' : ' disabled'}>${D.pwCheck.at ? 'Check again' : 'Check now'}</button></div>
+    <div style="display:grid;grid-template-columns:${sel ? 'minmax(0,1.25fr) minmax(0,1fr)' : '1fr'};gap:16px;align-items:start">
+      <div class="box" style="gap:0;padding:8px">
+        <label for="pw-search" style="height:40px;display:flex;align-items:center;gap:10px;margin:4px 4px 8px;padding:0 12px;background:var(--field);border-radius:12px">
+          ${ico('M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20', 15, 2.4, 'chev')}
+          <input id="pw-search" data-i="pwq" value="${esc(st.pwQ)}" placeholder="Search ${D.passwords.length} saved password${D.passwords.length === 1 ? '' : 's'}" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:14px" autocomplete="off"></label>
+        ${shown.map((p) => `<button class="pwitem" aria-current="${p.id === st.sel}" data-a="pick:${p.id}">
+          <span class="av" style="width:34px;height:34px;background:${esc(p.color)};font-size:14px">${esc(p.letter)}</span>
+          <span class="tx" style="gap:1px"><span style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.site)}</span>
+            <span style="font-size:12.5px;color:var(--sec);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.user || '(no username)')}</span></span>
+          ${p.issue ? `<span class="pill">${esc(p.issue)}</span>` : ''}${CHEV}</button>`).join('')}
+        ${!list.length ? `<span class="empty">No saved passwords yet. When you sign in to a site, Pacitum asks to save the password. You can also import them from a CSV file.</span>`
+          : !shown.length ? `<span class="empty">No saved passwords match “${esc(st.pwQ)}”.</span>` : ''}
+      </div>${detail}</div>
+    <h2>Options</h2>
+    <div class="card">
+      ${row('Offer to save passwords', 'Ask after you sign in to a site', sw('passwords_offer', true, 'Offer to save passwords'))}
+      ${row('Sign in automatically', 'Fill and submit when there is only one saved account', sw('passwords_autosignin', false, 'Sign in automatically'))}
+      ${isWin() ? row('Ask for Windows PIN to show passwords', 'Also needed to copy or export', sw('passwords_pin', true, 'Ask for Windows PIN')) : ''}
+      ${row('Suggest strong passwords', 'When you create a new account', sw('passwords_suggest', true, 'Suggest strong passwords'))}
+    </div>
+    <h2>Never saved</h2>
+    <div class="card">${D.never.length ? D.never.map((o) => `<div class="row s"><span style="flex:1;font-size:14.5px">${esc(o.replace(/^https?:\/\//, ''))}</span>
+      <button class="ib f" aria-label="Remove ${esc(o)} from never saved" data-a="never" data-v="${esc(o)}">${X}</button></div>`).join('')
+      : `<div class="row s"><span class="d" style="flex:1">Sites where you choose “Never for this site” appear here.</span></div>`}</div>`;
+}
+
+// ---------------------------------------------------------------- Addresses and payments
+function secAutofill() {
+  const addrs = D.addresses.map((a) => `<div class="box" style="gap:6px;padding:18px">
+      <span class="lab">Address</span><span style="font-weight:600;font-size:16px">${esc(a.name || a.organization || 'Address')}</span>
+      <span style="font-size:13.5px;color:var(--sec2);line-height:1.5">${esc(a.street)}${a.street ? '<br>' : ''}${esc([a.city, a.region, a.postal].filter(Boolean).join(', '))}${a.country ? '<br>' + esc(a.country) : ''}${a.phone || a.email ? '<br>' + esc([a.phone, a.email].filter(Boolean).join(' · ')) : ''}</span>
+      <div style="display:flex;gap:8px;margin-top:6px"><button class="btn" style="height:34px" data-a="sheet:addr" data-v="${esc(a.id)}">Edit</button><button class="btn danger" style="height:34px" data-a="addrDel" data-v="${esc(a.id)}">Remove</button></div></div>`);
+  const cards = D.cards.map((c) => `<div style="display:flex;flex-direction:column;gap:6px;padding:18px;background:#151112;color:#FFFFFF;border-radius:20px">
+      <span style="font-size:12.5px;font-weight:600;color:#A1A1A8">${esc(c.nickname || 'Card')}</span>
+      <span class="mono" style="font-size:17px;letter-spacing:.08em">${esc(c.masked)}</span>
+      <span style="font-size:13.5px;color:#A1A1A8">${esc(c.name)}${c.name ? ' · ' : ''}Expires ${String(c.m).padStart(2, '0')}/${String(c.y % 100).padStart(2, '0')}</span>
+      <div style="display:flex;gap:8px;margin-top:6px"><button class="btn" style="height:34px;background:#2A2324;color:#FFFFFF" data-a="sheet:card" data-v="${esc(c.id)}">Edit</button><button class="btn" style="height:34px;background:#2A2324;color:#FF8A92" data-a="cardDel" data-v="${esc(c.id)}">Remove</button></div></div>`);
+  return `<h1>Addresses and payments</h1>
+    <div class="card">
+      ${row('Save and fill addresses', 'Includes phone numbers and email', sw('autofill_addresses', true, 'Save and fill addresses'))}
+      ${row('Save and fill payment methods', 'Card numbers stay on this device' + (isWin() ? ' and need your Windows PIN to fill' : ''), sw('autofill_payments', false, 'Save and fill payment methods'))}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:10px 4px 0"><h2 style="margin:0;flex:1">Saved</h2>
+      <button class="btn out" data-a="sheet:addr">${PLUS}Add address</button><button class="btn out" data-a="sheet:card">${PLUS}Add card</button></div>
+    ${addrs.length || cards.length ? `<div class="grid2">${addrs.join('')}${cards.join('')}</div>`
+      : `<div class="card"><div class="row s"><span class="d" style="flex:1">Nothing saved yet. Pacitum asks to save an address after you fill in a form, or add one here.</span></div></div>`}`;
+}
+
+// ---------------------------------------------------------------- Privacy
+function secPrivacy() {
+  const cm = sv('cookie_mode', 'third');
+  const cookieText = { all: 'Sites can use cookies to remember you, including ones from other sites embedded in the page.',
+    private: 'Third-party cookies are blocked in private tabs only.', third: 'Third-party cookies are blocked everywhere. Some sign-in pop-ups may need an exception.' }[cm];
+  const sb = sv('safe_browsing', 'standard');
+  const sbText = { enhanced: 'Blocks known dangerous, scam and tracking sites and warns before risky downloads.', standard: 'Blocks known dangerous sites and downloads.', off: 'Not recommended. Pacitum won’t warn you about dangerous sites.' }[sb];
+  return `<h1>Privacy and security</h1>
+    <div class="box" style="flex-direction:row;align-items:center;gap:16px">
+      <span class="tx"><span class="t">Clear browsing data</span><span class="d">History, cookies, cached images and files</span></span>
+      <button class="btn ink lg" style="height:38px" data-a="sheet:clear">Clear data…</button></div>
+    <div class="box"><span class="t">Cookies</span>${seg('cookie_mode', 'third', [['all', 'Allow all'], ['private', 'Block in private'], ['third', 'Block third-party']])}<span class="d">${cookieText}</span></div>
+    <div class="box"><span class="t">Safe browsing</span>${seg('safe_browsing', 'standard', [['enhanced', 'Enhanced'], ['standard', 'Standard'], ['off', 'Off']])}<span class="d">${sbText}</span></div>
+    <div class="card">
+      ${row('Always use secure connections', 'Upgrade to HTTPS and warn before loading HTTP sites', sw('https_only', true, 'Always use secure connections'))}
+      ${row('Block trackers', 'Stop known tracking scripts and ads on every site', sw('adblock_enabled', true, 'Block trackers'))}
+      ${row('Send a “Do Not Track” request', 'Adds DNT and Global Privacy Control to your requests', sw('do_not_track', false, 'Do Not Track'))}
+      ${row('Clear cookies when Pacitum closes', 'You will be signed out of most sites', sw('clear_cookies_on_exit', false, 'Clear cookies when Pacitum closes'))}
+    </div>
+    <h2>Site permissions</h2>
+    <div class="card">${D.sitePerms.map((p) => `<button class="row s" style="border-left:0;border-right:0;border-top:0;background:transparent;text-align:left;width:100%;padding:0" data-a="sheet:perm" data-v="${esc(p.key)}">
+      <span style="flex:1;font-size:14.5px">${esc(p.label)}</span><span style="font-size:13px;color:var(--sec2)">${esc(p.value)}${p.allowed.length + p.blocked.length ? ` · ${p.allowed.length + p.blocked.length} site${p.allowed.length + p.blocked.length === 1 ? '' : 's'}` : ''}</span>${CHEV}</button>`).join('')}</div>
+    ${D.sites.length ? `<h2>Sites with their own settings</h2><div class="card">${D.sites.map((o) => `<button class="row s" style="border-left:0;border-right:0;border-top:0;background:transparent;text-align:left;width:100%;padding:0" data-a="sheet:site" data-v="${esc(o)}">
+      <span style="flex:1;font-size:14.5px">${esc(o.replace(/^https?:\/\//, ''))}</span>${CHEV}</button>`).join('')}</div>` : ''}`;
+}
+
+// ---------------------------------------------------------------- Appearance
+const ACCENTS = [['Red', '#D9141F'], ['Black', '#151112'], ['Blue', '#2F6FEB'], ['Green', '#1F8F5F'], ['Purple', '#4B3FBF']];
+function themeSetting() { return String(sv('theme', 'System')); }
+function secAppearance() {
+  const t = themeSetting();
+  const cards = [['Light', 'Light', '#F7F4F1', '#FFFFFF'], ['Dark', 'Dark', '#151112', '#2A2324'], ['System', 'Match ' + osName(), 'linear-gradient(90deg,#F7F4F1 50%,#151112 50%)', 'rgba(160,160,168,.5)']];
+  const acc = String(sv('accent', '') || '').toUpperCase();
+  const def = !acc || acc === '#D9141F' || acc === '#2DD4BF';
+  return `<h1>Appearance</h1>
+    <div class="box" style="gap:14px"><span class="t">Theme</span>
+      <div class="grid3">${cards.map((c) => `<button class="tcard" aria-pressed="${t === c[0]}" data-a="theme" data-v="${c[0]}">
+        <span style="height:92px;border-radius:11px;background:${c[2]};display:flex;flex-direction:column;gap:6px;padding:10px;box-shadow:inset 0 0 0 1px rgba(127,127,127,.18)">
+          <span style="height:10px;width:60%;border-radius:4px;background:${c[3]}"></span><span style="height:22px;border-radius:6px;background:${c[3]}"></span></span>
+        <span style="font-size:14px;font-weight:600;padding:0 4px">${esc(c[1])}</span></button>`).join('')}</div>
+      ${['Light', 'Dark', 'System'].includes(t) ? '' : `<span class="d">Using the ${esc((D.themes.find((x) => x.id === t.toLowerCase()) || {}).name || t)} theme. <a href="#" data-a="go:themes" style="font-weight:600;color:var(--text)">Change in Themes</a></span>`}</div>
+    <div class="card">
+      <div class="row"><span class="tx"><span class="t">Accent colour</span><span class="d">Used for the active tab, the cursor and your profile</span></span>
+        <div style="display:flex;gap:8px">${ACCENTS.map((w) => `<button class="swatch" aria-label="${w[0]}" aria-pressed="${w[1] === '#D9141F' ? def : acc === w[1]}" style="background:${w[1]};--ring:${w[1]}" data-a="accent" data-v="${w[1]}"></button>`).join('')}</div></div>
+      ${row('Tab size', 'Compact fits more tabs', seg('tab_size', 'comfy', [['compact', 'Compact'], ['comfy', 'Comfortable']], 'sm'))}
+      ${row('Font size', '', select('default_font_size', 16, [[9, 'Very small'], [12, 'Small'], [16, 'Medium (recommended)'], [20, 'Large'], [24, 'Very large']], 'Font size'))}
+      ${row('Page zoom', '', select('default_zoom', 100, [50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200].map((z) => [z, z + '%']), 'Page zoom'))}
+      ${row('Show bookmarks bar', 'Ctrl+Shift+B', sw('show_bookmarks_bar', true, 'Show bookmarks bar'))}
+      ${row('Show home button', sv('show_home_button', false) ? `Opens ${esc(sv('homepage', 'pacitum://newtab'))} · <a href="#" data-a="sheet:home" style="font-weight:600;color:var(--text)">Change</a>` : '', sw('show_home_button', false, 'Show home button'))}
+      ${row('Always show the downloads button', 'Otherwise it appears after your first download', sw('pin_downloads_button', false, 'Always show downloads button'))}
+    </div>`;
+}
+
+// ---------------------------------------------------------------- Themes
+const T = {
+  light: { strip: '#E8E2DE', stripChip: '#D9D1CC', toolbar: '#FFFFFF', bg: '#F7F4F1', card: '#FFFFFF', text: '#151112', field: '#F1ECE8', accent: '#D9141F' },
+  dark: { strip: '#0E0B0C', stripChip: '#2F2829', toolbar: '#1B1617', bg: '#141011', card: '#1B1617', text: '#F6F1EF', field: '#262021', accent: '#FF3B47' },
+  midnight: { strip: '#0B1230', stripChip: '#1E2A57', toolbar: '#16204A', bg: '#0A1028', card: '#141D44', text: '#EEF2FF', field: '#22305F', accent: '#5A9BFF' },
+  forest: { strip: '#1E3A2C', stripChip: '#2D5241', toolbar: '#F3F7F4', bg: '#E8EFE9', card: '#FFFFFF', text: '#0F1F17', field: '#E1E9E3', accent: '#1F8F5F' },
+  sakura: { strip: '#F3D3DA', stripChip: '#E8BBC5', toolbar: '#FFF8F9', bg: '#FCEFF2', card: '#FFFFFF', text: '#2A1418', field: '#F7E3E8', accent: '#D6336C' },
+  sand: { strip: '#E6D8C1', stripChip: '#D7C5A8', toolbar: '#FBF7F0', bg: '#F3ECDF', card: '#FFFDF9', text: '#2B2117', field: '#EEE4D3', accent: '#C2410C' },
+  graphite: { strip: '#1F2026', stripChip: '#3A3B43', toolbar: '#2E2F36', bg: '#24252B', card: '#2E2F36', text: '#F2F2F4', field: '#3B3C44', accent: '#FF7A45' },
+  contrast: { strip: '#000000', stripChip: '#FFFFFF', toolbar: '#000000', bg: '#000000', card: '#000000', text: '#FFFFFF', field: '#1A1A1A', accent: '#FFD400' }
+};
+function secThemes() {
+  const t = themeSetting().toLowerCase();
+  const follow = t === 'system';
+  const current = follow ? (D.palette.dark ? 'dark' : 'light') : t;
+  const themes = D.themes;
+  const cur = themes.find((x) => x.id === current) || themes[0];
+  const acc = String(sv('accent', '') || '').toUpperCase();
+  const baseAcc = (cur.accent || '#D9141F').toUpperCase();
+  const custom = acc && acc !== baseAcc && acc !== '#D9141F' && acc !== '#2DD4BF';
+  const sws = [['Theme default', baseAcc], ['Red', '#D9141F'], ['Blue', '#2F6FEB'], ['Green', '#1F8F5F'], ['Purple', '#6D5BD0'], ['Orange', '#E8590C']];
+  return `<div style="display:flex;align-items:flex-end;gap:12px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px"><h1>Themes</h1><span style="font-size:14px;color:var(--sec)">Changes the tab strip, toolbar, menus and Pacitum's own pages. Websites keep their own colours.</span></div>
+      <button class="btn lg" style="height:38px" data-a="themeReset">Reset to default</button></div>
+    <div class="grid4">${themes.map((th) => { const c = T[th.id] || T.light; const on = th.id === current; return `<button class="th" aria-pressed="${on}" data-a="pickTheme" data-v="${th.id}">
+      <span class="pv" style="background:${c.bg}">
+        <span style="height:18px;display:flex;align-items:flex-end;gap:3px;padding-left:6px;background:${c.strip}"><span style="width:44px;height:13px;border-radius:5px 5px 0 0;background:${c.toolbar}"></span><span style="width:34px;height:9px;margin-bottom:2px;border-radius:3px;background:${c.stripChip}"></span></span>
+        <span style="height:18px;display:flex;align-items:center;gap:4px;padding:0 6px;background:${c.toolbar}"><span style="flex:1;height:9px;border-radius:4px;background:${c.field}"></span><span style="width:9px;height:9px;border-radius:3px;background:${c.accent}"></span></span>
+        <span style="flex:1;display:flex;gap:5px;padding:7px"><span style="width:26%;border-radius:5px;background:${c.card}"></span><span style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="height:8px;width:60%;border-radius:3px;background:${c.text};opacity:.8"></span><span style="flex:1;border-radius:5px;background:${c.card}"></span></span></span>
+      </span>
+      <span style="display:flex;align-items:center;gap:8px;padding:0 4px"><span style="flex:1;font-size:14px;font-weight:600">${esc(th.name)}</span>
+        ${on ? `<span class="ck"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--onacc)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>` : ''}</span></button>`; }).join('')}</div>
+    <div class="card">
+      <div class="row" style="min-height:64px"><span class="tx"><span class="t">Accent colour</span><span class="d">${custom ? 'Custom colour on top of ' + esc(cur.name) : 'Using the colour that comes with ' + esc(cur.name)}</span></span>
+        <div style="display:flex;gap:8px">${sws.map((w, i) => `<button class="swatch" aria-label="${w[0]}" aria-pressed="${i === 0 ? !custom : custom && acc === w[1]}" style="background:${w[1]};--ring:${w[1]}" data-a="accent" data-v="${i === 0 ? '' : w[1]}"></button>`).join('')}</div></div>
+      ${row(`Follow ${osName()} light and dark`, 'Switch between Pacitum Light and Pacitum Dark with the system', sw(follow, false, 'Follow system light and dark', { act: 'follow' }))}
+      ${row('Use theme on the new tab page', 'Background and shortcut tiles take the theme colours', sw('theme_ntp', true, 'Use theme on the new tab page'))}
+      <div class="row" style="min-height:64px"><span class="tx"><span class="t">Private tabs</span><span class="d">Always use Pacitum Dark so they are easy to spot</span></span>
+        <span style="font-size:13px;font-weight:600;color:var(--sec);background:var(--field);border-radius:8px;padding:4px 10px">Always dark</span></div>
+    </div>
+    <div class="box" style="flex-direction:row;align-items:center;gap:16px">
+      <span style="width:44px;height:44px;border-radius:14px;background:var(--field);display:flex;align-items:center;justify-content:center;flex:none">${ico('M12 5v14M5 12h14', 22, 2)}</span>
+      <span class="tx"><span class="t">Make your own theme</span><span class="d">Pick colours for the tab strip, toolbar and pages, then save it</span></span>
+      <button class="btn red lg" style="height:38px" data-a="sheet:customTheme">${themes.find((x) => x.id === 'custom') ? 'Edit theme' : 'Create theme'}</button></div>`;
+}
+
+// ---------------------------------------------------------------- Search
+function secSearch() {
+  const engines = [['Google', 'Google', 'google.com'], ['Bing', 'Bing', 'bing.com'], ['DuckDuckGo', 'DuckDuckGo', 'duckduckgo.com'], ['Brave', 'Brave Search', 'search.brave.com'], ['Yahoo', 'Yahoo', 'search.yahoo.com']];
+  const cur = sv('search_engine', 'Google');
+  return `<h1>Search and address bar</h1>
+    <div class="box" style="gap:6px;padding:14px"><span class="t" style="padding:4px 8px 6px">Search engine</span>
+      ${engines.map((e) => `<button class="radio" role="radio" aria-checked="${cur === e[0]}" data-a="set:search_engine" data-v="${e[0]}"><span class="dot"></span>
+        <span style="flex:1;font-size:14.5px;font-weight:600">${e[1]}</span><span style="font-size:12.5px;color:var(--sec)">${e[2]}</span></button>`).join('')}</div>
+    <div class="card">
+      ${row('Typing hints', 'Finish addresses in grey as you type. Press Tab to accept.', sw('inline_autocomplete', true, 'Typing hints'))}
+      ${row('Suggestions from your history and bookmarks', 'Shown under the address bar as you type', sw('show_suggestions', true, 'History suggestions'))}
+      ${row('Search suggestions', 'Sends what you type to your search engine', sw('search_suggest_online', true, 'Search suggestions'))}
+      ${row('Search shortcuts', 'Type “yt” then Space to search YouTube', `<button class="btn" data-a="sheet:shortcuts">Manage</button>`)}
+    </div>`;
+}
+
+// ---------------------------------------------------------------- Default browser / startup / downloads
+function secDefault() {
+  const d = D.isDefault;
+  return `<h1>Default browser</h1>
+    <div class="hero"><span style="width:56px;height:56px;border-radius:18px;background:var(--field);display:flex;align-items:center;justify-content:center;flex:none">${ico('M3.5 5h17v14h-17zM3.5 9.5h17', 26, 2)}</span>
+      <span class="tx" style="gap:3px"><span style="font-weight:600;font-size:18px">${d ? 'Pacitum is your default browser' : 'Pacitum is not your default browser'}</span>
+      <span style="font-size:13.5px;color:var(--sec)">Links you click in other apps will open in ${d ? 'Pacitum' : 'another browser'}.</span></span>
+      <button class="btn lg ${d ? '' : 'ink'}" data-a="makeDefault"${d ? ' disabled' : ''}>${d ? 'Default' : 'Make default'}</button></div>`;
+}
+function secStartup() {
+  const cur = sv('startup', sv('restore_session', true) ? 'restore' : 'newtab');
+  const opts = [['newtab', 'Open the new tab page', 'Start fresh every time'], ['restore', 'Continue where you left off', 'Reopen the tabs from last time'], ['pages', 'Open specific pages', 'Choose pages to open at start']];
+  const pages = sv('startup_pages', []) || [];
+  return `<h1>On startup</h1>
+    <div class="box" style="gap:6px;padding:14px">${opts.map((o) => `<button class="radio" style="min-height:58px" role="radio" aria-checked="${cur === o[0]}" data-a="set:startup" data-v="${o[0]}"><span class="dot"></span>
+      <span class="tx"><span style="font-size:14.5px;font-weight:600">${o[1]}</span><span style="font-size:12.5px;color:var(--sec)">${o[2]}</span></span></button>`).join('')}</div>
+    ${cur === 'pages' ? `<h2>Pages</h2><div class="card">${pages.map((u, i) => `<div class="row s"><span style="flex:1;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u)}</span>
+        <button class="ib f" aria-label="Remove ${esc(u)}" data-a="pageDel" data-v="${i}">${X}</button></div>`).join('')}
+      <div class="row s" style="gap:8px"><input class="in" id="newpage" placeholder="Add a page, for example example.com" style="flex:1"><button class="btn" data-a="pageAdd">Add</button><button class="btn" data-a="pagesCurrent">Use current pages</button></div></div>` : ''}`;
+}
+function secDownloads() {
+  return `<h1>Downloads</h1>
+    <div class="card">
+      <div class="row"><span class="tx"><span class="t">Save files to</span><span class="mono" style="font-size:12.5px;color:var(--sec2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(D.downloadDir)}</span></span>
+        <button class="btn" data-a="openDl">Open</button><button class="btn" data-a="chooseDl">Change</button></div>
+      ${row('Ask where to save each file', '', sw('ask_download_location', false, 'Ask where to save each file'))}
+      ${row('Show downloads when they finish', '', sw('show_downloads_when_done', true, 'Show downloads when they finish'))}
+    </div>`;
+}
+
+// ---------------------------------------------------------------- Languages / accessibility / system
+function secLanguages() {
+  const langs = D.languages;
+  const names = langs.slice(0, 2).map((l) => l.name.split(' · ').pop()).join(' and ');
+  return `<h1>Languages</h1>
+    <div class="box" style="gap:4px;padding:14px"><span class="t" style="padding:4px 8px 8px">Preferred languages</span>
+      ${langs.map((l, i) => `<div draggable="true" data-drag="${i}" style="height:52px;display:flex;align-items:center;gap:12px;padding:0 6px 0 10px;border-radius:13px;background:${i === 0 ? 'var(--page)' : 'transparent'}">
+        <span style="font-weight:600;font-size:13px;color:var(--sec);width:18px">${i + 1}</span>
+        <span class="tx" style="gap:0"><span style="font-size:14.5px;font-weight:600">${esc(l.name)}</span>${i === 0 ? '<span style="font-size:12.5px;color:var(--sec)">Sites see this language first</span>' : ''}</span>
+        ${i > 0 ? `<button class="ib f" aria-label="Move up" data-a="langUp" data-v="${i}">${ico('M12 19V5M6 11l6-6 6 6', 13, 2.6)}</button>` : ''}
+        ${langs.length > 1 ? `<button class="ib f" aria-label="Remove ${esc(l.name)}" data-a="langDel" data-v="${i}">${X}</button>` : ''}
+        <span style="cursor:grab;display:flex;padding:4px">${ico('M5 9h14M5 15h14', 16, 2.4, 'chev')}</span></div>`).join('')}
+      <button class="btn" style="align-self:flex-start;margin:6px 8px 2px" data-a="sheet:addLang">Add language</button></div>
+    <div class="card">
+      ${row('Offer to translate pages', `When a page isn't in ${esc(names)}`, sw('offer_translate', true, 'Offer to translate pages'))}
+      ${row('Spell check', esc(names), sw('spellcheck', true, 'Spell check'))}
+    </div>`;
+}
+function secAccess() {
+  const mf = +sv('min_font_size', 0);
+  return `<h1>Accessibility</h1>
+    <div class="card">
+      ${row('Always show focus ring', "Outline the item you're on when using the keyboard", sw('always_focus_ring', false, 'Always show focus ring'))}
+      ${row('Reduce motion', "Fewer animations in Pacitum's own screens", sw('reduce_motion', !sv('animations', true), 'Reduce motion'))}
+      ${row('Move around pages with a text cursor', 'Turn on or off with F7', sw('caret_browsing', false, 'Caret browsing'))}
+      <div class="row"><span class="tx"><span class="t">Minimum font size</span><span class="d">${mf ? `Text on pages never gets smaller than ${mf} px` : 'Off: pages choose their own text sizes'}</span></span>
+        <button class="ib f" style="width:34px;height:34px;border-radius:11px" aria-label="Smaller" data-a="font:-1">${ico('M5 12h14', 13, 2.8)}</button>
+        <span style="width:40px;text-align:center;font-weight:600;font-size:15px;font-variant-numeric:tabular-nums">${mf || 'Off'}</span>
+        <button class="ib f" style="width:34px;height:34px;border-radius:11px" aria-label="Bigger" data-a="font:1">${ico('M12 5v14M5 12h14', 13, 2.8)}</button></div>
+    </div>`;
+}
+function secSystem() {
+  return `<h1>System and performance</h1>
+    <div class="card">
+      ${row('Memory saver', "Sleep tabs you haven't used for 10 minutes. They wake up when you go back.", sw('freeze_background_tabs', true, 'Memory saver'))}
+      ${row('Use graphics acceleration', 'Turn off if pages flicker. Needs a restart.' + (st.restartNeeded ? ` <a href="#" data-a="restart" style="font-weight:600;color:var(--text)">Restart now</a>` : ''), sw('gpu_acceleration', true, 'Use graphics acceleration'))}
+      ${row('Keep running in the background', 'Lets downloads finish after you close the window', sw('run_in_background', false, 'Keep running in the background'))}
+      ${D.os !== 'linux' ? row('Proxy settings', '', `<button class="btn" data-a="proxy">Open in ${osName()}${ico('M14 4h6v6M20 4l-8 8M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4', 13, 2.4)}</button>`) : ''}
+    </div>`;
+}
+
+// ---------------------------------------------------------------- Reset / About
+function secReset() {
+  return `<h1>Reset settings</h1>
+    <div class="box" style="gap:14px;padding:22px;border-radius:22px">
+      <span style="font-weight:600;font-size:17px">Restore settings to their defaults</span>
+      <span style="font-size:14px;line-height:1.55;color:var(--sec2);max-width:600px">This resets your start page, new tab page, search engine, theme and pinned tabs. It also turns off extensions and clears cookies. Bookmarks, history and saved passwords are kept.</span>
+      ${st.resetAsk ? `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:var(--dangersoft)">
+          <span style="flex:1;font-size:14px;font-weight:600;color:var(--danger)">Reset all settings for ${esc(D.profile.name || 'this profile')}?</span>
+          <button class="btn" style="background:var(--card)" data-a="resetNo">Cancel</button><button class="btn red" data-a="resetYes">Reset</button></div>`
+        : `<button class="btn danger lg" style="align-self:flex-start" data-a="resetAsk">Reset settings…</button>`}
+    </div>`;
+}
+const REPO = 'https://github.com/patchon-t/pacitum-browser';
+function secAbout() {
+  const u = D.update || {};
+  const status = u.busy ? 'Checking for updates…' : (u.status || 'Pacitum is up to date');
+  const avail = /available|new version|download/i.test(status) && !/up to date/i.test(status);
+  const failed = /couldn|fail|error|offline/i.test(status);
+  const color = failed ? 'var(--danger)' : avail ? 'var(--warnfg)' : 'var(--ok)';
+  const link = (label, act, v, ext) => `<a href="#" class="row" style="min-height:56px" data-a="${act}" data-v="${esc(v || '')}"><span style="flex:1;font-size:15px;font-weight:600">${label}</span>${ext ? EXT : CHEV}</a>`;
+  return `<h1>About Pacitum</h1>
+    <div class="hero" style="gap:22px;padding:26px">
+      <svg width="76" height="76" viewBox="0 0 2582 2582" role="img" aria-label="Pacitum"><rect width="2582" height="2582" rx="620" fill="#151112"/><path fill="#FFFFFF" d="M919.037 1843.07H574.063C512.885 1843.07 471.657 1780.49 495.802 1724.28L883.927 820.671C905.23 771.075 954.021 738.93 1008 738.93H1395.63C1477.58 738.93 1549.28 755.104 1610.74 787.452C1672.2 819.799 1720.01 865.266 1754.15 923.852C1788.3 982.437 1805.37 1050.91 1805.37 1129.26C1805.37 1208.33 1787.76 1276.8 1752.53 1334.67C1717.67 1392.54 1668.61 1437.1 1605.35 1468.37C1542.45 1499.64 1468.95 1515.28 1384.85 1515.28H1100.18V1282.37H1324.46C1359.69 1282.37 1389.7 1276.26 1414.5 1264.04C1439.66 1251.46 1458.89 1233.67 1472.19 1210.67C1485.84 1187.67 1492.67 1160.53 1492.67 1129.26C1492.67 1097.63 1485.84 1070.67 1472.19 1048.39C1458.89 1025.75 1439.66 1008.5 1414.5 996.634C1389.7 984.414 1359.69 978.304 1324.46 978.304H1218.79V1843.07H919.037Z"/><path fill="#FF0000" d="M2052.05 738.93C2099.09 738.93 2137.22 777.064 2137.22 824.105V1757.9C2137.22 1804.94 2099.09 1843.07 2052.05 1843.07H1922.64C1875.6 1843.07 1837.46 1804.94 1837.46 1757.9V824.105C1837.46 777.064 1875.6 738.93 1922.64 738.93H2052.05Z"/></svg>
+      <span class="tx" style="gap:4px"><span style="font-weight:600;font-size:24px">Pacitum</span>
+        <span style="font-size:14px;color:var(--sec2)">Version ${esc(D.version)} · ${esc(D.arch)} · Qt ${esc(D.qt)} WebEngine · Chromium ${esc(D.chromium)}</span>
+        <span style="display:flex;align-items:center;gap:8px;margin-top:4px;font-size:13.5px;font-weight:600;color:${color}"><span style="width:8px;height:8px;border-radius:3px;background:${color}"></span>${esc(status)}</span></span>
+      <button class="btn lg" data-a="checkUpdates"${u.busy ? ' disabled' : ''}>Check for updates</button></div>
+    <div class="card">
+      ${link('Source code on GitHub', 'open', REPO, true)}
+      ${link("What's new in " + esc(D.version), 'open', REPO + '/releases', true)}
+      ${link('Open-source licences', 'sheet:licences')}
+      ${link('Report a problem', 'open', REPO + '/issues/new', true)}
+    </div>
+    <h2>Advanced</h2>
+    <div class="card">
+      ${row('Check for updates automatically', 'Looks for a new version a few times a day and asks before installing', sw('auto_check_updates', true, 'Check for updates automatically'))}
+      ${row('Update feed', 'A URL returning a GitHub-style release JSON. Leave empty for the default.', `<input class="in" style="width:300px" data-c="setText:update_feed_url" value="${esc(sv('update_feed_url', ''))}" placeholder="Default">`)}
+      ${row('User agent', `<span class="mono" style="font-size:12px;user-select:text">${esc(D.ua)}</span>`, '')}
+      ${row('Profile folder', `<span class="mono" style="font-size:12px;user-select:text">${esc(D.dataDir)}</span>`, `<button class="btn" data-a="openFolder" data-v="${esc(D.dataDir)}">Open</button>`)}
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:2px 4px;color:var(--sec);font-size:13px">
+      <span>Made by Patch · Tech by Patch · A project by</span>
+      %NEXT_MARK%
+    </div>`;
+}
+
+const SECTIONS = { you: secYou, passwords: secPasswords, autofill: secAutofill, privacy: secPrivacy, appearance: secAppearance, themes: secThemes, search: secSearch,
+  default: secDefault, startup: secStartup, downloads: secDownloads, languages: secLanguages, access: secAccess, system: secSystem, reset: secReset, about: secAbout };
+
+function render() {
+  if (!D) return;
+  document.body.classList.toggle('ring', !!sv('always_focus_ring', false));
+  document.body.classList.toggle('still', !!sv('reduce_motion', !sv('animations', true)));
+  renderNav();
+  const a = document.activeElement, id = a && a.id, pos = a && a.selectionStart;
+  $('#content').innerHTML = `<div class="col">${(SECTIONS[st.section] || secYou)()}</div>`;
+  if (id && id !== 'set-search') { const e = document.getElementById(id); if (e) { e.focus(); try { e.setSelectionRange(pos, pos); } catch (x) {} } }
+  wireDrag();
+  document.title = 'Settings · ' + (NAV.find((n) => n.id === st.section) || NAV[0]).label;
+}
+function go(id, keepScroll) {
+  if (!SECTIONS[id]) id = 'you';
+  const changed = st.section !== id;
+  st.section = id; st.resetAsk = false;
+  try { history.replaceState(null, '', 'pacitum://settings/' + id); } catch (e) {}
+  render();
+  if (changed && !keepScroll) $('#main').scrollTop = 0;
+}
+function applyPalette(p) {
+  if (!p) return;
+  const r = document.documentElement.style;
+  const map = { page: 'page', card: 'card', text: 'text', sec: 'sec', ter: 'ter', border: 'border', border2: 'border2', field: 'field', surface: 'surface',
+    surfh: 'surfh', accent: 'accent', onacc: 'onacc', primary: 'primary', onprimary: 'onprimary', danger: 'danger', dangersoft: 'dangersoft', ok: 'ok', warn: 'warn' };
+  for (const k in map) if (p[k]) r.setProperty('--' + map[k], p[k]);
+  document.documentElement.style.colorScheme = p.dark ? 'dark' : 'light';
+}
+
+// ------------------------------------------------------------------ sheets (dialogs)
+function sheet(html, onReady) {
+  const layer = $('#layer');
+  layer.innerHTML = `<div class="scrim" data-a="closeSheet"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+  const first = layer.querySelector('input,select,textarea,button:not([data-a=closeSheet])');
+  if (first) first.focus();
+  if (onReady) onReady(layer.querySelector('.sheet'));
+}
+function closeSheet() { $('#layer').innerHTML = ''; }
+const val = (id) => { const e = document.getElementById(id); return e ? (e.type === 'checkbox' ? e.checked : e.value) : ''; };
+const fld = (id, label, value, type = 'text', ph = '') => `<label class="fl" for="${id}"><span class="lab">${label}</span><input class="in" id="${id}" type="${type}" value="${esc(value || '')}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
+
+const SHEETS = {
+  pwAdd() { this.pwEdit(true); },
+  pwEdit(isNew) {
+    const p = isNew === true ? null : D.passwords.find((x) => x.id === st.sel);
+    sheet(`<h3>${p ? 'Edit password' : 'Add password'}</h3>
+      ${fld('f-url', 'Site', p ? p.url : '', 'text', 'example.com')}
+      ${fld('f-user', 'Username', p ? p.user : '')}
+      <label class="fl" for="f-pw"><span class="lab">Password</span><div style="display:flex;gap:8px"><input class="in" id="f-pw" type="password" value="${p && st.shown[p.id] ? esc(st.shown[p.id]) : ''}" placeholder="${p ? 'Leave empty to keep the current password' : ''}" autocomplete="new-password" style="flex:1">
+        <button class="btn" data-a="genPw">Generate</button></div></label>
+      <label class="fl" for="f-note"><span class="lab">Note</span><textarea class="in" id="f-note">${esc(p ? p.note : '')}</textarea></label>
+      <div class="acts"><button class="btn lg" data-a="closeSheet">Cancel</button><button class="btn ink lg" data-a="pwSave" data-v="${p ? esc(p.id) : ''}">Save</button></div>`);
+  },
+  pwDelete() {
+    const p = D.passwords.find((x) => x.id === st.sel); if (!p) return;
+    sheet(`<h3>Delete password?</h3><span class="d" style="font-size:14px">The password for ${esc(p.user || 'this account')} on ${esc(p.site)} will be deleted from Pacitum. Your account on the site isn't affected.</span>
+      <div class="acts"><button class="btn lg" data-a="closeSheet">Cancel</button><button class="btn red lg" data-a="pwDel" data-v="${esc(p.id)}">Delete</button></div>`);
+  },
+  addr(id) {
+    const a = D.addresses.find((x) => x.id === id) || {};
+    sheet(`<h3>${a.id ? 'Edit address' : 'Add address'}</h3>
+      ${fld('a-name', 'Name', a.name)}${fld('a-org', 'Organisation', a.organization)}${fld('a-street', 'Street address', a.street)}
+      <div class="grid2" style="gap:10px">${fld('a-city', 'City', a.city)}${fld('a-region', 'Province or state', a.region)}${fld('a-postal', 'Postal code', a.postal)}${fld('a-country', 'Country', a.country)}
+      ${fld('a-phone', 'Phone', a.phone, 'tel')}${fld('a-email', 'Email', a.email, 'email')}</div>
+      <div class="acts"><button class="btn lg" data-a="closeSheet">Cancel</button><button class="btn ink lg" data-a="addrSave" data-v="${esc(a.id || '')}">Save</button></div>`);
+  },
+  card(id) {
+    const c = D.cards.find((x) => x.id === id) || {};
+    const months = Array.from({ length: 12 }, (_, i) => i + 1), y0 = new Date().getFullYear(), years = Array.from({ length: 15 }, (_, i) => y0 + i);
+    sheet(`<h3>${c.id ? 'Edit card' : 'Add card'}</h3>
+      ${fld('c-num', 'Card number', '', 'text', c.id ? c.masked + ' (leave empty to keep)' : '')}
+      ${fld('c-name', 'Name on card', c.name)}
+      <div class="grid2" style="gap:10px"><label class="fl"><span class="lab">Expires (month)</span><select class="sel" id="c-m">${months.map((m) => `<option${m === c.m ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
+      <label class="fl"><span class="lab">Expires (year)</span><select class="sel" id="c-y">${years.map((y) => `<option${y === c.y ? ' selected' : ''}>${y}</option>`).join('')}</select></label></div>
+      ${fld('c-nick', 'Nickname (optional)', c.nickname)}
+      <span class="d">Card numbers are encrypted and never leave this device.</span>
+      <div class="acts"><button class="btn lg" data-a="closeSheet">Cancel</button><button class="btn ink lg" data-a="cardSave" data-v="${esc(c.id || '')}">Save</button></div>`);
+  },
+  clear() {
+    sheet(`<h3>Clear browsing data</h3>
+      <label class="chk"><input type="checkbox" id="cl-h" checked><span class="tx"><span class="t" style="font-size:14.5px">Browsing history</span><span class="d">Pages you visited and address bar suggestions</span></span></label>
+      <label class="chk"><input type="checkbox" id="cl-c" checked><span class="tx"><span class="t" style="font-size:14.5px">Cookies and other site data</span><span class="d">Signs you out of most sites</span></span></label>
+      <label class="chk"><input type="checkbox" id="cl-k" checked><span class="tx"><span class="t" style="font-size:14.5px">Cached images and files</span><span class="d">Frees up space; some sites may load slower next time</span></span></label>
+      <div class="acts"><button class="btn lg" data-a="closeSheet">Cancel</button><button class="btn ink lg" data-a="clearNow">Clear data</button></div>`);
+  },
+  perm(key) {
+    const p = D.sitePerms.find((x) => x.key === key); if (!p) return;
+    const opts = p.twoState ? [[1, 'Allowed'], [2, 'Blocked']] : [[0, 'Ask first'], [1, 'Allowed'], [2, 'Blocked']];
+    const list = (arr, label) => arr.length ? `<span class="lab" style="margin-top:6px">${label}</span>${arr.map((o) => `<div class="row s" style="border-bottom:1px solid var(--border)"><span style="flex:1">${esc(o.replace(/^https?:\/\//, ''))}</span>
+      <button class="ib f" aria-label="Remove" data-a="permSiteDel" data-v="${esc(key)}|${esc(o)}">${X}</button></div>`).join('')}` : '';
+    sheet(`<h3>${esc(p.label)}</h3><span class="d" style="font-size:14px">What sites can do when they ask for this</span>
+      <div class="seg" role="radiogroup" style="grid-template-columns:repeat(${opts.length},minmax(0,1fr))">${opts.map((o) => `<button role="radio" aria-checked="${p.decision === o[0]}" data-a="permDef" data-v="${esc(key)}|${o[0]}">${o[1]}</button>`).join('')}</div>
+      ${list(p.allowed, 'Allowed on')}${list(p.blocked, 'Blocked on')}
+      ${!p.allowed.length && !p.blocked.length ? '<span class="d">No sites have their own setting for this yet.</span>' : ''}
+      <div class="acts"><button class="btn ink lg" data-a="closeSheet">Done</button></div>`);
+  },
+  async site(origin) {
+    const r = await call('siteDetail', { origin }); if (!r) return;
+    sheet(`<h3>${esc(r.host || origin)}</h3><span class="d" style="font-size:14px">${esc(origin)}</span>
+      <div class="card" style="padding:0 16px;box-shadow:0 0 0 1px var(--border)">${r.rows.map((x) => `<div class="row s"><span style="flex:1">${esc(x.label)}</span>
+        <select class="sel" data-c="permSite:${esc(x.key)}|${esc(origin)}">${(x.twoState ? [] : [[0, `Default (${x.default})`]]).concat([[1, 'Allow'], [2, 'Block']]).concat(x.twoState ? [[0, `Default (${x.default})`]] : []).map((o) =>
+          `<option value="${o[0]}"${x.decision === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></div>`).join('')}</div>
+      <div class="acts"><button class="btn danger lg" data-a="siteReset" data-v="${esc(origin)}">Reset permissions</button><button class="btn ink lg" data-a="closeSheet">Done</button></div>`);
+  },
+  async import() {
+    const srcs = (await call('importSources')) || [];
+    sheet(`<h3>Import bookmarks and settings</h3>
+      ${srcs.length ? `<label class="fl"><span class="lab">From</span><select class="sel" id="im-src">${srcs.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')}</select></label>
+      <label class="chk"><input type="checkbox" id="im-b" checked><span>Bookmarks</span></label>
+      <label class="chk"><input type="checkbox" id="im-h" checked><span>History</span></label>` : '<span class="d" style="font-size:14px">No other browser with data was found on this computer.</span>'}
+      <span class="d">Or import an HTML bookmarks file exported from any browser.</span>
+      <div class="acts"><button class="btn lg" data-a="importHtml">Choose HTML file…</button>${srcs.length ? '<button class="btn ink lg" data-a="importGo">Import</button>' : '<button class="btn lg" data-a="closeSheet">Close</button>'}</div>`);
+  },
+  syncAdvanced() {
+    sheet(`<h3>Google sync: advanced</h3><span class="d" style="font-size:14px">Only needed if this build doesn't include a Google client: create a “Desktop app” OAuth client with the Google Drive API in Google Cloud.</span>
+      ${fld('sy-id', 'OAuth client ID', D.sync.clientId, 'text', '…apps.googleusercontent.com')}${fld('sy-secret', 'Client secret', '', 'password', 'Leave empty to keep the current one')}
+      <div class="acts"><button class="btn lg" data-a="closeSheet">Cancel</button><button class="btn ink lg" data-a="syncClient">Save</button></div>`);
+  },
+  home() {
+    sheet(`<h3>Home button</h3>${fld('f-home', 'Opens', sv('homepage', 'pacitum://newtab'))}
+      <div class="acts"><button class="btn lg" data-a="homeNtp">Use the new tab page</button><button class="btn ink lg" data-a="homeSave">Save</button></div>`);
+  },
+  shortcuts() {
+    const list = shortcuts();
+    sheet(`<h3>Search shortcuts</h3><span class="d" style="font-size:14px">Type a shortcut, then Space, to search that site from the address bar. Use %s where the words go.</span>
+      <div class="card" style="padding:0 16px;box-shadow:0 0 0 1px var(--border)">${list.map((s, i) => `<div class="row s"><span class="mono" style="width:56px;font-weight:600">${esc(s.key)}</span>
+        <span class="tx"><span style="font-weight:600">${esc(s.name)}</span><span class="d mono" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.url)}</span></span>
+        <button class="ib f" aria-label="Remove ${esc(s.key)}" data-a="scDel" data-v="${i}">${X}</button></div>`).join('')}</div>
+      <div class="grid3" style="grid-template-columns:80px 1fr 2fr;gap:8px"><input class="in" id="sc-k" placeholder="yt"><input class="in" id="sc-n" placeholder="YouTube"><input class="in" id="sc-u" placeholder="https://www.youtube.com/results?search_query=%s"></div>
+      <div class="acts"><button class="btn lg" data-a="scAdd">Add</button><button class="btn ink lg" data-a="closeSheet">Done</button></div>`);
+  },
+  addLang() {
+    sheet(`<h3>Add language</h3><input class="in" id="lang-q" placeholder="Search languages" data-i="langq">
+      <div id="lang-list" style="max-height:340px;overflow:auto;display:flex;flex-direction:column;gap:2px">${langItems('')}</div>
+      <div class="acts"><button class="btn lg" data-a="closeSheet">Close</button></div>`);
+  },
+  customTheme() {
+    const c = sv('custom_theme', null) || { name: 'My theme', strip: '#1E3A2C', toolbar: '#FFFFFF', bg: '#F3F1EC', accent: '#D9141F', dark: false };
+    const pick = (id, label, v) => `<label class="row s" style="cursor:pointer"><span style="flex:1;font-weight:600">${label}</span><input type="color" id="${id}" value="${esc(v)}" style="width:44px;height:32px;border:0;border-radius:8px;background:transparent;cursor:pointer"></label>`;
+    sheet(`<h3>Make your own theme</h3>${fld('ct-name', 'Name', c.name)}
+      <div class="card" style="padding:0 16px;box-shadow:0 0 0 1px var(--border)">${pick('ct-strip', 'Tab strip', c.strip)}${pick('ct-toolbar', 'Toolbar and cards', c.toolbar)}${pick('ct-bg', 'Pages', c.bg)}${pick('ct-accent', 'Accent', c.accent)}
+      <label class="row s" style="cursor:pointer"><span style="flex:1;font-weight:600">Dark text on light colours</span><input type="checkbox" id="ct-light" ${c.dark ? '' : 'checked'} style="width:18px;height:18px;accent-color:var(--primary)"></label></div>
+      <div class="acts"><button class="btn lg" data-a="closeSheet">Cancel</button><button class="btn red lg" data-a="ctSave">Save and use</button></div>`);
+  },
+  licences() {
+    const l = [['Qt 6 and Qt WebEngine', 'LGPL 3.0', 'https://www.qt.io/licensing/open-source-lgpl-obligations'], ['Chromium', 'BSD 3-Clause and others', 'https://www.chromium.org/chromium-projects/'],
+      ['Rubik typeface', 'SIL Open Font License 1.1', 'https://fonts.google.com/specimen/Rubik/license'], ['QR Code generator library', 'MIT', 'https://www.nayuki.io/page/qr-code-generator-library'],
+      ['Pacitum', 'See the repository', REPO]];
+    sheet(`<h3>Open-source licences</h3><div class="card" style="padding:0 16px;box-shadow:0 0 0 1px var(--border)">${l.map((x) => `<a href="#" class="row s" data-a="open" data-v="${esc(x[2])}"><span class="tx"><span style="font-weight:600">${x[0]}</span><span class="d">${x[1]}</span></span>${EXT}</a>`).join('')}</div>
+      <div class="acts"><button class="btn ink lg" data-a="closeSheet">Done</button></div>`);
+  }
+};
+function shortcuts() {
+  const s = sv('search_shortcuts', null);
+  return Array.isArray(s) ? s : [{ key: 'yt', name: 'YouTube', url: 'https://www.youtube.com/results?search_query=%s' }, { key: 'w', name: 'Wikipedia', url: 'https://en.wikipedia.org/w/index.php?search=%s' },
+    { key: 'gh', name: 'GitHub', url: 'https://github.com/search?q=%s' }, { key: 'm', name: 'Google Maps', url: 'https://www.google.com/maps/search/%s' }];
+}
+function langItems(q) {
+  q = q.toLowerCase();
+  return D.moreLanguages.filter((l) => !q || l.name.toLowerCase().includes(q) || l.code.includes(q)).map((l) => `<button class="radio" style="min-height:44px" data-a="langAdd" data-v="${esc(l.code)}"><span style="flex:1">${esc(l.name)}</span><span class="d">${esc(l.code)}</span></button>`).join('') || '<span class="empty">No match</span>';
+}
+
+// ------------------------------------------------------------------ drag to reorder languages
+function wireDrag() {
+  let from = -1;
+  document.querySelectorAll('[data-drag]').forEach((el) => {
+    el.addEventListener('dragstart', (e) => { from = +el.dataset.drag; e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('dragover', (e) => { e.preventDefault(); el.style.boxShadow = 'inset 0 2px 0 var(--primary)'; });
+    el.addEventListener('dragleave', () => { el.style.boxShadow = ''; });
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.style.boxShadow = ''; const to = +el.dataset.drag; if (from < 0 || from === to) return; moveLang(from, to); });
+  });
+}
+function langCodes() { return D.languages.map((l) => l.code); }
+function saveLangs(codes) { setKey('languages', codes); refresh(); }
+function moveLang(from, to) { const c = langCodes(); const [x] = c.splice(from, 1); c.splice(to, 0, x); saveLangs(c); }
+
+// ------------------------------------------------------------------ events
+async function onAction(a, v, el) {
+  const [cmd, arg] = a.split(/:(.*)/s);
+  switch (cmd) {
+    case 'go': go(arg); break;
+    case 'sw': { const [key, def] = arg.split(':'); setKey(key, !sv(key, def === '1')); if (key === 'gpu_acceleration') { st.restartNeeded = true; render(); } break; }
+    case 'set': setKey(arg, el.dataset.v); break;
+    case 'picker': D.picker = !D.picker; bridge.set('picker', D.picker); render(); break;
+    case 'theme': D.s.theme = v; bridge.set('theme', v); break;
+    case 'pickTheme': { const name = { light: 'Light', dark: 'Dark' }[v] || (v.charAt(0).toUpperCase() + v.slice(1)); D.s.theme = name; D.s.accent = ''; bridge.set('accent', ''); bridge.set('theme', name); break; }
+    case 'themeReset': D.s.theme = 'System'; D.s.accent = ''; bridge.set('accent', ''); bridge.set('theme', 'System'); break;
+    case 'follow': { const on = themeSetting() === 'System'; const next = on ? (D.palette.dark ? 'Dark' : 'Light') : 'System'; D.s.theme = next; bridge.set('theme', next); break; }
+    case 'accent': D.s.accent = v; bridge.set('accent', v); render(); break;
+    case 'act': call(arg); break;
+    case 'sync': call('sync', { do: arg }); break;
+    case 'sync.bookmarks': case 'sync.settings': case 'sync.notes': case 'sync.history': { const k = cmd.slice(5); D.sync[k] = !D.sync[k]; bridge.set(cmd, D.sync[k]); render(); break; }
+    case 'sheet': { const f = SHEETS[arg]; if (f) f.call(SHEETS, v); break; }
+    case 'closeSheet': if (el === eventTarget || el.tagName === 'BUTTON') closeSheet(); break;
+    case 'pick': st.sel = arg; render(); break;
+    case 'open': call('openUrl', { url: v }); break;
+    case 'copyUser': { const p = D.passwords.find((x) => x.id === st.sel); if (p) { await call('copy', { text: p.user }); toast('Username copied'); } break; }
+    case 'reveal': {
+      const id = st.sel; if (st.shown[id] != null) { delete st.shown[id]; render(); break; }
+      const pw = await call('pwReveal', { id }); if (pw != null) { st.shown[id] = pw; render(); setTimeout(() => { delete st.shown[id]; render(); }, 60000); } break;
+    }
+    case 'copyPw': { const ok = await call('pwCopy', { id: st.sel }); if (ok) { st.copied = st.sel; render(); toast('Password copied. It clears from the clipboard in a minute.'); setTimeout(() => { st.copied = ''; render(); }, 2500); } break; }
+    case 'pwCheck': { const r = await call('pwCheck'); if (r) toast(r.weak + r.reused ? 'Check finished' : 'No problems found'); break; }
+    case 'pwImport': toast(await call('pwImport')); break;
+    case 'pwExport': toast(await call('pwExport')); break;
+    case 'genPw': { const g = await call('pwGenerate'); const f = $('#f-pw'); if (f && g) { f.value = g; f.type = 'text'; } break; }
+    case 'pwSave': { const r = await call('pwSave', { id: v, url: val('f-url'), user: val('f-user'), password: val('f-pw'), note: val('f-note') });
+      if (typeof r === 'string' && r.includes(' ')) { toast(r); break; } if (r) st.sel = r; if (v) delete st.shown[v]; closeSheet(); toast('Saved'); break; }
+    case 'pwDel': await call('pwDelete', { id: v }); closeSheet(); toast('Password deleted'); break;
+    case 'never': call('neverRemove', { origin: v }); break;
+    case 'addrSave': await call('addrSave', { id: v, name: val('a-name'), organization: val('a-org'), street: val('a-street'), city: val('a-city'), region: val('a-region'),
+      postal: val('a-postal'), country: val('a-country'), phone: val('a-phone'), email: val('a-email') }); closeSheet(); toast('Address saved'); break;
+    case 'addrDel': call('addrDelete', { id: v }); break;
+    case 'cardSave': { const r = await call('cardSave', { id: v, number: val('c-num'), name: val('c-name'), m: +val('c-m'), y: +val('c-y'), nickname: val('c-nick') });
+      if (typeof r === 'string' && r.includes(' ')) { toast(r); break; } closeSheet(); toast('Card saved'); break; }
+    case 'cardDel': call('cardDelete', { id: v }); break;
+    case 'clearNow': await call('clearData', { history: val('cl-h'), cookies: val('cl-c'), cache: val('cl-k') }); closeSheet(); toast('Browsing data cleared'); break;
+    case 'permDef': { const [key, d] = v.split('|'); await call('permDefault', { key, decision: +d }); SHEETS.perm(key); break; }
+    case 'permSiteDel': { const [key, o] = v.split('|'); await call('permSite', { key, origin: o, decision: 0 }); SHEETS.perm(key); break; }
+    case 'siteReset': await call('siteReset', { origin: v }); closeSheet(); toast('Permissions reset'); break;
+    case 'importGo': { const types = []; if (val('im-b')) types.push('bookmarks'); if (val('im-h')) types.push('history'); await call('import', { source: val('im-src'), types }); closeSheet(); toast('Importing…'); break; }
+    case 'importHtml': { const r = await call('importHtml'); if (r) { closeSheet(); toast(r); } break; }
+    case 'syncClient': await call('sync', { do: 'client', id: val('sy-id'), secret: val('sy-secret') || undefined }); closeSheet(); toast('Saved'); break;
+    case 'homeSave': setKey('homepage', val('f-home').trim() || 'pacitum://newtab'); closeSheet(); break;
+    case 'homeNtp': setKey('homepage', 'pacitum://newtab'); closeSheet(); break;
+    case 'scDel': { const l = shortcuts(); l.splice(+v, 1); setKey('search_shortcuts', l); SHEETS.shortcuts(); break; }
+    case 'scAdd': { const k = val('sc-k').trim(), n = val('sc-n').trim(), u = val('sc-u').trim(); if (!k || !u.includes('%s')) { toast('Add a shortcut and a URL with %s'); break; }
+      const l = shortcuts().filter((s) => s.key !== k); l.push({ key: k, name: n || k, url: u }); setKey('search_shortcuts', l); SHEETS.shortcuts(); break; }
+    case 'langAdd': { const c = langCodes(); c.push(v); closeSheet(); saveLangs(c); break; }
+    case 'langDel': { const c = langCodes(); c.splice(+v, 1); saveLangs(c); break; }
+    case 'langUp': moveLang(+v, +v - 1); break;
+    case 'font': { const n = Math.max(0, Math.min(24, (+sv('min_font_size', 0) || (arg > 0 ? 5 : 0)) + (+arg))); setKey('min_font_size', n < 6 ? 0 : n); break; }
+    case 'restart': call('restart'); break;
+    case 'proxy': call('openProxy'); break;
+    case 'makeDefault': call('makeDefault'); toast(isWin() ? 'Choose Pacitum in Windows Settings' : 'Choose Pacitum in your system settings'); break;
+    case 'chooseDl': call('chooseDownloadDir'); break;
+    case 'openDl': call('openFolder', { path: D.downloadDir }); break;
+    case 'openFolder': call('openFolder', { path: v }); break;
+    case 'checkUpdates': D.update = { busy: true, status: 'Checking for updates…' }; render(); call('checkUpdates'); break;
+    case 'resetAsk': st.resetAsk = true; render(); break;
+    case 'resetNo': st.resetAsk = false; render(); break;
+    case 'resetYes': st.resetAsk = false; await call('resetSettings'); toast('Settings reset'); break;
+    case 'pageDel': { const l = (sv('startup_pages', []) || []).slice(); l.splice(+v, 1); setKey('startup_pages', l); break; }
+    case 'pageAdd': { let u = val('newpage').trim(); if (!u) break; if (!/^[a-z]+:\/\//i.test(u)) u = 'https://' + u; const l = (sv('startup_pages', []) || []).slice(); l.push(u); setKey('startup_pages', l); break; }
+    case 'pagesCurrent': { const n = await call('pagesCurrent'); toast(n ? `Added ${n} page${n === 1 ? '' : 's'}` : 'No web pages are open'); break; }
+    case 'ctSave': {
+      const ct = { name: val('ct-name') || 'My theme', strip: val('ct-strip'), toolbar: val('ct-toolbar'), bg: val('ct-bg'), accent: val('ct-accent'), dark: !val('ct-light') };
+      D.s.custom_theme = ct; bridge.set('custom_theme', ct); D.s.theme = 'Custom'; D.s.accent = ''; bridge.set('accent', ''); bridge.set('theme', 'Custom'); closeSheet(); break;
+    }
+  }
+}
+let eventTarget = null;
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-a]'); if (!el) return;
+  if (el.disabled) return;
+  if (el.tagName === 'A') e.preventDefault();
+  if (el.dataset.a === 'closeSheet' && el.classList.contains('scrim') && e.target !== el) return;   // clicks inside the sheet
+  eventTarget = e.target;
+  onAction(el.dataset.a, el.dataset.v, el);
+});
+document.addEventListener('input', (e) => {
+  const k = e.target.dataset && e.target.dataset.i;
+  if (k === 'navq') { st.q = e.target.value; renderNav(); }
+  else if (k === 'pwq') { st.pwQ = e.target.value; render(); }
+  else if (k === 'langq') { $('#lang-list').innerHTML = langItems(e.target.value); }
+});
+document.addEventListener('change', (e) => {
+  const c = e.target.dataset && e.target.dataset.c; if (!c) return;
+  const [cmd, arg] = c.split(/:(.*)/s);
+  if (cmd === 'set') setKey(arg, isNaN(+e.target.value) ? e.target.value : +e.target.value);
+  else if (cmd === 'setText') setKey(arg, e.target.value.trim());
+  else if (cmd === 'permSite') { const [key, o] = arg.split('|'); call('permSite', { key, origin: o, decision: +e.target.value }); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#layer').innerHTML) { closeSheet(); e.preventDefault(); }
+  if (e.key === 'Enter' && e.target.id === 'set-search') { const first = $('#nav .nrow'); if (first) first.click(); }
+  if (e.key === 'Enter' && e.target.id === 'newpage') onAction('pageAdd', '', e.target);
+});
+
+// ------------------------------------------------------------------ start
+function refresh() { if (!bridge) return; bridge.state((s) => { D = s; applyPalette(D.palette); render(); }); }
+function start() {
+  const m = location.pathname.replace(/^\/+/, '').split('/')[0] || (location.hostname === 'settings' ? '' : '');
+  const q = new URLSearchParams(location.search);
+  st.section = SECTIONS[m] ? m : 'you';
+  new QWebChannel(qt.webChannelTransport, (ch) => {
+    bridge = ch.objects.settings;
+    bridge.changed.connect(refresh);
+    bridge.toast.connect(toast);
+    bridge.importFinished.connect((res) => { const ok = (res || []).filter((r) => r.ok).map((r) => `${r.count} ${r.type}`); toast(ok.length ? 'Imported ' + ok.join(' and ') : 'Nothing was imported'); });
+    bridge.state((s) => {
+      D = s; applyPalette(D.palette); render();
+      if (q.get('site')) SHEETS.site(q.get('site'));
+    });
+  });
+}
+if (window.qt && qt.webChannelTransport) start();
+else document.getElementById('content').innerHTML = '<div class="col"><h1>Settings</h1><p class="d">Settings can only be opened inside Pacitum.</p></div>';
+</script>
+</body>
+</html>

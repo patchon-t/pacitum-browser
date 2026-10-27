@@ -3,6 +3,7 @@
 #include "HistoryManager.h"
 #include "AppSettings.h"
 #include "ThemeManager.h"
+#include "SyncManager.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -141,7 +142,9 @@ ImportResult readSource(const Source& s, bool wantBm, bool wantHv, HistoryManage
 } // namespace
 
 FirstRunBridge::FirstRunBridge(BookmarkManager* bm, HistoryManager* hm, Hooks hooks, QObject* parent)
-    : QObject(parent), m_bm(bm), m_hm(hm), m_hooks(std::move(hooks)) {}
+    : QObject(parent), m_bm(bm), m_hm(hm), m_hooks(std::move(hooks)) {
+    connect(SyncManager::instance(), &SyncManager::changed, this, [this]{ emit syncChanged(syncState()); });
+}
 
 QVariantList FirstRunBridge::listImportSources() const {
     QVariantList l;
@@ -192,7 +195,8 @@ void FirstRunBridge::startImport(const QString& source, const QStringList& types
 
 void FirstRunBridge::waitForImport() { if (m_future.isValid() && !m_future.isFinished()) m_future.waitForFinished(); }
 
-bool FirstRunBridge::isDefaultBrowser() const {
+bool FirstRunBridge::isDefaultBrowser() const { return isDefaultBrowserStatic(); }
+bool FirstRunBridge::isDefaultBrowserStatic() {
 #ifdef Q_OS_WIN
     QSettings uc(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice"), QSettings::NativeFormat);
     return uc.value(QStringLiteral("ProgId")).toString().contains(QStringLiteral("Pacitum"), Qt::CaseInsensitive);
@@ -202,15 +206,18 @@ bool FirstRunBridge::isDefaultBrowser() const {
 }
 
 void FirstRunBridge::requestDefaultBrowser() {
+    requestDefaultBrowserStatic();
+    // Re-check a few times while the user is in Settings.
+    for (int ms : {3000, 8000, 15000, 30000})
+        QTimer::singleShot(ms, this, [this]{ emit defaultBrowserChanged(isDefaultBrowser()); });
+}
+void FirstRunBridge::requestDefaultBrowserStatic() {
 #ifdef Q_OS_WIN
     // Windows 10/11 only allow the user to change it: open Settings → Default apps for Pacitum.
     QDesktopServices::openUrl(QUrl(QStringLiteral("ms-settings:defaultapps?registeredAppUser=Pacitum%20Browser")));
 #else
     QDesktopServices::openUrl(QUrl(QStringLiteral("settings://default-apps")));
 #endif
-    // Re-check a few times while the user is in Settings.
-    for (int ms : {3000, 8000, 15000, 30000})
-        QTimer::singleShot(ms, this, [this]{ emit defaultBrowserChanged(isDefaultBrowser()); });
 }
 
 void FirstRunBridge::setTheme(const QString& mode) { if (m_hooks.setTheme) m_hooks.setTheme(mode); emit themeChanged(palette()); }
@@ -222,6 +229,22 @@ void FirstRunBridge::setAccent(const QString& hex) {
 QVariantMap FirstRunBridge::palette() const { return m_hooks.palette ? m_hooks.palette() : QVariantMap{}; }
 bool FirstRunBridge::reducedMotion() const { return Pacitum::reducedMotion(); }
 void FirstRunBridge::finish() { markFirstRunDone(); if (m_hooks.finish) m_hooks.finish(); }
+
+QString FirstRunBridge::searchEngine() const { return AppSettings::get(QStringLiteral("search_engine")).toString(QStringLiteral("Google")); }
+void FirstRunBridge::setSearchEngine(const QString& name) { if (m_hooks.setSearchEngine) m_hooks.setSearchEngine(name); }
+QVariantMap FirstRunBridge::syncState() const {
+    auto* sm = SyncManager::instance();
+    return QVariantMap{{QStringLiteral("signedIn"), sm->signedIn()}, {QStringLiteral("email"), sm->account().email},
+                       {QStringLiteral("name"), sm->account().name},
+                       {QStringLiteral("bookmarks"), sm->syncs(QStringLiteral("bookmarks"))}, {QStringLiteral("settings"), sm->syncs(QStringLiteral("settings"))},
+                       {QStringLiteral("notes"), sm->syncs(QStringLiteral("notes"))}, {QStringLiteral("history"), sm->syncs(QStringLiteral("history"))}};
+}
+void FirstRunBridge::syncSignIn() {
+    if (m_hooks.signIn) m_hooks.signIn(); else SyncManager::instance()->signIn();
+}
+void FirstRunBridge::syncSignOut() { SyncManager::instance()->signOut(); emit syncChanged(syncState()); }
+void FirstRunBridge::setSync(const QString& kind, bool on) { SyncManager::instance()->setSyncs(kind, on); emit syncChanged(syncState()); }
+void FirstRunBridge::openSettings() { markFirstRunDone(); if (m_hooks.openSettings) m_hooks.openSettings(); }
 
 bool FirstRunBridge::isFirstRunDone() { return AppSettings::get(QStringLiteral("first_run_done")).toBool(false); }
 void FirstRunBridge::markFirstRunDone() { AppSettings::set(QStringLiteral("first_run_done"), true); }

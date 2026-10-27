@@ -20,6 +20,7 @@
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QGuiApplication>
+#include <QScreen>
 #include <QLibrary>
 #include <cstdlib>
 #include <QtMath>
@@ -221,7 +222,7 @@ void WindowButton::paintEvent(QPaintEvent*) {
 }
 
 ToggleSwitch::ToggleSwitch(QWidget* parent) : QAbstractButton(parent) {
-    setCheckable(true); setCursor(Qt::PointingHandCursor); setFixedSize(40, 22);
+    setCheckable(true); setCursor(Qt::PointingHandCursor); setFixedSize(40, 24);
     m_anim.setDuration(160); m_anim.setEasingCurve(QEasingCurve::OutCubic);   // kit #38: knob 160 ms
     connect(&m_anim, &QVariantAnimation::valueChanged, this, [this](const QVariant& v){ m_pos = v.toReal(); update(); });
 }
@@ -232,15 +233,21 @@ void ToggleSwitch::nextCheckState() {
     m_anim.setStartValue(m_pos); m_anim.setEndValue(isChecked() ? 1.0 : 0.0); m_anim.start();
 }
 void ToggleSwitch::paintEvent(QPaintEvent*) {
+    // 2.0.1 (design): 40x24 pill, ink ("primary") when on, borderStrong when off, 18 px white knob
+    // with a soft shadow.
     const auto& pal = ThemeManager::current();
     QPainter p(this); p.setRenderHint(QPainter::Antialiasing);
     p.setPen(Qt::NoPen);
-    p.setBrush(mix(QColor(pal.disabled), QColor(pal.accent), m_pos));
-    p.drawRoundedRect(QRectF(0, 0, 40, 22), 11, 11);
-    // knob stretches a little mid-travel (reads as a quick slide rather than a jump)
-    const qreal stretch = 4.0 * std::sin(M_PI * m_pos);
-    p.setBrush(Qt::white);
-    p.drawRoundedRect(QRectF(3 + 18 * m_pos - stretch / 2, 3, 16 + stretch, 16), 8, 8);
+    QColor off(pal.borderStrong), on(pal.primary.isEmpty() ? pal.accent : pal.primary);
+    if (!isEnabled()) { off.setAlphaF(0.5); on.setAlphaF(0.4); }
+    const qreal y0 = (height() - 24) / 2.0;
+    p.setBrush(mix(off, on, m_pos));
+    p.drawRoundedRect(QRectF(0, y0, 40, 24), 12, 12);
+    const qreal x = 3 + 16 * m_pos;
+    p.setBrush(QColor(0, 0, 0, 50));
+    p.drawEllipse(QRectF(x, y0 + 4, 18, 18));
+    p.setBrush(isEnabled() ? QColor(Qt::white) : QColor(255, 255, 255, 200));
+    p.drawEllipse(QRectF(x, y0 + 3, 18, 18));
 }
 
 SegmentThumb::SegmentThumb(QButtonGroup* group, QWidget* parent) : QWidget(parent), m_group(group) {
@@ -331,7 +338,39 @@ PopupMenu::PopupMenu(QWidget* parent) : QMenu(parent) {
     if (!m_shadow) return;   // spec fallback: plain card with 1 px outline (app QSS), no shadow
     setWindowFlags(windowFlags() | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
     setAttribute(Qt::WA_TranslucentBackground);
-    setStyleSheet(QStringLiteral("QMenu{background:transparent;border:none;margin:%1px;padding:6px;}").arg(kShadow));
+    // Scoped by a property so the style never cascades onto plain child menus.
+    setProperty("pacitumPopup", true);
+    setStyleSheet(QStringLiteral("QMenu[pacitumPopup=\"true\"]{background:transparent;border:none;margin:%1px;padding:6px;}").arg(kShadow));
+}
+QMenu* addSubMenu(QMenu* parent, const QString& title, const QIcon& icon) {
+    if (auto* pm = qobject_cast<PopupMenu*>(parent); pm && pm->shadowMargin() > 0) {
+        auto* sm = new PopupMenu(parent);
+        sm->setTitle(title);
+        if (!icon.isNull()) sm->setIcon(icon);
+        parent->addMenu(sm);
+        return sm;
+    }
+    return icon.isNull() ? parent->addMenu(title) : parent->addMenu(icon, title);
+}
+void PopupMenu::showEvent(QShowEvent* e) {
+    QMenu::showEvent(e);
+    auto* pm = qobject_cast<QMenu*>(parentWidget());
+    if (!m_shadow || !pm || !menuAction() || actions().isEmpty()) return;
+    auto* ppm = qobject_cast<PopupMenu*>(pm);
+    const int pmInset = ppm ? ppm->shadowMargin() : 0;
+    const QRect ar = pm->actionGeometry(menuAction());
+    const QPoint itemTop = pm->mapToGlobal(QPoint(0, ar.top()));
+    const int pmLeft = pm->mapToGlobal(QPoint(pmInset, 0)).x();
+    const int pmRight = pm->mapToGlobal(QPoint(pm->width() - pmInset, 0)).x();
+    QScreen* sc = QGuiApplication::screenAt(itemTop);
+    const QRect avail = sc ? sc->availableGeometry() : QRect(0, 0, 1 << 20, 1 << 20);
+    const int gap = 4;
+    int x = pmRight + gap - kShadow;                                  // card to the right of the parent card
+    if (x + width() - kShadow > avail.right()) x = pmLeft - gap - width() + kShadow;   // no room: open to the left
+    int y = itemTop.y() - actionGeometry(actions().first()).top();    // first row level with the parent row
+    if (y + height() - kShadow > avail.bottom()) y = avail.bottom() - height() + kShadow;
+    if (y + kShadow < avail.top()) y = avail.top() - kShadow;
+    move(x, y);
 }
 void PopupMenu::paintEvent(QPaintEvent* e) {
     if (m_shadow) {
@@ -390,54 +429,34 @@ public:
         for (auto* c : w->findChildren<QWidget*>()) if (c->inherits("QWebEngineView")) return false;
         const bool reduced = Pacitum::reducedMotion();
         if (e->type() == QEvent::Hide) {
+            // 2.0.1: close is instant. The old snapshot "ghost" fade-out overlapped the next
+            // pop-up's open animation when a button was clicked again quickly (double image, blink),
+            // and grabbing a snapshot on every close made small actions lag.
             removeScrim(w);
-            // Close: a click-through snapshot fades out (menus/popups 120 ms InCubic, dialogs 120 ms + 0.97).
-            if (w->property("_pmShown").toBool() && !e->spontaneous()) {
-                w->setProperty("_pmShown", false);
-                Motion::ghostOut(w, Motion::Fast, dialog ? 0.97 : 0.98);
-            }
+            if (auto* a = w->findChild<QPropertyAnimation*>(QStringLiteral("_pmFadeIn"), Qt::FindDirectChildrenOnly)) a->stop();
+            w->setWindowOpacity(1.0);
             return false;
         }
-        w->setProperty("_pmShown", true);
-        // Context menus open at the cursor: opacity only, 120 ms (kit #23). Menus/popups 140 ms with
-        // a 4 px drop (kit #22); dialogs 200 ms rising 8 px over a scrim (kit #25). Reduced motion:
-        // the fade stays (120 ms), the movement goes.
+        // Context menus open at the cursor: a 90 ms fade. Drop-downs and pop-ups: 120 ms fade with a
+        // 4 px drop. Dialogs: 160 ms fade rising 8 px over a scrim. No snapshots, no extra windows.
         const bool context = menu && !w->parentWidget() ? true
                              : menu && (QCursor::pos() - w->pos()).manhattanLength() < 24;
-        const int ms = Motion::fadeMs(dialog ? Motion::Medium : context ? Motion::Fast : Motion::Quick);
-        if (ms <= 0) return false;
+        const int ms = reduced ? 0 : dialog ? 160 : context ? 90 : 120;
         if (dialog && w->isModal()) addScrim(w);
-        // 1.9.0 / 1.8.11: zoom out of where it was opened (context menus: the cursor; drop-downs: the
-        // edge nearest the button; dialogs: their centre), after the window has been positioned.
-        if (!reduced && !w->property("_pmNoZoom").toBool()) {
-            QPointer<QWidget> g(w);
-            w->setWindowOpacity(0.0);
-            QTimer::singleShot(0, w, [g, dialog, context, ms]{
-                if (!g || !g->isVisible()) return;
-                const QRect r = g->geometry();
-                const QPoint c = QCursor::pos();
-                QPoint origin = dialog ? r.center()
-                              : context ? c
-                              : QPoint(qBound(r.left(), c.x(), r.right()), qAbs(c.y() - r.top()) <= qAbs(c.y() - r.bottom()) ? r.top() : r.bottom());
-                if (!Motion::popIn(g, origin, dialog ? 0.93 : 0.86, dialog ? Motion::Enter : Motion::Medium)) {
-                    auto* a = new QPropertyAnimation(g.data(), "windowOpacity", g.data());   // plain fade fallback
-                    a->setDuration(ms); a->setStartValue(0.0); a->setEndValue(1.0); a->setEasingCurve(QEasingCurve::OutCubic);
-                    a->start(QAbstractAnimation::DeleteWhenStopped);
-                }
-            });
-            return false;
-        }
+        if (ms <= 0) return false;
+        if (auto* old = w->findChild<QPropertyAnimation*>(QStringLiteral("_pmFadeIn"), Qt::FindDirectChildrenOnly)) { old->stop(); old->deleteLater(); }
         w->setWindowOpacity(0.0);
         auto* a = new QPropertyAnimation(w, "windowOpacity", w);
+        a->setObjectName(QStringLiteral("_pmFadeIn"));
         a->setDuration(ms); a->setStartValue(0.0); a->setEndValue(1.0); a->setEasingCurve(QEasingCurve::OutCubic);
         a->start(QAbstractAnimation::DeleteWhenStopped);
         QPointer<QWidget> guard(w);
-        const int dy = (reduced || context || w->property("_pmNoSlide").toBool()) ? 0 : dialog ? 8 : -4;
+        const int dy = (context || w->property("_pmNoSlide").toBool()) ? 0 : dialog ? 8 : -4;
         if (dy) QTimer::singleShot(0, w, [guard, ms, dy]{   // after the window has been positioned
             if (!guard || !guard->isVisible()) return;
             const QPoint end = guard->pos();
             auto* m = new QPropertyAnimation(guard.data(), "pos", guard.data());
-            m->setDuration(ms + 40); m->setStartValue(end + QPoint(0, dy)); m->setEndValue(end); m->setEasingCurve(QEasingCurve::OutCubic);
+            m->setDuration(ms); m->setStartValue(end + QPoint(0, dy)); m->setEndValue(end); m->setEasingCurve(QEasingCurve::OutCubic);
             m->start(QAbstractAnimation::DeleteWhenStopped);
         });
         return false;

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PacitumBrowser VERSION 1.9.1 LANGUAGES CXX)
+project(PacitumBrowser VERSION 2.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -45,7 +45,9 @@ set(SOURCES
     src/AdBlocker.cpp
     src/SessionManager.cpp
     src/ZoomController.cpp
-    src/SettingsPage.cpp
+    src/Passwords.cpp
+    src/PageDialogs.cpp
+    src/SettingsBridge.cpp
     src/WebProfile.cpp
     src/ProfileManager.cpp
     src/ProfileUi.cpp
@@ -90,7 +92,9 @@ set(HEADERS
     include/AdBlocker.h
     include/SessionManager.h
     include/ZoomController.h
-    include/SettingsPage.h
+    include/Passwords.h
+    include/PageDialogs.h
+    include/SettingsBridge.h
     include/WebProfile.h
     include/ProfileManager.h
     include/ProfileUi.h
@@ -163,7 +167,11 @@ if(TARGET Qt6::Bluetooth)
     target_compile_definitions(PacitumBrowser PRIVATE PACITUM_HAVE_BLUETOOTH)
 endif()
 if(WIN32)
-    target_link_libraries(PacitumBrowser PRIVATE user32 dwmapi shell32 psapi setupapi ole32)
+    target_link_libraries(PacitumBrowser PRIVATE user32 dwmapi shell32 psapi setupapi ole32 crypt32 credui advapi32 windowsapp)
+    if(MSVC)
+        # Windows Hello (C++/WinRT) needs C++20 coroutines; C++17 pulls in the removed <experimental/coroutine>.
+        set_source_files_properties(src/Passwords.cpp PROPERTIES COMPILE_OPTIONS "/std:c++20")
+    endif()
 endif()
 
 # 1.8.9: Windows install helper. Runs from a copy in the temp folder (Qt Core/Gui/Widgets only), shows

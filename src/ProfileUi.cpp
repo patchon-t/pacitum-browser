@@ -25,6 +25,17 @@
 #include <QTimer>
 #include <QPropertyAnimation>
 #include <QScreen>
+#include <QSvgRenderer>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QDateTime>
+#include <QLocale>
+#include <QKeyEvent>
+#include <QWindow>
+#include <algorithm>
+#include "Widgets.h"
 
 static const PacitumPalette& pal() { return ThemeManager::current(); }
 static bool dark() { return QColor(pal().page).lightness() < 128; }
@@ -102,81 +113,246 @@ QLabel* avatarLabel(QWidget* parent, const ProfileInfo& p, int size, int ring = 
 }
 
 // ======================= picker =======================
-ProfilePicker::ProfilePicker(Mode mode, QWidget* parent) : QWidget(parent, Qt::Window), m_mode(mode) {
+// 2.0.1: rebuilt from the design's "Profile picker" artboard (1040 x 680).
+namespace {
+QString relativeDay(qint64 ms) {
+    if (ms <= 0) return QStringLiteral("Not used yet");
+    const QDate d = QDateTime::fromMSecsSinceEpoch(ms).date(), today = QDate::currentDate();
+    const qint64 days = d.daysTo(today);
+    if (days <= 0) return QStringLiteral("Used today");
+    if (days == 1) return QStringLiteral("Yesterday");
+    if (days < 7) return QStringLiteral("%1 days ago").arg(days);
+    if (days < 14) return QStringLiteral("Last week");
+    if (days < 60) return QStringLiteral("%1 weeks ago").arg(days / 7);
+    return QLocale().toString(d, QLocale::ShortFormat);
+}
+int sessionTabs(const QString& id) {
+    QFile f(ProfileManager::instance()->profileDir(id) + QStringLiteral("/browser_session.json"));
+    if (!f.open(QIODevice::ReadOnly)) return 0;
+    return int(QJsonDocument::fromJson(f.readAll()).object().value(QStringLiteral("tabs")).toArray().size());
+}
+QPixmap svgPixmap(const QString& file, int h, qreal dpr) {
+    QSvgRenderer r(file);
+    if (!r.isValid()) return {};
+    const QSize ds = r.defaultSize();
+    const int w = qMax(1, ds.width() * h / qMax(1, ds.height()));
+    QPixmap pm(QSize(w, h) * dpr); pm.setDevicePixelRatio(dpr); pm.fill(Qt::transparent);
+    QPainter p(&pm); p.setRenderHint(QPainter::Antialiasing); r.render(&p, QRectF(0, 0, w, h));
+    return pm;
+}
+
+// One profile row: 68 px, radius 16. Selected = card fill + border + a 4 x 24 accent bar on the left.
+class ProfileRow : public QAbstractButton {
+public:
+    ProfileRow(const ProfileInfo& p, QWidget* parent) : QAbstractButton(parent), m_p(p) {
+        setCheckable(true); setAutoExclusive(false); setCursor(Qt::PointingHandCursor);
+        setFixedHeight(68); setFocusPolicy(Qt::StrongFocus); setAttribute(Qt::WA_Hover, true);
+        const int tabs = p.isGuest ? 0 : sessionTabs(p.id);
+        const QString what = p.isGuest ? QStringLiteral("Nothing is saved") : p.email.isEmpty() ? QStringLiteral("Local profile") : p.email;
+        m_detail = p.isGuest ? what : QStringLiteral("%1 · %2").arg(what, tabs == 0 ? QStringLiteral("No tabs") : tabs == 1 ? QStringLiteral("1 tab") : QStringLiteral("%1 tabs").arg(tabs));
+        m_last = p.isGuest ? QString() : relativeDay(p.lastUsed);
+        setAccessibleName(p.name);
+    }
+    QString id() const { return m_p.isGuest ? QStringLiteral("guest") : m_p.id; }
+    QString name() const { return m_p.name; }
+    bool editMode = false;
+    std::function<void()> onEdit, onActivate;
+protected:
+    void paintEvent(QPaintEvent*) override {
+        const auto& c = pal();
+        QPainter g(this); g.setRenderHint(QPainter::Antialiasing);
+        const QRectF r = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+        if (isChecked()) {
+            g.setPen(QPen(QColor(c.border), 1)); g.setBrush(QColor(c.toolbar)); g.drawRoundedRect(r, 16, 16);
+            g.setPen(Qt::NoPen); g.setBrush(QColor(c.accent));
+            QPainterPath bar; bar.addRoundedRect(QRectF(-4, height() / 2.0 - 12, 8, 24), 4, 4);
+            g.save(); g.setClipRect(QRectF(0, 0, 4, height())); g.drawPath(bar); g.restore();
+        } else if (underMouse()) {
+            g.setPen(Qt::NoPen); g.setBrush(QColor(c.surface)); g.drawRoundedRect(r, 16, 16);
+        }
+        if (hasFocus() && !isChecked()) { g.setPen(QPen(QColor(c.focusRing), 2)); g.setBrush(Qt::NoBrush); g.drawRoundedRect(r.adjusted(1, 1, -1, -1), 15, 15); }
+        const qreal dpr = devicePixelRatioF();
+        g.drawPixmap(QPointF(18, 14), ProfileManager::avatarPixmap(m_p, 40, dpr));
+        QFont f = font(); f.setPixelSize(15); f.setWeight(QFont::Medium);
+        g.setFont(f); g.setPen(QColor(c.text));
+        const int right = editMode ? 52 : 16;
+        QFontMetrics fm(f);
+        g.drawText(QRectF(72, 13, width() - 72 - 130, 22), Qt::AlignLeft | Qt::AlignVCenter, fm.elidedText(m_p.name, Qt::ElideRight, width() - 200));
+        QFont s = font(); s.setPixelSize(13); g.setFont(s); g.setPen(QColor(c.textSecondary));
+        g.drawText(QRectF(72, 35, width() - 72 - 130, 20), Qt::AlignLeft | Qt::AlignVCenter, QFontMetrics(s).elidedText(m_detail, Qt::ElideRight, width() - 200));
+        QFont l = font(); l.setPixelSize(12); g.setFont(l);
+        if (!m_last.isEmpty()) g.drawText(QRectF(width() - right - 120, 0, 120, height()), Qt::AlignRight | Qt::AlignVCenter, m_last);
+        if (editMode && !m_p.isGuest)
+            g.drawPixmap(QPointF(width() - 38, height() / 2.0 - 9), ThemeManager::icon(QStringLiteral("edit"), c.textSecondary, 18).pixmap(QSize(18, 18), dpr));
+    }
+    void mouseReleaseEvent(QMouseEvent* e) override {
+        if (editMode && !m_p.isGuest && e->position().x() > width() - 52 && onEdit) { onEdit(); return; }
+        QAbstractButton::mouseReleaseEvent(e);
+    }
+    void mouseDoubleClickEvent(QMouseEvent*) override { if (onActivate) onActivate(); }
+    void nextCheckState() override { setChecked(true); }
+private:
+    ProfileInfo m_p; QString m_detail, m_last;
+};
+
+// Text button with an icon (Add profile, Browse as guest, Manage).
+QPushButton* flatButton(QWidget* parent, const QString& icon, const QString& text, int px = 14) {
+    auto* b = new QPushButton(text, parent); b->setObjectName(QStringLiteral("PfFlat"));
+    if (!icon.isEmpty()) { b->setIcon(ThemeManager::icon(icon, pal().text, 16)); b->setIconSize(QSize(16, 16)); }
+    b->setCursor(Qt::PointingHandCursor);
+    b->setStyleSheet(QStringLiteral("QPushButton#PfFlat{background:transparent;border:0;border-radius:12px;padding:0 14px;min-height:40px;font-size:%1px;font-weight:500;color:%2;}"
+                                    "QPushButton#PfFlat:hover{background:%3;}QPushButton#PfFlat:pressed{background:%4;}")
+                         .arg(px).arg(pal().text, pal().surface, pal().surfaceHover));
+    return b;
+}
+}
+
+ProfilePicker::ProfilePicker(Mode mode, QWidget* parent) : QWidget(parent, Qt::Window | Qt::FramelessWindowHint), m_mode(mode) {
     ensurePalette();
+    const auto& c = pal();
     setObjectName(QStringLiteral("PfRoot")); setAttribute(Qt::WA_StyledBackground, true);
     setWindowTitle(QStringLiteral("Pacitum — Choose a profile"));
     setWindowIcon(QIcon(QStringLiteral(":/icons/pacitum-icon-256.png")));
     setStyleSheet(baseStyle());
-    auto* v = new QVBoxLayout(this); v->setContentsMargins(0, 0, 0, 0); v->setSpacing(0);
-    auto* body = new QWidget(this); auto* bl = new QVBoxLayout(body); bl->setContentsMargins(32, 36, 32, 32); bl->setSpacing(0);
-    auto* logo = new QLabel(body); logo->setPixmap(QIcon(QStringLiteral(":/icons/pacitum-icon-256.png")).pixmap(QSize(36, 36), devicePixelRatioF()));
-    logo->setAlignment(Qt::AlignCenter);
-    auto* t = new QLabel(QStringLiteral("Who’s browsing?"), body); t->setObjectName(QStringLiteral("PfTitle")); t->setAlignment(Qt::AlignCenter);
-    auto* s = new QLabel(QStringLiteral("Each profile keeps its own bookmarks, history, passwords and theme."), body);
-    s->setObjectName(QStringLiteral("PfSub")); s->setAlignment(Qt::AlignCenter);
-    bl->addWidget(logo); bl->addSpacing(16); bl->addWidget(t); bl->addSpacing(10); bl->addWidget(s); bl->addSpacing(34);
-    m_cards = new QHBoxLayout(); m_cards->setSpacing(16); bl->addLayout(m_cards); bl->addStretch();
-    v->addWidget(body, 1);
-    auto* foot = new QWidget(this); foot->setObjectName(QStringLiteral("PfFooter")); foot->setAttribute(Qt::WA_StyledBackground, true); foot->setFixedHeight(64);
-    auto* fl = new QHBoxLayout(foot); fl->setContentsMargins(20, 0, 20, 0);
-    m_startup = new QCheckBox(QStringLiteral("Show this window on startup"), foot);
-    m_startup->setChecked(ProfileManager::instance()->showPickerOnStartup());
-    connect(m_startup, &QCheckBox::toggled, this, [](bool on){ ProfileManager::instance()->setShowPickerOnStartup(on); });
-    auto* manage = new QPushButton(QStringLiteral("Manage profiles"), foot); manage->setObjectName(QStringLiteral("PfPill"));
-    manage->setIcon(ThemeManager::icon(QStringLiteral("profile-switch"), pal().text, 16)); manage->setCursor(Qt::PointingHandCursor);
-    connect(manage, &QPushButton::clicked, this, [this]{ m_editAll = !m_editAll; rebuild(); });
-    fl->addWidget(m_startup); fl->addStretch(); fl->addWidget(manage);
-    v->addWidget(foot);
+    setFixedSize(1040, 680);
+    auto* h = new QHBoxLayout(this); h->setContentsMargins(0, 0, 0, 0); h->setSpacing(0);
+
+    // Left: ink panel, stacked wordmark, one line of help at the bottom.
+    auto* side = new QWidget(this); side->setFixedWidth(290); side->setObjectName(QStringLiteral("PfSide"));
+    side->setAttribute(Qt::WA_StyledBackground, true);
+    side->setStyleSheet(QStringLiteral("#PfSide{background:%1;}").arg(dark() ? c.frame : QStringLiteral("#151112")));
+    auto* sl = new QVBoxLayout(side); sl->setContentsMargins(36, 48, 36, 40); sl->setSpacing(0);
+    auto* wm = new QLabel(side); wm->setPixmap(svgPixmap(QStringLiteral(":/brand/wordmark_stacked.svg"), 109, devicePixelRatioF()));
+    wm->setAccessibleName(QStringLiteral("Pacitum"));
+    sl->addWidget(wm, 0, Qt::AlignLeft | Qt::AlignTop); sl->addStretch(1);
+    auto* help = new QLabel(QStringLiteral("Each profile keeps its own tabs, history, bookmarks and sign-ins. Switch any time from the menu."), side);
+    help->setWordWrap(true); help->setStyleSheet(QStringLiteral("color:#B8AFAA;font-size:14px;"));
+    sl->addWidget(help);
+    h->addWidget(side);
+
+    // Right: caption buttons, title, list, footer.
+    auto* main = new QWidget(this); auto* ml = new QVBoxLayout(main); ml->setContentsMargins(0, 0, 0, 0); ml->setSpacing(0);
+    auto* caps = new QHBoxLayout; caps->setContentsMargins(0, 0, 0, 0); caps->setSpacing(0); caps->addStretch(1);
+    auto capBtn = [&](const QString& icon, const QString& tip, auto fn) {
+        auto* b = new QToolButton(main); b->setFixedSize(46, 40); b->setToolTip(tip); b->setAccessibleName(tip);
+        b->setIcon(ThemeManager::icon(icon, c.text, 12)); b->setIconSize(QSize(12, 12)); b->setCursor(Qt::ArrowCursor);
+        b->setStyleSheet(QStringLiteral("QToolButton{border:0;background:transparent;}QToolButton:hover{background:%1;}").arg(icon == QLatin1String("close") ? QStringLiteral("#C42B1C") : c.surface));
+        connect(b, &QToolButton::clicked, this, fn); caps->addWidget(b);
+    };
+    capBtn(QStringLiteral("window-minimize"), QStringLiteral("Minimize"), [this]{ showMinimized(); });
+    capBtn(QStringLiteral("close"), QStringLiteral("Close window"), [this]{ close(); });
+    ml->addLayout(caps);
+
+    auto* body = new QWidget(main); auto* bl = new QVBoxLayout(body); bl->setContentsMargins(44, 8, 44, 0); bl->setSpacing(0);
+    auto* head = new QHBoxLayout; head->setContentsMargins(0, 0, 0, 14);
+    auto* title = new QLabel(m_mode == Manage ? QStringLiteral("Profiles") : QStringLiteral("Choose a profile"), body);
+    title->setStyleSheet(QStringLiteral("font-size:22px;font-weight:600;"));
+    m_manage = flatButton(body, QString(), QStringLiteral("Manage"), 13);
+    m_manage->setStyleSheet(m_manage->styleSheet() + QStringLiteral("QPushButton#PfFlat{color:%1;min-height:28px;padding:0 8px;border-radius:8px;}").arg(c.textSecondary));
+    connect(m_manage, &QAbstractButton::clicked, this, [this]{ m_editAll = !m_editAll; m_manage->setText(m_editAll ? QStringLiteral("Done") : QStringLiteral("Manage")); rebuild(); });
+    head->addWidget(title); head->addStretch(1); head->addWidget(m_manage);
+    bl->addLayout(head);
+    m_list = new QVBoxLayout; m_list->setSpacing(4); m_list->setContentsMargins(0, 0, 0, 0);
+    bl->addLayout(m_list);
+    auto* actions = new QHBoxLayout; actions->setContentsMargins(0, 10, 0, 0); actions->setSpacing(4);
+    auto* add = flatButton(body, QStringLiteral("add"), QStringLiteral("Add profile"));
+    auto* guest = flatButton(body, QStringLiteral("profile"), QStringLiteral("Browse as guest"));
+    connect(add, &QAbstractButton::clicked, this, [this]{ const QString id = ProfileEditDialog::addProfile(this); if (!id.isEmpty()) { m_selected = id; rebuild(); } });
+    connect(guest, &QAbstractButton::clicked, this, [this]{ emit chosen(QStringLiteral("guest")); });
+    actions->addWidget(add); actions->addWidget(guest); actions->addStretch(1);
+    bl->addLayout(actions); bl->addStretch(1);
+    ml->addWidget(body, 1);
+
+    auto* foot = new QWidget(main); foot->setObjectName(QStringLiteral("PfFoot")); foot->setAttribute(Qt::WA_StyledBackground, true);
+    foot->setStyleSheet(QStringLiteral("#PfFoot{border-top:1px solid %1;}").arg(c.border));
+    auto* fl = new QHBoxLayout(foot); fl->setContentsMargins(44, 16, 44, 26); fl->setSpacing(10);
+    auto* sw = new ToggleSwitch(foot); sw->setChecked(ProfileManager::instance()->showPickerOnStartup());
+    connect(sw, &ToggleSwitch::toggled, this, [](bool on){ ProfileManager::instance()->setShowPickerOnStartup(on); });
+    auto* swl = new QLabel(QStringLiteral("Show at startup"), foot); swl->setStyleSheet(QStringLiteral("font-size:14px;"));
+    swl->setBuddy(sw);
+    fl->addWidget(sw); fl->addWidget(swl); fl->addStretch(1);
+    auto* open = new QPushButton(foot); m_open = open; open->setObjectName(QStringLiteral("PfOpen")); open->setCursor(Qt::PointingHandCursor);
+    open->setLayoutDirection(Qt::RightToLeft);
+    open->setIcon(ThemeManager::icon(QStringLiteral("arrow-right"), c.onPrimary, 16)); open->setIconSize(QSize(16, 16));
+    open->setStyleSheet(QStringLiteral("QPushButton#PfOpen{background:%1;color:%2;border:0;border-radius:14px;min-height:46px;padding:0 22px;font-size:15px;font-weight:500;}"
+                                       "QPushButton#PfOpen:hover{background:%3;}").arg(c.primary, c.onPrimary, QColor(c.primary).lighter(dark() ? 92 : 135).name()));
+    open->setDefault(true);
+    connect(open, &QAbstractButton::clicked, this, &ProfilePicker::openSelected);
+    fl->addWidget(open);
+    ml->addWidget(foot);
+    h->addWidget(main, 1);
+
     connect(ProfileManager::instance(), &ProfileManager::profilesChanged, this, &ProfilePicker::rebuild);
+    m_selected = ProfileManager::instance()->lastUsed();
     rebuild();
-    resize(qMax(654, 64 + 172 * (int(ProfileManager::instance()->profiles().size()) + 2)), 470);
 }
 
-QWidget* ProfilePicker::card(const ProfileInfo& p, bool add) {
-    auto* c = new ClickFrame(this); c->setObjectName(QStringLiteral("PfCard")); c->setAttribute(Qt::WA_StyledBackground, true); c->setAttribute(Qt::WA_Hover, true);
-    c->setFixedSize(156, 216); c->setCursor(Qt::PointingHandCursor); c->setProperty("editAll", m_editAll);
-    Motion::installHoverLift(c, -3);   // card lifts 3 px on hover (160 ms OutCubic)
-    if (add || p.isGuest) c->setProperty("dashed", add);
-    if (!add && !p.isGuest)   // hover ring in the profile's own colour
-        c->setStyleSheet(QStringLiteral("#PfCard:hover { border: 2px solid %1; }").arg(p.colour));
-    auto* l = new QVBoxLayout(c); l->setContentsMargins(10, 40, 10, 16); l->setSpacing(0); l->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
-    if (add) {
-        auto* plus = new QLabel(c); plus->setFixedSize(76, 76); plus->setAlignment(Qt::AlignCenter);
-        QPixmap pm(qRound(76 * devicePixelRatioF()), qRound(76 * devicePixelRatioF())); pm.setDevicePixelRatio(devicePixelRatioF()); pm.fill(Qt::transparent);
-        { QPainter g(&pm); g.setRenderHint(QPainter::Antialiasing); g.setPen(QPen(QColor(pal().textSecondary), 1.5)); g.drawEllipse(QRectF(1, 1, 74, 74));
-          g.drawPixmap(QPointF(26, 26), ThemeManager::icon(QStringLiteral("add"), pal().text, 24).pixmap(QSize(24, 24), devicePixelRatioF())); }
-        plus->setPixmap(pm); l->addWidget(plus, 0, Qt::AlignHCenter);
-    } else l->addWidget(avatarLabel(c, p, 76), 0, Qt::AlignHCenter);
-    auto* n = new QLabel(add ? QStringLiteral("Add profile") : p.name, c); n->setObjectName(QStringLiteral("PfCardName")); n->setAlignment(Qt::AlignCenter);
-    auto* sub = new QLabel(add ? QStringLiteral("Keep things apart") : p.isGuest ? QStringLiteral("Nothing is saved")
-                           : (p.email.isEmpty() ? QStringLiteral("Local profile") : p.email), c);
-    sub->setObjectName(QStringLiteral("PfCardSub")); sub->setAlignment(Qt::AlignCenter);
-    l->addSpacing(14); l->addWidget(n); l->addSpacing(2); l->addWidget(sub);
-    if (p.isGuest) { auto* b = new QLabel(QStringLiteral("Guest"), c); b->setObjectName(QStringLiteral("PfBadge")); b->move(10, 10); b->adjustSize(); }
-    if (!add && !p.isGuest) {
-        auto* e = new QToolButton(c); e->setObjectName(QStringLiteral("PfEditBtn")); e->setFixedSize(28, 28); e->move(156 - 36, 8);
-        e->setIcon(ThemeManager::icon(QStringLiteral("edit"), pal().textSecondary, 14)); e->setIconSize(QSize(14, 14)); e->setToolTip(QStringLiteral("Edit profile"));
-        e->setVisible(m_editAll); e->setCursor(Qt::PointingHandCursor);
-        const QString id = p.id;
-        connect(e, &QToolButton::clicked, this, [this, id]{ ProfileEditDialog::editProfile(id, this); rebuild(); });
-    }
-    const QString id = p.id; const bool guest = p.isGuest;
-    c->onClick = [this, id, guest, add]{
-        if (add) { if (!ProfileEditDialog::addProfile(this).isEmpty()) rebuild(); return; }
-        emit chosen(guest ? QStringLiteral("guest") : id);
-    };
-    return c;
+void ProfilePicker::paintEvent(QPaintEvent* e) {
+    QPainter p(this); p.fillRect(rect(), QColor(pal().page));
+    QWidget::paintEvent(e);
 }
 
 void ProfilePicker::rebuild() {
-    while (auto* it = m_cards->takeAt(0)) { if (auto* w = it->widget()) w->deleteLater(); delete it; }
-    m_cards->addStretch();
-    for (const auto& p : ProfileManager::instance()->profiles()) m_cards->addWidget(card(p, false));
-    ProfileInfo g; g.isGuest = true; g.name = QStringLiteral("Guest"); g.avatar = QStringLiteral("guest");
-    m_cards->addWidget(card(g, false));
-    m_cards->addWidget(card({}, true));
-    m_cards->addStretch();
+    while (auto* it = m_list->takeAt(0)) { if (auto* w = it->widget()) w->deleteLater(); delete it; }
+    auto list = ProfileManager::instance()->profiles();
+    std::sort(list.begin(), list.end(), [](const ProfileInfo& a, const ProfileInfo& b){ return a.lastUsed > b.lastUsed; });
+    bool found = false;
+    for (const auto& p : list) found |= p.id == m_selected;
+    if (!found && !list.isEmpty()) m_selected = list.first().id;
+    for (const auto& p : list) {
+        auto* row = new ProfileRow(p, this);
+        row->editMode = m_editAll;
+        row->setChecked(p.id == m_selected);
+        const QString id = p.id;
+        connect(row, &QAbstractButton::clicked, this, [this, id]{ select(id); });
+        row->onActivate = [this, id]{ select(id); openSelected(); };
+        row->onEdit = [this, id]{ ProfileEditDialog::editProfile(id, this); rebuild(); };
+        m_list->addWidget(row);
+    }
+    select(m_selected);
+}
+
+void ProfilePicker::select(const QString& id) {
+    m_selected = id;
+    QString name;
+    for (int i = 0; i < m_list->count(); ++i)
+        if (auto* r = dynamic_cast<ProfileRow*>(m_list->itemAt(i)->widget())) {
+            r->setChecked(r->id() == id); r->update();
+            if (r->id() == id) name = r->name();
+        }
+    if (m_open) {
+        m_open->setText(QStringLiteral("Open as %1").arg(name.isEmpty() ? QStringLiteral("profile") : name));
+        m_open->setEnabled(!name.isEmpty());
+    }
+}
+
+void ProfilePicker::openSelected() { if (!m_selected.isEmpty()) emit chosen(m_selected); }
+
+void ProfilePicker::keyPressEvent(QKeyEvent* e) {
+    QList<ProfileRow*> rows;
+    for (int i = 0; i < m_list->count(); ++i) if (auto* r = dynamic_cast<ProfileRow*>(m_list->itemAt(i)->widget())) rows << r;
+    int cur = -1;
+    for (int i = 0; i < rows.size(); ++i) if (rows[i]->id() == m_selected) cur = i;
+    if ((e->key() == Qt::Key_Down || e->key() == Qt::Key_Up) && !rows.isEmpty()) {
+        const int n = qBound(0, cur + (e->key() == Qt::Key_Down ? 1 : -1), int(rows.size()) - 1);
+        select(rows[n]->id()); rows[n]->setFocus(); return;
+    }
+    if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) { openSelected(); return; }
+    if (e->key() == Qt::Key_Escape) { close(); return; }
+    QWidget::keyPressEvent(e);
+}
+
+// Frameless: drag the window from any empty spot.
+void ProfilePicker::mousePressEvent(QMouseEvent* e) {
+    if (e->button() == Qt::LeftButton) {
+        if (auto* wh = windowHandle(); wh && wh->startSystemMove()) return;
+        m_dragFrom = e->globalPosition().toPoint() - frameGeometry().topLeft();
+    }
+    QWidget::mousePressEvent(e);
+}
+void ProfilePicker::mouseMoveEvent(QMouseEvent* e) {
+    if ((e->buttons() & Qt::LeftButton) && !m_dragFrom.isNull()) move(e->globalPosition().toPoint() - m_dragFrom);
+    QWidget::mouseMoveEvent(e);
 }
 
 void ProfilePicker::closeEvent(QCloseEvent* e) { QWidget::closeEvent(e); }

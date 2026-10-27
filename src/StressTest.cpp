@@ -122,7 +122,7 @@ void BrowserWindow::runStressTest() {
             auto ntp = std::make_shared<int>(-1);
             QTimer::singleShot(2500, this, [home, ntp]{
                 if (home && home->view()) home->view()->page()->runJavaScript(
-                    QStringLiteral("(typeof S==='object'&&document.querySelectorAll('#dock .sc').length>0&&!!document.getElementById('sheet'))?1:0"),
+                    QStringLiteral("(typeof S==='object'&&!!document.getElementById('q')&&!!document.getElementById('cz')&&document.getElementById('clock').textContent.length>0)?1:0"),
                     [ntp](const QVariant& v){ *ntp = v.toInt(); });
             });
             QTimer::singleShot(4000, this, [this, st, ntp]{

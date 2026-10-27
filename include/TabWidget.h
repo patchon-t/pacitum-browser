@@ -10,6 +10,7 @@
 #include <functional>
 #include <QAbstractButton>
 #include <QVariantAnimation>
+#include <QElapsedTimer>
 
 class AnimatedToolButton;
 
@@ -32,6 +33,7 @@ protected:
 class PacitumTabBar : public QTabBar {
     Q_OBJECT
 public:
+    static void setCompact(bool on);   // 2.0.1 Settings › Tab size
     void setSpinnerSuspended(bool on);   // pause the loading-spinner animation while the window is minimized/hidden
     // Pacitum 1.5 floating-tab look (custom painted; used for the window's tab strip).
     void enableFloatingTabs();
@@ -68,6 +70,7 @@ protected:
     void mousePressEvent(QMouseEvent* e) override;
     void mouseDoubleClickEvent(QMouseEvent* e) override;
     void mouseMoveEvent(QMouseEvent* e) override;
+    void mouseReleaseEvent(QMouseEvent* e) override;
     void leaveEvent(QEvent* e) override;
     void tabInserted(int index) override;
     void tabRemoved(int index) override;
@@ -76,6 +79,13 @@ protected:
 
 private:
     void startSelectionSlide();
+    void cancelSlide();                       // snap the active shape to its tab
+    void markStructChange();                  // open / close / move: no glide for a moment
+    QElapsedTimer m_structTimer;
+    bool m_structSeen = false;
+    bool m_dragging = false;                  // a tab is being dragged
+    QPoint m_pressPos;
+    mutable bool m_selPainted = false;        // the active tab was painted in this paint event
     QVariantAnimation* m_slideAnim = nullptr;
     QRectF m_slideFrom;
     qreal m_slideT = 1.0;                     // 1 = no slide running
@@ -93,6 +103,7 @@ private:
     QHash<quint64, QVariantAnimation*> m_hoverAnim;
     quint64 m_hoverId = 0;
     QVariantAnimation* m_spin = nullptr;
+    QElapsedTimer m_spinTick;                 // spinner repaints are limited to ~30 a second
     bool m_spinSuspended = false;
     qreal m_spinAngle = 0;
     qreal m_spinV = 0;                        // shared spinner phase 0..1 (1600 ms loop)

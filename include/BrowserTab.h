@@ -18,6 +18,7 @@ class QToolButton;
 
 class FindBar;
 class PermissionController;
+#include "Passwords.h"
 namespace Motion { class FadeOverlay; }
 
 class BrowserTab : public QWidget {
@@ -65,7 +66,7 @@ public:
     // Session restore: remember the URL/title but only create the page load when first shown.
     void setLazyUrl(const QString& url, const QString& title);
     bool isLazy() const { return !m_pendingUrl.isEmpty(); }
-    static std::function<BrowserTab*()> s_popupFactory;
+    static std::function<BrowserTab*(int)> s_popupFactory;   // QWebEnginePage::WebWindowType
     void showFindBar();
     void refreshTheme();   // re-tint native chrome inside the tab (info bar)
     void hideFindBar();
@@ -74,6 +75,8 @@ public:
     bool hasInternalChannel() const;
 
 signals:
+    void passwordOffer(const Credential& c, bool update);   // 2.0.1 "Save password?"
+    void addressOffer(const AutofillAddress& a);
     void urlChanged(const QString& url);
     void titleChanged(const QString& title);
     void loadingChanged(bool loading);

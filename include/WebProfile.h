@@ -10,6 +10,17 @@ namespace Pacitum {
 void configureProfile(QWebEngineProfile* profile, bool persistent);
 // Apply user-controlled web settings (JS, popups) to a settings object.
 void applyWebSettings(QWebEngineSettings* s);
+// 2.0.1 Settings: languages + spell check, cookie mode, fonts. Re-read from browser_settings.json.
+void applyProfilePrefs(QWebEngineProfile* profile, bool privateProfile);
+// "Always use secure connections": the page interceptor upgrades http:// navigations to https://
+// (thread-safe; read on the network thread). Hosts the user chose to open over http are remembered
+// until Pacitum closes.
+void setHttpsOnly(bool on);
+bool httpsOnly();
+void allowHttp(const QString& host);
+bool httpAllowed(const QString& host);
+bool wasUpgraded(const QString& host);
+void setSafeBrowsing(const QString& mode);
 
 // Disk-backed main profile (Qt 6's defaultProfile() is off-the-record, so cookies would not persist).
 QWebEngineProfile* mainProfile();
