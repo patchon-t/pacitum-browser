@@ -1,18 +1,119 @@
-![Pacitum_Titile](สกรีนช็อต%202026-10-13%20152618.png)
-# Pacitum Browser (Qt6 WebEngine)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/banner-dark.png">
+    <img src="docs/readme/banner-light.png" alt="Pacitum Browser 2.0: a calm, fast browser, redrawn" width="100%">
+  </picture>
+</p>
 
-A calm, fast web browser written in C++17 on Qt 6 WebEngine.
-Version **2.0.0**: a complete redesign.
+<p align="center">
+  <a href="https://github.com/namo2024mntik-ops/pacitum-browser/releases/latest"><b>Download</b></a> ·
+  <a href="#whats-new-in-200">What's new</a> ·
+  <a href="#build-from-source">Build from source</a> ·
+  <a href="BUILD.md">BUILD.md</a>
+</p>
 
-**2.0 at a glance**
-- **New look**: warm neutrals, ink for actions and Pacitum red for the active tab and highlights, in light and dark. The design system is in [docs/design-system-2.0.md](docs/design-system-2.0.md).
-- **New logo**: a new app icon (Windows, macOS, Linux, installer) and the PACITUM wordmark on the new tab and About pages.
-- **Rubik** is the new interface font (bundled).
-- **Taller tabs** with a red bar on the active one, a 60 px toolbar, a bigger address bar, bolder icons.
-- **Pop-ups toggle**: a second click on Extensions, Downloads, Profile or ⋮ closes the pop-up instead of reopening it (it used to blink).
-- **About Pacitum** shows the wordmark and the NEXT PROJECT mark. ⋮ › Help and about Pacitum opens it.
+# Pacitum Browser 2.0
 
-Earlier: 1.9.1 and 1.8.12 (two editions from the same source):
+Pacitum is a calm, fast web browser written in C++17 on **Qt 6 WebEngine**. It runs the same Chromium engine as Chrome and Edge, and keeps its own interface out of the way so the page gets the space. It runs on Windows, Linux and macOS.
+
+**2.0.0 redraws the whole browser**: a new identity, and a new look for every screen from the tab strip to the smallest dialog.
+
+## Download
+
+| Windows | Linux | macOS (Apple silicon) |
+|---|---|---|
+| `PacitumBrowser-Setup-2.0.0.exe` | `PacitumBrowser-2.0.0-linux-x86_64.AppImage` | `PacitumBrowser-2.0.0-macOS-arm64.dmg` |
+
+Get the file for your system from the [latest release](https://github.com/namo2024mntik-ops/pacitum-browser/releases/latest). Each file has a `.sha256` checksum next to it. Pacitum updates itself after that.
+
+## What's new in 2.0.0
+
+<p align="center">
+  <img src="docs/readme/newtab-light.webp" alt="Pacitum 2.0 new tab page in the light theme" width="49%">
+  <img src="docs/readme/omnibox-dark.webp" alt="Pacitum 2.0 address bar suggestions in the dark theme" width="49%">
+</p>
+
+- **New identity.** The wordmark is PACI and TUM on one line, with a new app icon and one red.
+- **Warm paper and ink.** Light is warm neutrals with ink text; dark swaps every colour. One red marks only what is selected.
+- **Tab strip.** The active tab is white and merges into the toolbar, marked by a short red bar on its top edge. The other tabs sit flat on the strip.
+- **Address bar.** One field for search and addresses, with suggestions from your search engine and your history, and the keys to move through them.
+- **New tab page.** Top sites with visit counts, "Where you left off" to restore your last window, and how many tabs are asleep.
+- **More menu (⋮).** History, downloads, zoom and print in one menu.
+- **Extensions, profiles and site permissions.** A new extension manager, a profile picker, and permission prompts that say what a site wants.
+- **Settings and themes.** Every setting on one page with a sidebar, and themes that recolour the whole browser.
+
+## Features
+
+- **Chrome extensions.** Click **Add to Pacitum** on a Chrome Web Store page, or add a `.crx`, `.zip` or unpacked folder. Pacitum lists what an extension may do before you add it.
+- **Search suggestions** from Google, Bing, DuckDuckGo, Brave or Yahoo, plus up to four pages from your history.
+- **Split view and tools.** Two pages side by side, screenshot, picture-in-picture, a notes panel and a QR code for the page.
+- **Reader mode and Translate.**
+- **Bookmark folders** on the bookmarks bar, with Open all, drag and drop, and sync.
+- **Google sync.** Bookmarks, settings, notes and recent history sync through a private area of your Google Drive. See [`SYNC.md`](SYNC.md).
+- **Safer downloads and updates.** Downloads are marked as from the internet on Windows so SmartScreen checks them. The updater only installs a release with a SHA-256 checksum, over HTTPS from GitHub.
+- **Ad and tracker blocking**, private tabs and session restore.
+
+## System requirements
+
+| | Windows | Linux | macOS |
+|---|---|---|---|
+| **OS** | Windows 10 (1809+) or Windows 11, 64-bit | x86_64 with glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 36 or newer) | Apple silicon; may need a newer macOS than 12 |
+| **CPU** | x86_64 | x86_64 | Apple silicon (M1 or newer) |
+
+- **Memory:** 4 GB minimum, 8 GB recommended (each site runs in its own Chromium process; Pacitum caps this at 8).
+- **Disk:** about 500 MB free, plus space for cache, profile data and extensions.
+- **Graphics:** Direct3D 11 (Windows), OpenGL (Linux) or Metal (macOS). With a broken driver, start with `PACITUM_DISABLE_GPU=1` for software rendering.
+- **Linux AppImage:** needs FUSE (`libfuse2`), or run it with `--appimage-extract-and-run`.
+- **macOS:** the app isn't notarized. The first time, right-click it and choose **Open**.
+
+## Build from source
+
+You need Qt 6.11 or newer with Qt WebEngine, Qt WebChannel and Qt Positioning, CMake 3.16+, Ninja and a C++17 compiler (MSVC 2019+, GCC 11+ or Apple Clang).
+
+```bash
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="<path to Qt>/<version>/<kit>"
+cmake --build build
+./build/PacitumBrowser        # build\PacitumBrowser.exe on Windows
+```
+
+[`BUILD.md`](BUILD.md) has the steps for each system, the Windows installer and the AppImage and dmg builds.
+
+## Source map
+
+Pacitum started as a Python browser and was ported to C++ file by file.
+
+
+| Python (`safari_browser/*.py`) | C++ (`safari_browser_cpp/include|src/*.cpp`) |
+|---|---|
+| `main.py` | `src/main.cpp` |
+| `browser_window.py` | `BrowserWindow.h/cpp` |
+| `browser_tab.py` | `BrowserTab.h/cpp` |
+| `tab_widget.py` | `TabWidget.h/cpp` (PacitumTabWidget + PacitumTabBar) |
+| `address_bar.py` | `AddressBar.h/cpp` |
+| `bookmark_manager.py` | `BookmarkManager.h/cpp` |
+| `bookmarks_bar.py` | `BookmarksBar.h/cpp` |
+| `history_manager.py` | `HistoryManager.h/cpp` (SQLite via QtSql) |
+| `download_manager.py` | `DownloadManager.h/cpp` |
+| `find_bar.py` | `FindBar.h/cpp` |
+| `ad_blocker.py` | `AdBlocker.h/cpp` (QWebEngineUrlRequestInterceptor) |
+| `session_manager.py` | `SessionManager.h/cpp` |
+| `zoom_controller.py` | `ZoomController.h/cpp` |
+| `settings_dialog.py` | `SettingsPage.h/cpp` (full-page settings tab) |
+| — | `WebProfile.h/cpp` (UA, Accept-Language, persistent profile) · `Widgets.h/cpp` (animated buttons, switches, spinner) |
+| `theme_manager.py` | `ThemeManager.h/cpp` (Pacitum design tokens → QSS, SVG icon tinting) |
+| — | `PacitumScheme.h/cpp` (`pacitum://newtab` internal page) |
+
+## Documentation
+
+- [`BUILD.md`](BUILD.md): building on Windows, Linux and macOS
+- [`SYNC.md`](SYNC.md): setting up Google sync
+- [`PERMISSIONS.md`](PERMISSIONS.md): site permissions
+- [`release-notes/`](release-notes): notes for every release
+
+<details>
+<summary><b>Version history (1.1 to 1.9.1)</b></summary>
+
+Version 1.9.1 and 1.8.12 (two editions from the same source):
 - **Pacitum 1.9.x** is built with **Qt 6.11** (newer Chromium) and runs **Chrome extensions**: "Add to Pacitum" on a Chrome Web Store page, or add a `.crx` / `.zip` / unpacked folder from the puzzle menu. Pin an extension to the toolbar to open its pop-up; switch it off or remove it from the same menu. Before adding, Pacitum lists what the extension may do.
 - **Pacitum 1.8.x** is the **legacy edition** (Qt 6.8 LTS) for computers that can't run the Qt 6.11 build. It gets everything below, but not Chrome extensions, and its updater stays on 1.8.x. **1.8.12 is the last legacy release**: from 1.9.1 on, only the Qt 6.11 edition is built.
 - Both: **bookmark folders** (on the bookmarks bar, with a drop-down; right-click to make one or move a bookmark; drag a bookmark onto a folder; pick the folder right after pressing ☆). Folders sync.
@@ -72,110 +173,8 @@ Version 1.2.0: merged Chrome-style title bar (frameless window, tabs in caption 
 Version 1.1.0 implemented the Pacitum design system: graphite/paper surfaces, single teal accent, pill omnibox,
 tab strip above the toolbar, design SVG icon set tinted at runtime, and a built-in `pacitum://newtab` page.
 
-## Architecture (1:1 with Python)
-| Python (`safari_browser/*.py`) | C++ (`safari_browser_cpp/include|src/*.cpp`) |
-|---|---|
-| `main.py` | `src/main.cpp` |
-| `browser_window.py` | `BrowserWindow.h/cpp` |
-| `browser_tab.py` | `BrowserTab.h/cpp` |
-| `tab_widget.py` | `TabWidget.h/cpp` (PacitumTabWidget + PacitumTabBar) |
-| `address_bar.py` | `AddressBar.h/cpp` |
-| `bookmark_manager.py` | `BookmarkManager.h/cpp` |
-| `bookmarks_bar.py` | `BookmarksBar.h/cpp` |
-| `history_manager.py` | `HistoryManager.h/cpp` (SQLite via QtSql) |
-| `download_manager.py` | `DownloadManager.h/cpp` |
-| `find_bar.py` | `FindBar.h/cpp` |
-| `ad_blocker.py` | `AdBlocker.h/cpp` (QWebEngineUrlRequestInterceptor) |
-| `session_manager.py` | `SessionManager.h/cpp` |
-| `zoom_controller.py` | `ZoomController.h/cpp` |
-| `settings_dialog.py` | `SettingsPage.h/cpp` (full-page settings tab) |
-| — | `WebProfile.h/cpp` (UA, Accept-Language, persistent profile) · `Widgets.h/cpp` (animated buttons, switches, spinner) |
-| `theme_manager.py` | `ThemeManager.h/cpp` (Pacitum design tokens → QSS, SVG icon tinting) |
-| — | `PacitumScheme.h/cpp` (`pacitum://newtab` internal page) |
+</details>
 
-## Prerequisites
-- Qt 6.8+ with **QtWebEngineWidgets**. CI builds both editions: Qt 6.11 → Pacitum 1.9.x (Chrome extensions), Qt 6.8 LTS → Pacitum 1.8.x legacy. CMake picks the version from the Qt it finds.
-- CMake 3.16+, Ninja or MSVC/MinGW
-- C++17 compiler (MSVC 2019+, MinGW 13+, GCC 11+)
+## Credits
 
-On Windows with MSVC:
-```
-winget install Qt.Qt.6.9
-winget install Kitware.CMake
-winget install Ninja-build.Ninja
-```
-
-On MSYS2 UCRT64 (mingw):
-```
-pacman -S mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-webengine \
-          mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
-```
-
-On Ubuntu, install Qt 6.8+ with QtWebEngineWidgets using the Qt Online Installer; the distribution packages may be older than the required version. Install CMake and Ninja with `sudo apt install cmake ninja-build`.
-
-## Build
-```bash
-cmake -B build -DCMAKE_PREFIX_PATH="C:/Qt/<version>/msvc2022_64" -G Ninja
-cmake --build build --config Release
-./build/PacitumBrowser        # or build/PacitumBrowser.exe on Windows
-```
-
-Qt Creator: Open `CMakeLists.txt` → Configure → Run.
-
-## Features (parity with Python)
-- Pacitum UI: tab strip (40) → toolbar (44) → bookmarks bar (32); pill omnibox with lock/warning/search icon and star; ⋮ main menu with zoom row; System/Light/Dark themes + accent colors
-- Tabs: drag, close others/right, duplicate, split view (two PacitumTabWidgets in QSplitter), pin/mute, vertical mode (Ctrl+Shift+E)
-- Navigation, history (SQLite), bookmarks (JSON), downloads (QWebEngineDownloadRequest), find (Ctrl+F), zoom 25-500%
-- Ad blocker (host + path interceptor), private mode (NoPersistentCookies), session restore, Do Not Track
-- Hardware acceleration, GPU raster, 512 MB disk cache, spellcheck, crash auto-reload
-
-Made by Ai (Grok bot + opencode-BaseApp + claude code)
-
-## Settings
-Stored in `browser_settings.json`, `bookmarks.json`, `browser_session.json`, `browser_history.db` (identical filenames to Python so data migrates).
-
-## Windows installer
-GitHub Actions (`.github/workflows/windows.yml`) builds `PacitumBrowser.exe` with Qt 6.8 LTS MSVC 2022, bundles it with windeployqt and produces `installer/PacitumBrowser-Setup-<ver>.exe` via Inno Setup (`installer.iss`). The app icon (`resources/pacitum.ico`, 16–256 px) is embedded through `resources/app.rc`.
-
-## System requirements
-Since Pacitum Browser 1.8.7 Pacitum runs on Windows, macOS (Apple silicon) and Linux.
-Since 1.9.0 there are two editions built from the same source:
-
-| Edition | Built with | Chromium | Chrome extensions | Updates | Support |
-|---|---|---|---|---|---|
-| **Pacitum 1.9.x** (recommended) | Qt 6.11 | newer Chromium | ✅ | newest version | ✅ |
-| **Pacitum 1.8.x legacy** | Qt 6.8 LTS | Chromium 122 base (security fixes backported) | — | stays on 1.8.x | - |
-
-Use the legacy edition only if 1.9 doesn't start or doesn't draw correctly on your computer (for example older graphics drivers).
-
-| | Windows | Linux | macOS |
-|---|---|---|---|
-| **OS** | Windows 10 (1809+) or Windows 11, 64-bit | x86_64 distro with glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 36 or newer) | macOS 12 Monterey or newer (1.8.x legacy); 1.9.x may need a newer macOS |
-| **CPU** | x86_64 | x86_64 | Apple silicon (M1 or newer) |
-| **Download** | `PacitumBrowser-Setup-<ver>.exe` | `PacitumBrowser-<ver>-linux-x86_64.AppImage` | `PacitumBrowser-<ver>-macOS-arm64.dmg` |
-
-Pick the file from the release of your edition: tag `v1.9.x` for 1.9, tag `v1.8.x` for legacy.
-
-- **Memory:** 4 GB RAM minimum, 8 GB recommended (each site runs in its own Chromium process; Pacitum caps this at 8).
-- **Disk:** about 500 MB free for the app plus space for cache, profile data and Chrome extensions.
-- **Graphics:** a GPU with Direct3D 11 (Windows), OpenGL (Linux) or Metal (macOS) support. With a broken driver, start with `PACITUM_DISABLE_GPU=1` to use software rendering.
-- **Linux AppImage:** needs FUSE (`libfuse2`) to run, or run it with `--appimage-extract-and-run`.
-- **macOS:** the app isn't notarized; the first time, right-click → **Open**.
-
-### Building from source
-- Qt with Qt WebEngine, Qt WebChannel and Qt Positioning (optional: Qt Serial Port, Qt Connectivity):
-  - **Qt 6.11 or newer** → builds Pacitum **1.9.x** (Chrome extensions)
-  - **Qt 6.8 LTS** → builds Pacitum **1.8.x legacy**
-  - CMake picks the edition from the Qt it finds and prints it (`-- Pacitum 1.9.0 with Qt 6.11.x`).
-- CMake 3.16+ and Ninja
-- A C++17 compiler: MSVC 2019+ (Windows), GCC 11+ (Linux), Xcode / Apple Clang (macOS)
-- Windows CI note: aqtinstall 3.3.0 can't install Qt 6.11 for MSVC; the workflow pins the upstream fix.
-
-See `BUILD.md` for the steps on each system.
-
-### Building from source
-- Qt **6.8 or newer** with Qt WebEngine, Qt WebChannel and Qt Positioning (optional: Qt Serial Port, Qt Connectivity)
-- CMake 3.16+ and Ninja
-- A C++17 compiler: MSVC 2019+ (Windows), GCC 11+ (Linux), Xcode / Apple Clang (macOS)
-
-See `BUILD.md` for the steps on each system.
+Made by Patch (Tech by Patch) with AI help (Grok bot, opencode-BaseApp and Claude Code). QR codes use Nayuki's QR Code generator (`third_party/qrcodegen`, MIT).
