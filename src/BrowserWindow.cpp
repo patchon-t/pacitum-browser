@@ -8,6 +8,8 @@
 #include <QDateTime>
 #include <QCursor>
 #include "BrowserWindow.h"
+#include "SyncGuide.h"
+#include "SyncManager.h"
 #include "Passwords.h"
 #include "BrowserTab.h"
 #include "TabWidget.h"
@@ -2912,6 +2914,21 @@ void BrowserWindow::openWelcome() {
                 if (auto* t = qobject_cast<BrowserTab*>(m_tabs->widget(i)); t && t->currentUrl().startsWith(QStringLiteral("pacitum://welcome")))
                     t->loadUrl(PacitumSchemeHandler::newTabUrl());
             endWelcome();
+        };
+        h.setSearchEngine = [this](const QString& name) {
+            writeSetting(QStringLiteral("search_engine"), name);
+            onSettingChanged(QStringLiteral("search_engine"));
+        };
+        h.signIn = [this]() {
+            auto* sm = SyncManager::instance();
+            if (sm->hasClient()) sm->signIn(); else SyncGuide::open(this);
+        };
+        h.openSettings = [this]() {
+            for (int i = 0; i < m_tabs->count(); ++i)
+                if (auto* t = qobject_cast<BrowserTab*>(m_tabs->widget(i)); t && t->currentUrl().startsWith(QStringLiteral("pacitum://welcome")))
+                    t->loadUrl(PacitumSchemeHandler::newTabUrl());
+            endWelcome();
+            showSettings();
         };
         m_firstRun = new FirstRunBridge(m_bookmarks, m_history, h, this);
         connect(m_firstRun, &FirstRunBridge::importFinished, this, [this]{ if (m_bookmarksBar) m_bookmarksBar->refresh(); });

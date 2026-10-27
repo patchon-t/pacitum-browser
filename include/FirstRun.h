@@ -19,6 +19,9 @@ public:
         std::function<void(const QString&)> setAccent;   // #RRGGBB
         std::function<QVariantMap()> palette;             // current tokens for the page
         std::function<void()> finish;                     // set flag + navigate to the new tab page
+        std::function<void(const QString&)> setSearchEngine;   // 2.0.1: "Google" | "Bing" | "DuckDuckGo"
+        std::function<void()> signIn;                     // 2.0.1: Google sign-in for sync
+        std::function<void()> openSettings;               // 2.0.1: "Open Settings" on the last step
     };
     FirstRunBridge(BookmarkManager* bm, HistoryManager* hm, Hooks hooks, QObject* parent = nullptr);
 
@@ -33,6 +36,14 @@ public:
     Q_INVOKABLE QVariantMap palette() const;
     Q_INVOKABLE bool reducedMotion() const;
     Q_INVOKABLE void finish();
+    // 2.0.1 welcome steps "Choose a search engine" and "Keep it in sync"
+    Q_INVOKABLE QString searchEngine() const;
+    Q_INVOKABLE void setSearchEngine(const QString& name);
+    Q_INVOKABLE QVariantMap syncState() const;          // {signedIn, email, name, bookmarks, settings, notes, history}
+    Q_INVOKABLE void syncSignIn();
+    Q_INVOKABLE void syncSignOut();
+    Q_INVOKABLE void setSync(const QString& kind, bool on);
+    Q_INVOKABLE void openSettings();
 
     // Blocks until a running background import has finished. The window calls this before it
     // deletes the HistoryManager the worker is writing to (1.5.1: closing the window during an
@@ -49,6 +60,7 @@ signals:
     void importFinished(const QVariantList& results);   // [{type, ok, count, message}]
     void themeChanged(const QVariantMap& palette);
     void defaultBrowserChanged(bool isDefault);
+    void syncChanged(const QVariantMap& state);
 
 private:
     BookmarkManager* m_bm;

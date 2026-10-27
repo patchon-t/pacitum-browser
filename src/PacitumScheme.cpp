@@ -102,6 +102,10 @@ void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
         html.replace(QStringLiteral("%I_MOON%"), svg(QStringLiteral("moon"), QStringLiteral("i")));
         html.replace(QStringLiteral("%I_CHECK%"), svg(QStringLiteral("check"), QStringLiteral("i")));
         html.replace(QStringLiteral("%I_SPARKLE%"), svg(QStringLiteral("sparkle"), QStringLiteral("sp")));
+        {   // 2.0.1 welcome: the PACITUM wordmark
+            QFile wm(QStringLiteral(":/brand/wordmark_paths.svgfrag"));
+            html.replace(QStringLiteral("%WORDMARK%"), wm.open(QIODevice::ReadOnly) ? QString::fromUtf8(wm.readAll()) : QString());
+        }
         QFile wc(QStringLiteral(":/qtwebchannel/qwebchannel.js"));
         html.replace(QStringLiteral("%QWEBCHANNEL%"), wc.open(QIODevice::ReadOnly) ? QString::fromUtf8(wc.readAll()) : QString());
         QFile logo(QStringLiteral(":/pages/logo.png"));

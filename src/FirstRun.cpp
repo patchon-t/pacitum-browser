@@ -3,6 +3,7 @@
 #include "HistoryManager.h"
 #include "AppSettings.h"
 #include "ThemeManager.h"
+#include "SyncManager.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -141,7 +142,9 @@ ImportResult readSource(const Source& s, bool wantBm, bool wantHv, HistoryManage
 } // namespace
 
 FirstRunBridge::FirstRunBridge(BookmarkManager* bm, HistoryManager* hm, Hooks hooks, QObject* parent)
-    : QObject(parent), m_bm(bm), m_hm(hm), m_hooks(std::move(hooks)) {}
+    : QObject(parent), m_bm(bm), m_hm(hm), m_hooks(std::move(hooks)) {
+    connect(SyncManager::instance(), &SyncManager::changed, this, [this]{ emit syncChanged(syncState()); });
+}
 
 QVariantList FirstRunBridge::listImportSources() const {
     QVariantList l;
@@ -226,6 +229,22 @@ void FirstRunBridge::setAccent(const QString& hex) {
 QVariantMap FirstRunBridge::palette() const { return m_hooks.palette ? m_hooks.palette() : QVariantMap{}; }
 bool FirstRunBridge::reducedMotion() const { return Pacitum::reducedMotion(); }
 void FirstRunBridge::finish() { markFirstRunDone(); if (m_hooks.finish) m_hooks.finish(); }
+
+QString FirstRunBridge::searchEngine() const { return AppSettings::get(QStringLiteral("search_engine")).toString(QStringLiteral("Google")); }
+void FirstRunBridge::setSearchEngine(const QString& name) { if (m_hooks.setSearchEngine) m_hooks.setSearchEngine(name); }
+QVariantMap FirstRunBridge::syncState() const {
+    auto* sm = SyncManager::instance();
+    return QVariantMap{{QStringLiteral("signedIn"), sm->signedIn()}, {QStringLiteral("email"), sm->account().email},
+                       {QStringLiteral("name"), sm->account().name},
+                       {QStringLiteral("bookmarks"), sm->syncs(QStringLiteral("bookmarks"))}, {QStringLiteral("settings"), sm->syncs(QStringLiteral("settings"))},
+                       {QStringLiteral("notes"), sm->syncs(QStringLiteral("notes"))}, {QStringLiteral("history"), sm->syncs(QStringLiteral("history"))}};
+}
+void FirstRunBridge::syncSignIn() {
+    if (m_hooks.signIn) m_hooks.signIn(); else SyncManager::instance()->signIn();
+}
+void FirstRunBridge::syncSignOut() { SyncManager::instance()->signOut(); emit syncChanged(syncState()); }
+void FirstRunBridge::setSync(const QString& kind, bool on) { SyncManager::instance()->setSyncs(kind, on); emit syncChanged(syncState()); }
+void FirstRunBridge::openSettings() { markFirstRunDone(); if (m_hooks.openSettings) m_hooks.openSettings(); }
 
 bool FirstRunBridge::isFirstRunDone() { return AppSettings::get(QStringLiteral("first_run_done")).toBool(false); }
 void FirstRunBridge::markFirstRunDone() { AppSettings::set(QStringLiteral("first_run_done"), true); }
