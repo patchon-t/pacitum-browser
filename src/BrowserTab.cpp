@@ -1,4 +1,8 @@
 #include "BrowserTab.h"
+#include "PageDialogs.h"
+#include <QAuthenticator>
+#include <QDateTime>
+#include <QSet>
 #include <QRegularExpression>
 #include <QResizeEvent>
 #include <QContextMenuEvent>
@@ -18,7 +22,7 @@
 #include "WebProfile.h"
 #include <functional>
 
-std::function<BrowserTab*()> BrowserTab::s_popupFactory;
+std::function<BrowserTab*(int)> BrowserTab::s_popupFactory;
 
 #include "PermissionController.h"
 #include <QPointer>
@@ -33,9 +37,9 @@ protected:
         if (menuHandler && lastContextMenuRequest()) { menuHandler(e->globalPos()); e->accept(); return; }
         QWebEngineView::contextMenuEvent(e);
     }
-    QWebEngineView* createWindow(QWebEnginePage::WebWindowType) override {
+    QWebEngineView* createWindow(QWebEnginePage::WebWindowType type) override {
         if (!BrowserTab::s_popupFactory) return nullptr;
-        BrowserTab* t = BrowserTab::s_popupFactory();
+        BrowserTab* t = BrowserTab::s_popupFactory(int(type));
         return t ? t->view() : nullptr;
     }
 };
@@ -68,6 +72,37 @@ public:
     QPointer<PermissionController> perms;
     QPointer<PasswordAgent> forms;   // 2.0.1 passwords / autofill helper
 protected:
+    // 2.0.1 page dialogs drawn by Pacitum inside the tab; a site that keeps opening them can be stopped.
+    QWidget* tabWidget() const { auto* v = QWebEngineView::forPage(this); return v ? v->parentWidget() : nullptr; }
+    QSet<QString> m_muted; QString m_lastOrigin; qint64 m_lastAt = 0; int m_burst = 0;
+    bool muted(const QUrl& o) {
+        const QString k = o.host();
+        if (m_muted.contains(k)) return true;
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        m_burst = (k == m_lastOrigin && now - m_lastAt < 10000) ? m_burst + 1 : 1;
+        m_lastOrigin = k; m_lastAt = now;
+        return false;
+    }
+    void after(const QUrl& o, const PageDialogs::Result& r) { if (r.suppress) m_muted.insert(o.host()); m_lastAt = QDateTime::currentMSecsSinceEpoch(); }
+    void javaScriptAlert(const QUrl& o, const QString& msg) override {
+        if (muted(o)) return;
+        after(o, PageDialogs::run(tabWidget(), PageDialogs::Alert, o.host(), msg, {}, m_burst >= 2));
+    }
+    bool javaScriptConfirm(const QUrl& o, const QString& msg) override {
+        // Qt asks "leave this page?" (beforeunload) through confirm
+        const bool leave = msg.startsWith(QLatin1String("Are you sure you want to leave"), Qt::CaseInsensitive) || msg.contains(QLatin1String("may not be saved"), Qt::CaseInsensitive);
+        if (!leave && muted(o)) return false;
+        const auto r = PageDialogs::run(tabWidget(), leave ? PageDialogs::Leave : PageDialogs::Confirm, o.host(), msg, {}, !leave && m_burst >= 2);
+        after(o, r);
+        return r.ok;
+    }
+    bool javaScriptPrompt(const QUrl& o, const QString& msg, const QString& def, QString* result) override {
+        if (muted(o)) return false;
+        const auto r = PageDialogs::run(tabWidget(), PageDialogs::Prompt, o.host(), msg, def, m_burst >= 2);
+        after(o, r);
+        if (r.ok && result) *result = r.text;
+        return r.ok;
+    }
     void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level, const QString& message, int line, const QString& source) override {
         if (forms && forms->handleConsole(message)) return;
         QWebEnginePage::javaScriptConsoleMessage(level, message, line, source);
@@ -75,7 +110,7 @@ protected:
     QWebEnginePage* createWindow(WebWindowType type) override {
         if (perms && !perms->allowPopup(type)) return new PopupSink(profile(), perms);
         if (!BrowserTab::s_popupFactory) return nullptr;
-        BrowserTab* t = BrowserTab::s_popupFactory();
+        BrowserTab* t = BrowserTab::s_popupFactory(int(type));
         return t ? t->view()->page() : nullptr;
     }
 };
@@ -103,6 +138,10 @@ protected:
 #include <QToolButton>
 #include "ThemeManager.h"
 #include "Passwords.h"
+#include "PageDialogs.h"
+#include <QAuthenticator>
+#include <QDateTime>
+#include <QSet>
 #include "Widgets.h"
 #include "Motion.h"
 
@@ -139,6 +178,15 @@ BrowserTab::BrowserTab(const QString& url, bool privateMode, const QString& sear
     m_perms = new PermissionController(this, m_view, m_page);
     static_cast<PacitumPage*>(m_page)->perms = m_perms;
     m_page->setUrlRequestInterceptor(new Pacitum::GoogleSignInInterceptor(m_page));
+    connect(m_page, &QWebEnginePage::authenticationRequired, this, [this](const QUrl& url, QAuthenticator* auth){
+        const auto r = PageDialogs::run(this, PageDialogs::Auth, url.host() + (url.port() > 0 ? QStringLiteral(":%1").arg(url.port()) : QString()),
+                                        auth->realm().isEmpty() ? QString() : QStringLiteral("“%1”").arg(auth->realm()), auth->user(), false, url.scheme() == QLatin1String("http"));
+        if (r.ok) { auth->setUser(r.user); auth->setPassword(r.pass); } else *auth = QAuthenticator();
+    });
+    connect(m_page, &QWebEnginePage::proxyAuthenticationRequired, this, [this](const QUrl&, QAuthenticator* auth, const QString& proxyHost){
+        const auto r = PageDialogs::run(this, PageDialogs::Auth, proxyHost, QStringLiteral("Your proxy server needs a username and password."), auth->user());
+        if (r.ok) { auth->setUser(r.user); auth->setPassword(r.pass); } else *auth = QAuthenticator();
+    });
     {   // 2.0.1: saved passwords, addresses and cards
         auto* agent = new PasswordAgent(m_page, m_private, this);
         static_cast<PacitumPage*>(m_page)->forms = agent;

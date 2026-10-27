@@ -46,6 +46,7 @@ set(SOURCES
     src/SessionManager.cpp
     src/ZoomController.cpp
     src/Passwords.cpp
+    src/PageDialogs.cpp
     src/SettingsBridge.cpp
     src/WebProfile.cpp
     src/ProfileManager.cpp
@@ -92,6 +93,7 @@ set(HEADERS
     include/SessionManager.h
     include/ZoomController.h
     include/Passwords.h
+    include/PageDialogs.h
     include/SettingsBridge.h
     include/WebProfile.h
     include/ProfileManager.h

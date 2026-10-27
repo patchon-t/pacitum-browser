@@ -270,6 +270,7 @@ private:
     int importBookmarksFile(const QString& path, int* found = nullptr);   // -1: unreadable
     void restartBrowser();
     void printPage();
+    BrowserTab* openPopupWindow();
     void savePageAs();
     void openWelcome();
     void endWelcome();

@@ -244,11 +244,92 @@ void BrowserWindow::showUpdatePrompt(const UpdateInfo& info) {
 
 void BrowserWindow::installPopupFactory() {
     QPointer<BrowserWindow> self(this);
-    BrowserTab::s_popupFactory = [self]() -> BrowserTab* {
+    BrowserTab::s_popupFactory = [self](int type) -> BrowserTab* {
         if (!self) return nullptr;
+        if (type == QWebEnginePage::WebDialog) return self->openPopupWindow();   // 2.0.1 sign-in windows
         self->newTab(QStringLiteral("about:blank"));
         return self->activeTab();
     };
+}
+
+// 2.0.1 (design "Web pop-ups"): a window a site opens itself (window.open with a size, e.g. a
+// sign-in window) gets its own small Pacitum window. The address strip always shows the real
+// address and can't be hidden by the site; "Open in a tab" moves the page into this window.
+namespace {
+class PopupFrame : public QWidget {
+public:
+    PopupFrame(BrowserTab* tab, std::function<void(BrowserTab*)> toTab)
+        : QWidget(nullptr, Qt::Window), m_tab(tab), m_toTab(std::move(toTab)) {
+        setAttribute(Qt::WA_DeleteOnClose);
+        setWindowIcon(QIcon(QStringLiteral(":/icons/pacitum-icon-256.png")));
+        const auto& p = ThemeManager::current();
+        setStyleSheet(QStringLiteral("#PopStrip{background:%1;border-bottom:1px solid %2;} #PopUrl{background:%3;border-radius:12px;padding:0 12px;color:%4;font-size:13.5px;}"
+                                     "#PopBtn{border:0;border-radius:10px;background:transparent;} #PopBtn:hover{background:%5;}")
+                          .arg(p.toolbar, p.border, p.omnibox, p.textSecondary, p.surface));
+        auto* l = new QVBoxLayout(this); l->setContentsMargins(0, 0, 0, 0); l->setSpacing(0);
+        auto* strip = new QWidget(this); strip->setObjectName(QStringLiteral("PopStrip")); strip->setAttribute(Qt::WA_StyledBackground, true);
+        auto* sl = new QHBoxLayout(strip); sl->setContentsMargins(8, 8, 8, 8); sl->setSpacing(6);
+        m_url = new QLabel(strip); m_url->setObjectName(QStringLiteral("PopUrl")); m_url->setFixedHeight(32); m_url->setTextFormat(Qt::RichText);
+        m_url->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        auto* open = new QToolButton(strip); open->setObjectName(QStringLiteral("PopBtn")); open->setFixedSize(32, 32);
+        open->setIcon(ThemeManager::icon(QStringLiteral("external-link"), p.text, 16)); open->setToolTip(QStringLiteral("Open in a tab"));
+        if (open->icon().isNull()) open->setText(QStringLiteral("⧉"));
+        sl->addWidget(m_url, 1); sl->addWidget(open);
+        l->addWidget(strip);
+        tab->setParent(this); l->addWidget(tab, 1); tab->show();
+        connect(open, &QToolButton::clicked, this, [this]{
+            if (!m_tab) return;
+            auto* t = m_tab.data(); m_tab = nullptr;
+            layout()->removeWidget(t);
+            m_toTab(t);
+            close();
+        });
+        connect(tab, &BrowserTab::urlChanged, this, &PopupFrame::showUrl);
+        connect(tab, &BrowserTab::titleChanged, this, [this](const QString& t){ setWindowTitle(t.isEmpty() ? QStringLiteral("Pacitum") : t); });
+        connect(tab->view()->page(), &QWebEnginePage::windowCloseRequested, this, &QWidget::close);   // window.close() after signing in
+        connect(tab->view()->page(), &QWebEnginePage::geometryChangeRequested, this, [this](const QRect& r){
+            if (r.width() > 120 && r.height() > 120) resize(qMin(r.width(), 1200), qMin(r.height() + 48, 1000));
+        });
+        resize(520, 680);
+        showUrl(tab->currentUrl());
+    }
+    ~PopupFrame() override { if (m_tab) m_tab->deleteLater(); }
+private:
+    void showUrl(const QString& u) {
+        const QUrl url(u);
+        const auto& p = ThemeManager::current();
+        const bool secure = url.scheme() == QLatin1String("https");
+        const QString lock = secure ? QStringLiteral("<span style='color:%1'>🔒</span>&nbsp;").arg(p.secure) : QStringLiteral("<span style='color:%1'>⚠ Not secure</span>&nbsp;&nbsp;").arg(p.danger);
+        const QString path = url.toString(QUrl::RemoveScheme | QUrl::RemoveAuthority | QUrl::RemoveFragment);
+        m_url->setText(url.host().isEmpty() ? u.toHtmlEscaped()
+                       : lock + QStringLiteral("<b style='color:%1'>%2</b>%3").arg(p.text, url.host().toHtmlEscaped(), path.left(80).toHtmlEscaped()));
+    }
+    QPointer<BrowserTab> m_tab;
+    QLabel* m_url = nullptr;
+    std::function<void(BrowserTab*)> m_toTab;
+};
+}
+
+BrowserTab* BrowserWindow::openPopupWindow() {
+    const int prev = m_tabs->currentIndex();
+    newTab(QStringLiteral("about:blank"));
+    BrowserTab* tab = activeTab();
+    if (!tab) return nullptr;
+    const int i = m_tabs->indexOf(tab);
+    if (i >= 0) m_tabs->removeTab(i);
+    if (prev >= 0 && prev < m_tabs->count()) m_tabs->setCurrentIndex(prev);
+    QPointer<BrowserWindow> self(this);
+    auto* frame = new PopupFrame(tab, [self](BrowserTab* t){
+        if (!self) { t->deleteLater(); return; }
+        const int at = self->m_tabs->addTab(t, t->currentTitle().isEmpty() ? QStringLiteral("Page") : t->currentTitle());
+        self->m_tabs->setCurrentIndex(at);
+        self->updateTabIcon(t);
+        self->activateWindow();
+    });
+    const QRect g = frameGeometry();
+    frame->move(g.center() - QPoint(260, 340));
+    frame->show(); frame->raise(); frame->activateWindow();
+    return tab;
 }
 
 BrowserWindow::~BrowserWindow() {
@@ -625,6 +706,7 @@ void BrowserWindow::showExtensionsMenu() {
             });
         }
         if (ChromeExtensions::available()) {
+            connect(m.addAction(QStringLiteral("Manage extensions")), &QAction::triggered, this, [this]{ newTab(QStringLiteral("pacitum://extensions")); });
             connect(m.addAction(QStringLiteral("Get extensions from the Chrome Web Store")), &QAction::triggered, this, [this]{ newTab(QStringLiteral("https://chromewebstore.google.com/")); });
             connect(m.addAction(QStringLiteral("Add a .crx or .zip file…")), &QAction::triggered, this, [this]{
                 const QString f = QFileDialog::getOpenFileName(this, QStringLiteral("Add a Chrome extension"), QString(), QStringLiteral("Chrome extensions (*.crx *.zip)"));
@@ -1344,7 +1426,7 @@ void BrowserWindow::showSettings(const QString& section) {
 void BrowserWindow::attachInternalChannel(BrowserTab* tab, const QString& url) {
     if (!tab || !tab->view() || !m_settingsChannel) return;
     auto* page = tab->view()->page();
-    const bool settings = url.startsWith(QStringLiteral("pacitum://settings"));
+    const bool settings = url.startsWith(QStringLiteral("pacitum://settings")) || url.startsWith(QStringLiteral("pacitum://extensions"));
     if (settings && page->webChannel() != m_settingsChannel) page->setWebChannel(m_settingsChannel);
     else if (!settings && page->webChannel() == m_settingsChannel) page->setWebChannel(nullptr);
 }
@@ -2192,7 +2274,7 @@ void BrowserWindow::applyTheme(){
         for (int i = 0; i < tw->count(); ++i)
             if (auto* t = qobject_cast<BrowserTab*>(tw->widget(i)))
                 if (t->currentUrl().startsWith(QStringLiteral("pacitum:")) && !t->currentUrl().startsWith(QStringLiteral("pacitum://welcome"))
-                    && !t->currentUrl().startsWith(QStringLiteral("pacitum://settings"))) t->reload();
+                    && !t->currentUrl().startsWith(QStringLiteral("pacitum://settings")) && !t->currentUrl().startsWith(QStringLiteral("pacitum://extensions"))) t->reload();
     if (m_settingsBridge) m_settingsBridge->notifyChanged();   // Settings re-reads its colours live
     if (m_firstRun) emit m_firstRun->themeChanged(m_firstRun->palette());
 }

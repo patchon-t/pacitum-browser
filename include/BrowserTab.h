@@ -66,7 +66,7 @@ public:
     // Session restore: remember the URL/title but only create the page load when first shown.
     void setLazyUrl(const QString& url, const QString& title);
     bool isLazy() const { return !m_pendingUrl.isEmpty(); }
-    static std::function<BrowserTab*()> s_popupFactory;
+    static std::function<BrowserTab*(int)> s_popupFactory;   // QWebEnginePage::WebWindowType
     void showFindBar();
     void refreshTheme();   // re-tint native chrome inside the tab (info bar)
     void hideFindBar();

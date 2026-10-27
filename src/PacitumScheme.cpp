@@ -108,9 +108,10 @@ void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
         if (logo.open(QIODevice::ReadOnly))
             html.replace(QStringLiteral("qrc:/pages/logo.png"), QStringLiteral("data:image/png;base64,") + QString::fromLatin1(logo.readAll().toBase64()));
         body = html.toUtf8();
-    } else if (host == QStringLiteral("settings")) {
-        // 2.0.1 Settings (design: "Settings · all sections"). Talks to SettingsBridge over QWebChannel.
-        QFile f(QStringLiteral(":/pages/settings.html"));
+    } else if (host == QStringLiteral("settings") || host == QStringLiteral("extensions")) {
+        // 2.0.1 Settings and the extension manager (design: "Settings · all sections", "Extension
+        // manager", "About extension"). Both talk to SettingsBridge over QWebChannel.
+        QFile f(host == QStringLiteral("settings") ? QStringLiteral(":/pages/settings.html") : QStringLiteral(":/pages/extensions.html"));
         if (!f.open(QIODevice::ReadOnly)) { job->fail(QWebEngineUrlRequestJob::UrlNotFound); return; }
         QString html = QString::fromUtf8(f.readAll());
         for (auto it = m_vars.cbegin(); it != m_vars.cend(); ++it) html.replace(QLatin1Char('%') + it.key() + QLatin1Char('%'), it.value());

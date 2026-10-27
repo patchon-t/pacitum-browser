@@ -1,4 +1,11 @@
 #include "SettingsBridge.h"
+#include <QJsonDocument>
+#include <algorithm>
+#include <QIcon>
+#include <QFileInfo>
+#include <QDirIterator>
+#include "ExtensionManager.h"
+#include "ChromeExtensions.h"
 #include "AppSettings.h"
 #include "ThemeManager.h"
 #include "ProfileManager.h"
@@ -88,6 +95,11 @@ SettingsBridge::SettingsBridge(Hooks hooks, QObject* parent) : QObject(parent), 
     connect(ProfileManager::instance(), &ProfileManager::currentProfileChanged, this, &SettingsBridge::changed);
     connect(Updater::instance(), &Updater::statusChanged, this, &SettingsBridge::changed);
     connect(Perm::Store::forProfile(Pacitum::mainProfile()), &Perm::Store::changed, this, &SettingsBridge::changed);
+    connect(ExtensionManager::instance(), &ExtensionManager::changed, this, &SettingsBridge::changed);
+    if (ChromeExtensions::available()) {
+        connect(ChromeExtensions::instance(), &ChromeExtensions::changed, this, &SettingsBridge::changed);
+        connect(ChromeExtensions::instance(), &ChromeExtensions::message, this, &SettingsBridge::toast);
+    }
 }
 
 QWidget* SettingsBridge::win() const { return m_h.window ? m_h.window() : QApplication::activeWindow(); }
@@ -185,6 +197,56 @@ QVariantMap SettingsBridge::state() const {
     }
     o["moreLanguages"] = avail;
 
+    // 2.0.1 pacitum://extensions (design "Extension manager" / "About extension")
+    {
+        auto readJson = [](const QString& dir) { QFile f(dir + QStringLiteral("/manifest.json")); return f.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(f.readAll()).object() : QJsonObject(); };
+        auto dirSize = [](const QString& dir) { qint64 n = 0; QDirIterator it(dir, QDir::Files | QDir::Hidden, QDirIterator::Subdirectories); while (it.hasNext()) { it.next(); n += it.fileInfo().size(); } return n; };
+        auto access = [](const QJsonObject& m) {
+            QStringList hosts;
+            for (const auto& v : m.value(QStringLiteral("host_permissions")).toArray()) hosts << v.toString();
+            for (const auto& v : m.value(QStringLiteral("permissions")).toArray()) { const QString x = v.toString(); if (x.contains(QLatin1String("://")) || x == QLatin1String("<all_urls>")) hosts << x; }
+            for (const auto& cs : m.value(QStringLiteral("content_scripts")).toArray()) for (const auto& v : cs.toObject().value(QStringLiteral("matches")).toArray()) hosts << v.toString();
+            const bool all = std::any_of(hosts.cbegin(), hosts.cend(), [](const QString& h){ return h == QLatin1String("<all_urls>") || h.startsWith(QLatin1String("*://*/")) || h.startsWith(QLatin1String("http://*/")) || h.startsWith(QLatin1String("https://*/")); });
+            bool active = false; for (const auto& v : m.value(QStringLiteral("permissions")).toArray()) active |= v.toString() == QLatin1String("activeTab");
+            hosts.removeDuplicates();
+            return all ? QStringLiteral("all") : !hosts.isEmpty() ? QStringLiteral("some:%1").arg(hosts.size()) : active ? QStringLiteral("click") : QStringLiteral("none");
+        };
+        auto pngUrl = [](const QIcon& ic) {
+            if (ic.isNull()) return QString();
+            QByteArray png; QBuffer b(&png); b.open(QIODevice::WriteOnly); ic.pixmap(64, 64).save(&b, "PNG");
+            return QStringLiteral("data:image/png;base64,") + QString::fromLatin1(png.toBase64());
+        };
+        QVariantList exts;
+        if (ChromeExtensions::available()) {
+            auto* ce = ChromeExtensions::instance();
+            for (const auto& e : ce->items()) {
+                const QJsonObject m = readJson(e.path);
+                QVariantList cmds;
+                const QJsonObject commands = m.value(QStringLiteral("commands")).toObject();
+                for (auto it = commands.begin(); it != commands.end(); ++it) {
+                    const QJsonObject c = it.value().toObject();
+                    QString key = c.value(QStringLiteral("suggested_key")).toObject().value(QStringLiteral("default")).toString();
+                    cmds << QVariantMap{{"name", c.value(QStringLiteral("description")).toString(it.key() == QLatin1String("_execute_action") ? QStringLiteral("Open the extension") : it.key())}, {"key", key}};
+                }
+                exts << QVariantMap{{"kind", "chrome"}, {"id", e.id}, {"name", e.name}, {"version", e.version}, {"desc", e.description}, {"enabled", e.enabled},
+                                    {"error", e.error}, {"pinned", ce->pinned(e.id)}, {"icon", pngUrl(e.icon)}, {"permissions", e.permissions},
+                                    {"options", e.optionsUrl.toString()}, {"popup", !e.popupUrl.isEmpty()}, {"access", access(m)},
+                                    {"size", double(dirSize(e.path))}, {"updated", double(QFileInfo(e.path + QStringLiteral("/manifest.json")).lastModified().toMSecsSinceEpoch())},
+                                    {"source", m.contains(QStringLiteral("update_url")) ? QStringLiteral("Chrome Web Store") : QStringLiteral("Added from a file or folder")},
+                                    {"commands", cmds}, {"path", QDir::toNativeSeparators(e.path)}};
+            }
+        }
+        for (const auto& e : ExtensionManager::instance()->extensions()) {
+            exts << QVariantMap{{"kind", "script"}, {"id", e.id}, {"name", e.name}, {"version", e.version}, {"desc", e.description}, {"enabled", e.enabled},
+                                {"error", QString()}, {"pinned", false}, {"icon", QString()}, {"permissions", QStringList{QStringLiteral("Read and change pages on: ") + e.sites.join(QStringLiteral(", "))}},
+                                {"options", QString()}, {"popup", false}, {"access", e.sites.contains(QStringLiteral("<all_urls>")) || e.sites.contains(QStringLiteral("*://*/*")) ? QStringLiteral("all") : QStringLiteral("some:%1").arg(e.sites.size())},
+                                {"size", double(dirSize(e.dir))}, {"updated", double(QFileInfo(e.dir + QStringLiteral("/manifest.json")).lastModified().toMSecsSinceEpoch())},
+                                {"source", QStringLiteral("Pacitum user script")}, {"commands", QVariantList{}}, {"path", QDir::toNativeSeparators(e.dir)}};
+        }
+        o["extensions"] = exts;
+        o["chromeExtensions"] = ChromeExtensions::available();
+    }
+
     // default browser, updates, sync
     o["isDefault"] = FirstRunBridge::isDefaultBrowserStatic();
     auto* up = Updater::instance();
@@ -207,7 +269,7 @@ void SettingsBridge::set(const QString& key, const QVariant& value) {
         "gpu_acceleration", "run_in_background", "cookie_mode", "safe_browsing", "https_only", "adblock_enabled", "do_not_track",
         "clear_on_exit", "clear_cookies_on_exit", "tab_size", "startup", "startup_pages", "homepage", "auto_check_updates", "update_feed_url",
         "passwords_offer", "passwords_autosignin", "passwords_pin", "passwords_suggest", "autofill_addresses", "autofill_payments",
-        "theme_ntp", "search_shortcuts", "languages", "custom_theme"};
+        "theme_ntp", "search_shortcuts", "languages", "custom_theme", "ext_dev_mode"};
     if (key == QLatin1String("theme")) { if (m_h.setTheme) m_h.setTheme(value.toString()); emit changed(); return; }
     if (key == QLatin1String("accent")) { if (m_h.setAccent) m_h.setAccent(value.toString()); emit changed(); return; }
     if (key == QLatin1String("picker")) { ProfileManager::instance()->setShowPickerOnStartup(value.toBool()); emit changed(); return; }
@@ -383,6 +445,35 @@ QVariant SettingsBridge::act(const QString& name, const QVariantMap& a) {
             if (m_h.settingChanged) m_h.settingChanged(QLatin1String(k));
         emit changed();
         return true;
+    }
+    if (name.startsWith(QLatin1String("ext"))) {
+        const QString id = a.value("id").toString(), kind = a.value("kind").toString();
+        const bool chrome = kind == QLatin1String("chrome") && ChromeExtensions::available();
+        if (name == QLatin1String("extToggle")) { if (chrome) ChromeExtensions::instance()->setEnabled(id, a.value("on").toBool()); else ExtensionManager::instance()->setEnabled(id, a.value("on").toBool()); emit changed(); return true; }
+        if (name == QLatin1String("extPin") && chrome) { ChromeExtensions::instance()->setPinned(id, a.value("on").toBool()); emit changed(); return true; }
+        if (name == QLatin1String("extRemove")) { if (chrome) ChromeExtensions::instance()->uninstall(id); else ExtensionManager::instance()->remove(id); emit changed(); return true; }
+        if (name == QLatin1String("extOptions")) { if (m_h.openUrl) m_h.openUrl(a.value("url").toString()); return true; }
+        if (name == QLatin1String("extFolder")) { QDesktopServices::openUrl(QUrl::fromLocalFile(a.value("path").toString())); return true; }
+        if (name == QLatin1String("extLoadUnpacked")) {
+            const QString d = QFileDialog::getExistingDirectory(win(), QStringLiteral("Load unpacked extension"), QDir::homePath());
+            if (d.isEmpty()) return {};
+            QFile mf(d + QStringLiteral("/manifest.json"));
+            const QJsonObject m = mf.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(mf.readAll()).object() : QJsonObject();
+            const bool isChrome = m.contains(QStringLiteral("manifest_version")) && (m.contains(QStringLiteral("background")) || m.contains(QStringLiteral("action"))
+                                  || m.contains(QStringLiteral("browser_action")) || m.contains(QStringLiteral("permissions")));
+            if (isChrome && ChromeExtensions::available()) { ChromeExtensions::instance()->installFromFile(d, win()); return QStringLiteral("Adding the extension…"); }
+            QString err; const QString nid = ExtensionManager::instance()->install(d, &err);
+            emit changed();
+            return nid.isEmpty() ? err : QStringLiteral("Added");
+        }
+        if (name == QLatin1String("extAddFile") && ChromeExtensions::available()) {
+            const QString f = QFileDialog::getOpenFileName(win(), QStringLiteral("Add extension"), QDir::homePath(), QStringLiteral("Extensions (*.crx *.zip)"));
+            if (f.isEmpty()) return {};
+            ChromeExtensions::instance()->installFromFile(f, win());
+            return QStringLiteral("Adding the extension…");
+        }
+        if (name == QLatin1String("extReload")) { ExtensionManager::instance()->reload(); emit changed(); return QStringLiteral("Extensions reloaded"); }
+        return {};
     }
     if (name == QLatin1String("sync")) {
         auto* sm = SyncManager::instance();
