@@ -286,6 +286,8 @@
         <file>forms/agent.js</file>
         <file>pages/settings.html</file>
         <file>pages/i18n.js</file>
+        <file>lang/es.json</file>
+        <file>lang/ja.json</file>
         <file>lang/th.json</file>
         <file>pages/extensions.html</file>
         <file>pages/logo.png</file>
