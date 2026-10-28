@@ -285,12 +285,10 @@ int main(int argc, char *argv[]) {
         for (const char* w : {"Regular", "Medium", "SemiBold", "Bold"})
             QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Inter-%1.ttf").arg(QLatin1String(w)));
         QFont f = app.font();
-        f.setFamilies({QStringLiteral("Rubik"), QStringLiteral("Inter"), QStringLiteral("Segoe UI"), QStringLiteral("Cantarell"),
-                       // per-language fallbacks so Thai / CJK text is not drawn with an ill-matched face
-                       QStringLiteral("Leelawadee UI"), QStringLiteral("Noto Sans Thai"), QStringLiteral("Microsoft YaHei UI"),
-                       QStringLiteral("Yu Gothic UI"), QStringLiteral("Malgun Gothic"), QStringLiteral("Noto Sans CJK SC"), f.family()});
+        f.setFamilies({QStringLiteral("Rubik"), QStringLiteral("Inter"), QStringLiteral("Segoe UI"), QStringLiteral("Cantarell"), f.family()});
         f.setPixelSize(13);
         app.setFont(f);
+        Lang::applyAppFont();   // 2.0.1: Thai / CJK faces in front, per the display language
     }
 
     // User data lives in %LOCALAPPDATA%/Pacitum/Pacitum Browser (survives upgrades/reinstalls).

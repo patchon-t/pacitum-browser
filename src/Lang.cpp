@@ -291,8 +291,36 @@ void apply(const QString& choice) {
     if (want == st.code) { emit st.notifier.changed(); return; }
     loadDictionary(want);
     applyQtLocale();
+    applyAppFont();
     retranslateAll();
     emit st.notifier.changed();
+}
+
+QStringList fontFamilies() {
+    // Faces that carry the script, in order of preference per platform (Windows, macOS, Linux). Rubik / Inter only cover
+    // Latin and Cyrillic, so without these Thai and CJK text falls back to whatever the system picks (mismatched or missing glyphs).
+    const QString c = S().code;
+    if (c == QLatin1String("th")) return {QStringLiteral("Leelawadee UI"), QStringLiteral("Noto Sans Thai"), QStringLiteral("Thonburi"), QStringLiteral("Tahoma")};
+    if (c == QLatin1String("ja")) return {QStringLiteral("Yu Gothic UI"), QStringLiteral("Meiryo UI"), QStringLiteral("Hiragino Sans"), QStringLiteral("Noto Sans CJK JP"), QStringLiteral("Noto Sans JP")};
+    if (c == QLatin1String("zh-CN")) return {QStringLiteral("Microsoft YaHei UI"), QStringLiteral("PingFang SC"), QStringLiteral("Noto Sans CJK SC"), QStringLiteral("Noto Sans SC")};
+    if (c == QLatin1String("zh-TW")) return {QStringLiteral("Microsoft JhengHei UI"), QStringLiteral("PingFang TC"), QStringLiteral("Noto Sans CJK TC"), QStringLiteral("Noto Sans TC")};
+    if (c == QLatin1String("ko")) return {QStringLiteral("Malgun Gothic"), QStringLiteral("Apple SD Gothic Neo"), QStringLiteral("Noto Sans CJK KR"), QStringLiteral("Noto Sans KR")};
+    if (c == QLatin1String("vi")) return {QStringLiteral("Segoe UI"), QStringLiteral("Noto Sans")};   // stacked diacritics need a face that has them
+    return {};
+}
+QString cssFontStack() {
+    QStringList q;
+    for (const QString& f : fontFamilies()) q << QLatin1Char('"') + f + QLatin1Char('"');
+    return q.join(QStringLiteral(", "));
+}
+void applyAppFont() {
+    if (!qApp) return;
+    QFont f = qApp->font();
+    QStringList fam;
+    for (const QString& x : fontFamilies()) fam << x;
+    for (const QString& x : {QStringLiteral("Rubik"), QStringLiteral("Inter"), QStringLiteral("Segoe UI"), QStringLiteral("Cantarell")}) if (!fam.contains(x)) fam << x;
+    f.setFamilies(fam);
+    qApp->setFont(f);
 }
 
 QString code() { return S().code; }

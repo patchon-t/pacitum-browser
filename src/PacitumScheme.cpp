@@ -21,7 +21,9 @@ QString i18nize(QString html) {
     dict.replace(QStringLiteral("</"), QStringLiteral("<\\/")).replace(QChar(0x2028), QStringLiteral("\\u2028")).replace(QChar(0x2029), QStringLiteral("\\u2029"));
     QFile f(QStringLiteral(":/pages/i18n.js"));
     const QString js = f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()) : QString();
-    const QString boot = QStringLiteral("<script>window.__I18N=%1;</script><script>%2</script>").arg(dict, js);
+    QString boot = QStringLiteral("<script>window.__I18N=%1;</script><script>%2</script>").arg(dict, js);
+    if (const QString stack = Lang::cssFontStack(); !stack.isEmpty())   // faces that carry Thai / CJK, ahead of Rubik
+        boot += QStringLiteral("<style>html body,html button,html input,html select,html textarea{font-family:%1,Rubik,\"Segoe UI\",sans-serif}</style>").arg(stack);
     const int at = html.indexOf(QStringLiteral("<head>"));
     if (at >= 0) html.insert(at + 6, boot);
     return html;
