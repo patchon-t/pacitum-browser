@@ -805,7 +805,7 @@ void DownloadsPage::showUndo(const QList<DownloadEntry>& removed) {
         m_toastTimer = new QTimer(this); m_toastTimer->setSingleShot(true); m_toastTimer->setInterval(5000);
         connect(m_toastTimer, &QTimer::timeout, this, [this]{ m_undo.clear(); Motion::toast(m_toast, false); });
     }
-    m_toast->findChild<QLabel*>(QStringLiteral("DlToastText"))->setText(QStringLiteral("Cleared %1 download%2").arg(removed.size()).arg(removed.size() == 1 ? "" : "s"));
+    m_toast->findChild<QLabel*>(QStringLiteral("DlToastText"))->setText(removed.size() == 1 ? QStringLiteral("Cleared 1 download") : QStringLiteral("Cleared %1 downloads").arg(removed.size()));
     m_toast->adjustSize();
     m_toast->move((width() - m_toast->width()) / 2, height() - m_toast->height() - 24);
     m_toast->raise(); Motion::toast(m_toast, true); m_toastTimer->start();

@@ -12,7 +12,7 @@
 --chev:color-mix(in srgb,var(--sec) 75%,var(--page));--warnbg:color-mix(in srgb,#FF9F1A 16%,var(--card));--warnfg:color-mix(in srgb,#8A4B00 82%,var(--text))}
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;background:var(--page);color:var(--text);font:14px Rubik,"Segoe UI","Helvetica Neue",Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--page);color:var(--text);font:14px Rubik,"Segoe UI","Leelawadee UI","Noto Sans Thai","Microsoft YaHei UI","Yu Gothic UI","Malgun Gothic","Helvetica Neue",Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 button,select,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -148,7 +148,10 @@ let bridge = null, D = null;
 const st = { section: 'you', q: '', pwQ: '', sel: '', shown: {}, copied: '', resetAsk: false, restartNeeded: false };
 
 function call(name, args) { return new Promise((res) => { if (!bridge) return res(null); bridge.act(name, args || {}, res); }); }
-function setKey(k, v) { D.s[k] = v; if (bridge) bridge.set(k, v); render(); }
+function setKey(k, v) {
+  D.s[k] = v; if (bridge) bridge.set(k, v); render();
+  if (k === 'ui_language') setTimeout(() => location.reload(), 120);   // the page is translated when it loads
+}
 function sv(k, def) { const v = D && D.s ? D.s[k] : undefined; return v === undefined || v === null ? def : v; }
 function toast(t) { if (!t) return; const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2600); }
 function sw(key, def, label, opts) {
@@ -210,11 +213,11 @@ function secYou() {
   const p = D.profile, sy = D.sync;
   const av = p.photo ? `<span class="av" style="width:64px;height:64px;border-radius:20px;background-image:url('${p.photo}')"></span>`
                      : `<span class="av" style="width:64px;height:64px;border-radius:20px;background:${esc(p.colour || 'var(--accent)')};font-size:28px">${esc(p.initial)}</span>`;
-  const tabs = p.tabs === 1 ? '1 tab open' : `${p.tabs} tabs open`;
-  const syncLine = sy.signedIn ? `Syncing as ${esc(sy.email || 'your Google account')}${sy.last ? ` · last synced ${esc(sy.last)}` : ''}` : (sy.hasClient ? 'Not signed in' : 'Needs a one-time setup first');
+  const tabs = p.tabs === 1 ? t('1 tab open') : t('%1 tabs open', p.tabs);
+  const syncLine = sy.signedIn ? (sy.last ? t('Syncing as %1 · last synced %2', esc(sy.email || t('your Google account')), esc(sy.last)) : t('Syncing as %1', esc(sy.email || t('your Google account')))) : (sy.hasClient ? t('Not signed in') : t('Needs a one-time setup first'));
   return `<h1>You and Pacitum</h1>
   <div class="hero">${av}
-    <span class="tx" style="gap:3px"><span style="font-weight:600;font-size:20px">${esc(p.name || 'Profile')}</span><span class="d" style="font-size:13.5px">${p.guest ? 'Guest · nothing is saved' : `${esc(p.email || 'Personal profile')} · ${tabs}`}</span></span>
+    <span class="tx" style="gap:3px"><span style="font-weight:600;font-size:20px">${esc(p.name || 'Profile')}</span><span class="d" style="font-size:13.5px">${p.guest ? t('Guest · nothing is saved') : `${esc(p.email || t('Personal profile'))} · ${tabs}`}</span></span>
     <button class="btn lg" style="height:38px;border-radius:12px" data-a="act:manageProfiles">Manage profiles</button></div>
   <div class="card">
     ${row('Profile name and picture', `${esc(p.name)} · <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${esc(p.colour)};vertical-align:-1px"></span>`, `<button class="btn" data-a="act:editProfile">Edit</button>`)}
@@ -242,11 +245,11 @@ function pwCheckText() {
   if (!c.at) return 'Check your saved passwords for ones that are weak or used on more than one site.';
   const when = new Date(c.at), today = new Date();
   const time = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const day = when.toDateString() === today.toDateString() ? `today at ${time}` : `${when.toLocaleDateString()} at ${time}`;
+  const day = when.toDateString() === today.toDateString() ? t('today at %1', time) : t('%1 at %2', when.toLocaleDateString(), time);
   const parts = [];
-  if (c.reused) parts.push(`${c.reused} password${c.reused === 1 ? ' is' : 's are'} reused`);
-  if (c.weak) parts.push(`${c.weak} ${c.weak === 1 ? 'is' : 'are'} weak`);
-  return (parts.length ? parts.join(' and ') + '.' : 'No problems found.') + ` Checked ${day}.`;
+  if (c.reused) parts.push(c.reused === 1 ? t('1 password is reused') : t('%1 passwords are reused', c.reused));
+  if (c.weak) parts.push(c.weak === 1 ? t('1 password is weak') : t('%1 passwords are weak', c.weak));
+  return (parts.length ? parts.join(t(' and ')) + '.' : t('No problems found.')) + ' ' + t('Checked %1.', day);
 }
 function secPasswords() {
   const q = st.pwQ.toLowerCase();
@@ -319,7 +322,7 @@ function secAutofill() {
   const cards = D.cards.map((c) => `<div style="display:flex;flex-direction:column;gap:6px;padding:18px;background:#151112;color:#FFFFFF;border-radius:20px">
       <span style="font-size:12.5px;font-weight:600;color:#A1A1A8">${esc(c.nickname || 'Card')}</span>
       <span class="mono" style="font-size:17px;letter-spacing:.08em">${esc(c.masked)}</span>
-      <span style="font-size:13.5px;color:#A1A1A8">${esc(c.name)}${c.name ? ' · ' : ''}Expires ${String(c.m).padStart(2, '0')}/${String(c.y % 100).padStart(2, '0')}</span>
+      <span style="font-size:13.5px;color:#A1A1A8">${esc(c.name)}${c.name ? ' · ' : ''}${t('Expires %1', String(c.m).padStart(2, '0') + '/' + String(c.y % 100).padStart(2, '0'))}</span>
       <div style="display:flex;gap:8px;margin-top:6px"><button class="btn" style="height:34px;background:#2A2324;color:#FFFFFF" data-a="sheet:card" data-v="${esc(c.id)}">Edit</button><button class="btn" style="height:34px;background:#2A2324;color:#FF8A92" data-a="cardDel" data-v="${esc(c.id)}">Remove</button></div></div>`);
   return `<h1>Addresses and payments</h1>
     <div class="card">
@@ -362,17 +365,17 @@ function secPrivacy() {
 const ACCENTS = [['Red', '#D9141F'], ['Black', '#151112'], ['Blue', '#2F6FEB'], ['Green', '#1F8F5F'], ['Purple', '#4B3FBF']];
 function themeSetting() { return String(sv('theme', 'System')); }
 function secAppearance() {
-  const t = themeSetting();
-  const cards = [['Light', 'Light', '#F7F4F1', '#FFFFFF'], ['Dark', 'Dark', '#151112', '#2A2324'], ['System', 'Match ' + osName(), 'linear-gradient(90deg,#F7F4F1 50%,#151112 50%)', 'rgba(160,160,168,.5)']];
+  const ts = themeSetting();
+  const cards = [['Light', 'Light', '#F7F4F1', '#FFFFFF'], ['Dark', 'Dark', '#151112', '#2A2324'], ['System', t('Match %1', osName()), 'linear-gradient(90deg,#F7F4F1 50%,#151112 50%)', 'rgba(160,160,168,.5)']];
   const acc = String(sv('accent', '') || '').toUpperCase();
   const def = !acc || acc === '#D9141F' || acc === '#2DD4BF';
   return `<h1>Appearance</h1>
     <div class="box" style="gap:14px"><span class="t">Theme</span>
-      <div class="grid3">${cards.map((c) => `<button class="tcard" aria-pressed="${t === c[0]}" data-a="theme" data-v="${c[0]}">
+      <div class="grid3">${cards.map((c) => `<button class="tcard" aria-pressed="${ts === c[0]}" data-a="theme" data-v="${c[0]}">
         <span style="height:92px;border-radius:11px;background:${c[2]};display:flex;flex-direction:column;gap:6px;padding:10px;box-shadow:inset 0 0 0 1px rgba(127,127,127,.18)">
           <span style="height:10px;width:60%;border-radius:4px;background:${c[3]}"></span><span style="height:22px;border-radius:6px;background:${c[3]}"></span></span>
         <span style="font-size:14px;font-weight:600;padding:0 4px">${esc(c[1])}</span></button>`).join('')}</div>
-      ${['Light', 'Dark', 'System'].includes(t) ? '' : `<span class="d">Using the ${esc((D.themes.find((x) => x.id === t.toLowerCase()) || {}).name || t)} theme. <a href="#" data-a="go:themes" style="font-weight:600;color:var(--text)">Change in Themes</a></span>`}</div>
+      ${['Light', 'Dark', 'System'].includes(ts) ? '' : `<span class="d">Using the ${esc((D.themes.find((x) => x.id === ts.toLowerCase()) || {}).name || ts)} theme. <a href="#" data-a="go:themes" style="font-weight:600;color:var(--text)">Change in Themes</a></span>`}</div>
     <div class="card">
       <div class="row"><span class="tx"><span class="t">Accent colour</span><span class="d">Used for the active tab, the cursor and your profile</span></span>
         <div style="display:flex;gap:8px">${ACCENTS.map((w) => `<button class="swatch" aria-label="${w[0]}" aria-pressed="${w[1] === '#D9141F' ? def : acc === w[1]}" style="background:${w[1]};--ring:${w[1]}" data-a="accent" data-v="${w[1]}"></button>`).join('')}</div></div>
@@ -397,9 +400,9 @@ const T = {
   contrast: { strip: '#000000', stripChip: '#FFFFFF', toolbar: '#000000', bg: '#000000', card: '#000000', text: '#FFFFFF', field: '#1A1A1A', accent: '#FFD400' }
 };
 function secThemes() {
-  const t = themeSetting().toLowerCase();
-  const follow = t === 'system';
-  const current = follow ? (D.palette.dark ? 'dark' : 'light') : t;
+  const ts = themeSetting().toLowerCase();
+  const follow = ts === 'system';
+  const current = follow ? (D.palette.dark ? 'dark' : 'light') : ts;
   const themes = D.themes;
   const cur = themes.find((x) => x.id === current) || themes[0];
   const acc = String(sv('accent', '') || '').toUpperCase();
@@ -418,7 +421,7 @@ function secThemes() {
       <span style="display:flex;align-items:center;gap:8px;padding:0 4px"><span style="flex:1;font-size:14px;font-weight:600">${esc(th.name)}</span>
         ${on ? `<span class="ck"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--onacc)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>` : ''}</span></button>`; }).join('')}</div>
     <div class="card">
-      <div class="row" style="min-height:64px"><span class="tx"><span class="t">Accent colour</span><span class="d">${custom ? 'Custom colour on top of ' + esc(cur.name) : 'Using the colour that comes with ' + esc(cur.name)}</span></span>
+      <div class="row" style="min-height:64px"><span class="tx"><span class="t">Accent colour</span><span class="d">${custom ? t('Custom colour on top of %1', esc(t(cur.name))) : t('Using the colour that comes with %1', esc(t(cur.name)))}</span></span>
         <div style="display:flex;gap:8px">${sws.map((w, i) => `<button class="swatch" aria-label="${w[0]}" aria-pressed="${i === 0 ? !custom : custom && acc === w[1]}" style="background:${w[1]};--ring:${w[1]}" data-a="accent" data-v="${i === 0 ? '' : w[1]}"></button>`).join('')}</div></div>
       ${row(`Follow ${osName()} light and dark`, 'Switch between Pacitum Light and Pacitum Dark with the system', sw(follow, false, 'Follow system light and dark', { act: 'follow' }))}
       ${row('Use theme on the new tab page', 'Background and shortcut tiles take the theme colours', sw('theme_ntp', true, 'Use theme on the new tab page'))}
@@ -480,8 +483,13 @@ function secDownloads() {
 // ---------------------------------------------------------------- Languages / accessibility / system
 function secLanguages() {
   const langs = D.languages;
-  const names = langs.slice(0, 2).map((l) => l.name.split(' · ').pop()).join(' and ');
+  const names = langs.slice(0, 2).map((l) => l.name.split(' · ').pop()).join(t(' and '));
+  const cur = (D.uiLanguages || []).find((l) => l.code === D.uiLang);
+  const uiOpts = [['system', `System default (${cur ? cur.native : 'English'})`]].concat((D.uiLanguages || []).map((l) => [l.code, l.code === 'en' ? 'English' : `${l.native} · ${l.english}`]));
   return `<h1>Languages</h1>
+    <div class="card" data-keep>
+      ${row('Display language', 'Menus, dialogs and pages in Pacitum', select('ui_language', 'system', uiOpts, 'Display language'))}
+    </div>
     <div class="box" style="gap:4px;padding:14px"><span class="t" style="padding:4px 8px 8px">Preferred languages</span>
       ${langs.map((l, i) => `<div draggable="true" data-drag="${i}" style="height:52px;display:flex;align-items:center;gap:12px;padding:0 6px 0 10px;border-radius:13px;background:${i === 0 ? 'var(--page)' : 'transparent'}">
         <span style="font-weight:600;font-size:13px;color:var(--sec);width:18px">${i + 1}</span>
@@ -491,7 +499,7 @@ function secLanguages() {
         <span style="cursor:grab;display:flex;padding:4px">${ico('M5 9h14M5 15h14', 16, 2.4, 'chev')}</span></div>`).join('')}
       <button class="btn" style="align-self:flex-start;margin:6px 8px 2px" data-a="sheet:addLang">Add language</button></div>
     <div class="card">
-      ${row('Offer to translate pages', `When a page isn't in ${esc(names)}`, sw('offer_translate', true, 'Offer to translate pages'))}
+      ${row('Offer to translate pages', t("When a page isn't in %1", esc(names)), sw('offer_translate', true, 'Offer to translate pages'))}
       ${row('Spell check', esc(names), sw('spellcheck', true, 'Spell check'))}
     </div>`;
 }
@@ -542,12 +550,12 @@ function secAbout() {
     <div class="hero" style="gap:22px;padding:26px">
       <svg width="76" height="76" viewBox="0 0 2582 2582" role="img" aria-label="Pacitum"><rect width="2582" height="2582" rx="620" fill="#151112"/><path fill="#FFFFFF" d="M919.037 1843.07H574.063C512.885 1843.07 471.657 1780.49 495.802 1724.28L883.927 820.671C905.23 771.075 954.021 738.93 1008 738.93H1395.63C1477.58 738.93 1549.28 755.104 1610.74 787.452C1672.2 819.799 1720.01 865.266 1754.15 923.852C1788.3 982.437 1805.37 1050.91 1805.37 1129.26C1805.37 1208.33 1787.76 1276.8 1752.53 1334.67C1717.67 1392.54 1668.61 1437.1 1605.35 1468.37C1542.45 1499.64 1468.95 1515.28 1384.85 1515.28H1100.18V1282.37H1324.46C1359.69 1282.37 1389.7 1276.26 1414.5 1264.04C1439.66 1251.46 1458.89 1233.67 1472.19 1210.67C1485.84 1187.67 1492.67 1160.53 1492.67 1129.26C1492.67 1097.63 1485.84 1070.67 1472.19 1048.39C1458.89 1025.75 1439.66 1008.5 1414.5 996.634C1389.7 984.414 1359.69 978.304 1324.46 978.304H1218.79V1843.07H919.037Z"/><path fill="#FF0000" d="M2052.05 738.93C2099.09 738.93 2137.22 777.064 2137.22 824.105V1757.9C2137.22 1804.94 2099.09 1843.07 2052.05 1843.07H1922.64C1875.6 1843.07 1837.46 1804.94 1837.46 1757.9V824.105C1837.46 777.064 1875.6 738.93 1922.64 738.93H2052.05Z"/></svg>
       <span class="tx" style="gap:4px"><span style="font-weight:600;font-size:24px">Pacitum</span>
-        <span style="font-size:14px;color:var(--sec2)">Version ${esc(D.version)} · ${esc(D.arch)} · Qt ${esc(D.qt)} WebEngine · Chromium ${esc(D.chromium)}</span>
+        <span style="font-size:14px;color:var(--sec2)">${t('Version %1 · %2 · Qt %3 WebEngine · Chromium %4', esc(D.version), esc(D.arch), esc(D.qt), esc(D.chromium))}</span>
         <span style="display:flex;align-items:center;gap:8px;margin-top:4px;font-size:13.5px;font-weight:600;color:${color}"><span style="width:8px;height:8px;border-radius:3px;background:${color}"></span>${esc(status)}</span></span>
       <button class="btn lg" data-a="checkUpdates"${u.busy ? ' disabled' : ''}>Check for updates</button></div>
     <div class="card">
       ${link('Source code on GitHub', 'open', REPO, true)}
-      ${link("What's new in " + esc(D.version), 'open', REPO + '/releases', true)}
+      ${link(t("What's new in %1", esc(D.version)), 'open', REPO + '/releases', true)}
       ${link('Open-source licences', 'sheet:licences')}
       ${link('Report a problem', 'open', REPO + '/issues/new', true)}
     </div>
@@ -576,7 +584,7 @@ function render() {
   $('#content').innerHTML = `<div class="col">${(SECTIONS[st.section] || secYou)()}</div>`;
   if (id && id !== 'set-search') { const e = document.getElementById(id); if (e) { e.focus(); try { e.setSelectionRange(pos, pos); } catch (x) {} } }
   wireDrag();
-  document.title = 'Settings · ' + (NAV.find((n) => n.id === st.section) || NAV[0]).label;
+  document.title = t('Settings · %1', t((NAV.find((n) => n.id === st.section) || NAV[0]).label));
 }
 function go(id, keepScroll) {
   if (!SECTIONS[id]) id = 'you';
@@ -621,7 +629,7 @@ const SHEETS = {
   },
   pwDelete() {
     const p = D.passwords.find((x) => x.id === st.sel); if (!p) return;
-    sheet(`<h3>Delete password?</h3><span class="d" style="font-size:14px">The password for ${esc(p.user || 'this account')} on ${esc(p.site)} will be deleted from Pacitum. Your account on the site isn't affected.</span>
+    sheet(`<h3>Delete password?</h3><span class="d" style="font-size:14px">${t("The password for %1 on %2 will be deleted from Pacitum. Your account on the site isn't affected.", esc(p.user || t('this account')), esc(p.site))}</span>
       <div class="acts"><button class="btn lg" data-a="closeSheet">Cancel</button><button class="btn red lg" data-a="pwDel" data-v="${esc(p.id)}">Delete</button></div>`);
   },
   addr(id) {

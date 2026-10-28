@@ -1,3 +1,4 @@
+#include "PixelSnap.h"
 #include <QDateTime>
 #include <QTimer>
 #include <QtMath>
@@ -122,7 +123,7 @@ void TabCloseButton::paintEvent(QPaintEvent*) {
     if (isDown()) { p.setPen(Qt::NoPen); p.setBrush(qc(pal.pressed)); p.drawEllipse(rect()); }
     else if (underMouse()) { p.setPen(Qt::NoPen); p.setBrush(qc(pal.surfaceHover)); p.drawEllipse(rect()); }
     const QPixmap pm = ThemeManager::icon(QStringLiteral("close"), underMouse() ? pal.text : pal.textSecondary, 14).pixmap(QSize(14, 14), devicePixelRatioF());
-    p.drawPixmap(QPointF(4, 4), pm);
+    PixelSnap::drawCentered(p, QRectF(0, 0, width(), height()), pm);
 }
 
 // PacitumTabBar
@@ -535,7 +536,7 @@ void PacitumTabBar::paintFloatingTab(QPainter* p, const QStyleOptionTab& opt) co
         }
         spinnerDone:;
     } else if (fl.crashed) {
-        p->drawPixmap(iconR.toRect(), ThemeManager::icon(QStringLiteral("warning"), pal.danger, 16).pixmap(QSize(16, 16), devicePixelRatioF()));
+        PixelSnap::drawCentered(*p, iconR, ThemeManager::icon(QStringLiteral("warning"), pal.danger, 16).pixmap(QSize(16, 16), devicePixelRatioF()));
     } else if (!opt.icon.isNull()) {
         // favicons are clipped to a 4 px radius
         QPainterPath clip; clip.addRoundedRect(iconR, 4, 4);
@@ -545,7 +546,7 @@ void PacitumTabBar::paintFloatingTab(QPainter* p, const QStyleOptionTab& opt) co
             p->setOpacity(p->opacity() * fin); p->setRenderHint(QPainter::SmoothPixmapTransform);
             p->translate(c); p->scale(k, k); p->translate(-c);
         }
-        p->drawPixmap(iconR.toRect(), opt.icon.pixmap(QSize(16, 16), devicePixelRatioF()));
+        PixelSnap::drawCentered(*p, iconR, opt.icon.pixmap(QSize(16, 16), devicePixelRatioF()));
         p->restore();
     }
     if (pinned || (compact && !selected) || (compact && closeVisible)) { p->restore(); return; }
@@ -565,14 +566,14 @@ void PacitumTabBar::paintFloatingTab(QPainter* p, const QStyleOptionTab& opt) co
             p->setBrush(d); p->drawEllipse(c, 4, 4); p->restore();
         } else {
             const QPixmap pm = ThemeManager::icon(fl.usage == 2 ? QStringLiteral("screen-share") : QStringLiteral("location"), pal.accent, 14).pixmap(QSize(14, 14), devicePixelRatioF());
-            p->drawPixmap(ar.topLeft() + QPoint(1, 1), pm);
+            PixelSnap::drawCentered(*p, QRectF(ar.topLeft() + QPoint(1, 1), QSizeF(14, 14)), pm);
         }
         right = ar.left() - 4;
     } else if (fl.audible || fl.muted) {
         const QRect ar(right - 16, r.y() + kTop + kIconY, 16, 16);
         const QPixmap pm = fl.muted ? ThemeManager::icon(QStringLiteral("tab-mute"), pal.textSecondary, 15).pixmap(QSize(15, 15), devicePixelRatioF())
                                     : ThemeManager::icon(QStringLiteral("audio-playing"), pal.accent, 16).pixmap(QSize(16, 16), devicePixelRatioF());
-        p->drawPixmap(ar.topLeft() + QPoint((16 - pm.deviceIndependentSize().width()) / 2, (16 - pm.deviceIndependentSize().height()) / 2), pm);
+        PixelSnap::drawCentered(*p, QRectF(ar.topLeft(), QSizeF(16, 16)), pm);
         right = ar.left() - 4;
     }
 

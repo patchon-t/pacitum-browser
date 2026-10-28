@@ -1,6 +1,7 @@
 #include <cmath>
 #include "Widgets.h"
 #include "ThemeManager.h"
+#include "PixelSnap.h"
 #include <QPainter>
 #include <QPainterPath>
 #include <QStyleOptionToolButton>
@@ -102,8 +103,13 @@ void AnimatedToolButton::paintGlyph(QPainter& p) {
         if (ic.isNull() || opacity <= 0.001 || scale <= 0.001) return;
         const QPixmap pm = ic.pixmap(is, devicePixelRatioF(), mode);
         p.save();
-        p.setRenderHint(QPainter::SmoothPixmapTransform);
         p.setOpacity(p.opacity() * opacity);
+        if (scale == 1.0 && m_rotation == 0.0 && m_nudge == 0.0) {   // resting state: whole device pixels = crisp edges
+            PixelSnap::drawCentered(p, QRectF(c.x() - is.width() / 2.0, c.y() - is.height() / 2.0, is.width(), is.height()), pm);
+            p.restore();
+            return;
+        }
+        p.setRenderHint(QPainter::SmoothPixmapTransform);
         p.translate(c + QPointF(m_nudge, 0)); if (m_rotation != 0.0) p.rotate(m_rotation); p.scale(scale, scale); p.translate(-c);
         p.drawPixmap(QRectF(c.x() - is.width() / 2.0, c.y() - is.height() / 2.0, is.width(), is.height()), pm, QRectF(pm.rect()));
         p.restore();
@@ -213,7 +219,7 @@ void WindowButton::paintEvent(QPaintEvent*) {
                        : (m_max ? QStringLiteral("window-restore") : QStringLiteral("window-maximize"));
     const int gs = m_kind == Maximize ? 14 : 16;   // spec §4.2: maximise/restore glyph 14, others 16
     const QPixmap pm = ThemeManager::icon(name, fg.name(), gs).pixmap(QSize(gs, gs), devicePixelRatioF());
-    p.drawPixmap(QPointF((width() - gs) / 2.0, (height() - gs) / 2.0), pm);
+    PixelSnap::drawCentered(p, QRectF(0, 0, width(), height()), pm);
     if (hasFocus()) {   // keyboard focus ring (Tab only, see focusPolicy)
         p.setRenderHint(QPainter::Antialiasing);
         p.setPen(QPen(QColor(pal.accent), 2)); p.setBrush(Qt::NoBrush);

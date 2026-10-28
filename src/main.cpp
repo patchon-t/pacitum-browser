@@ -22,6 +22,7 @@
 #include <QMessageBox>
 #include <QThread>
 #include "PacitumScheme.h"
+#include "Lang.h"
 #include "WebProfile.h"
 #include "AppSettings.h"
 #include <QJsonDocument>
@@ -264,6 +265,8 @@ int main(int argc, char *argv[]) {
 
     QApplication app(argc, argv);
     pacitumLog(QStringLiteral("QApplication ready"));
+    Lang::init();   // 2.0.1: display language (Settings > Languages), before any window is built
+    pacitumLog(QStringLiteral("language: %1").arg(Lang::code()));
 #ifdef Q_OS_WIN
     // Lets the installer (AppMutex) detect a running instance before upgrading.
     CreateMutexW(nullptr, FALSE, L"PacitumBrowserRunning");
@@ -282,7 +285,10 @@ int main(int argc, char *argv[]) {
         for (const char* w : {"Regular", "Medium", "SemiBold", "Bold"})
             QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Inter-%1.ttf").arg(QLatin1String(w)));
         QFont f = app.font();
-        f.setFamilies({QStringLiteral("Rubik"), QStringLiteral("Inter"), QStringLiteral("Segoe UI"), QStringLiteral("Cantarell"), f.family()});
+        f.setFamilies({QStringLiteral("Rubik"), QStringLiteral("Inter"), QStringLiteral("Segoe UI"), QStringLiteral("Cantarell"),
+                       // per-language fallbacks so Thai / CJK text is not drawn with an ill-matched face
+                       QStringLiteral("Leelawadee UI"), QStringLiteral("Noto Sans Thai"), QStringLiteral("Microsoft YaHei UI"),
+                       QStringLiteral("Yu Gothic UI"), QStringLiteral("Malgun Gothic"), QStringLiteral("Noto Sans CJK SC"), f.family()});
         f.setPixelSize(13);
         app.setFont(f);
     }

@@ -220,7 +220,7 @@ void SitePermissionsPage::showSite(const QString& origin) {
     *conn = connect(cookies, &QWebEngineCookieStore::cookieAdded, meta, [count, host, metaG](const QNetworkCookie& c){
         QString d = c.domain(); if (d.startsWith(QLatin1Char('.'))) d = d.mid(1);
         if (host == d || host.endsWith(QLatin1Char('.') + d)) count->append(c);
-        if (metaG) metaG->setText(QStringLiteral("%1 cookie%2").arg(count->size()).arg(count->size() == 1 ? "" : "s"));
+        if (metaG) metaG->setText(count->size() == 1 ? QStringLiteral("1 cookie") : QStringLiteral("%1 cookies").arg(count->size()));
     });
     cookies->loadAllCookies();
     QTimer::singleShot(600, meta, [metaG, count]{ if (metaG && count->isEmpty()) metaG->setText(QStringLiteral("No cookies")); });

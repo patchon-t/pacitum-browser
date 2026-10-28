@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PacitumBrowser VERSION 2.0.0 LANGUAGES CXX)
+project(PacitumBrowser VERSION 2.0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -46,6 +46,7 @@ set(SOURCES
     src/SessionManager.cpp
     src/ZoomController.cpp
     src/Passwords.cpp
+    src/Lang.cpp
     src/PageDialogs.cpp
     src/SettingsBridge.cpp
     src/WebProfile.cpp
@@ -93,6 +94,7 @@ set(HEADERS
     include/SessionManager.h
     include/ZoomController.h
     include/Passwords.h
+    include/Lang.h
     include/PageDialogs.h
     include/SettingsBridge.h
     include/WebProfile.h
