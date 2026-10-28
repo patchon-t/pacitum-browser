@@ -36,7 +36,7 @@ struct Pattern {
 };
 
 struct State {
-    QString choice = QStringLiteral("system");
+    QString choice = QStringLiteral("en");
     QString code = QStringLiteral("en");
     QHash<QString, QString> exact;
     QVector<Pattern> patterns;
@@ -253,7 +253,7 @@ const QList<Info>& available() {
     return all;
 }
 
-QString setting() { return AppSettings::get(QStringLiteral("ui_language")).toString(QStringLiteral("system")); }
+QString setting() { return AppSettings::get(QStringLiteral("ui_language")).toString(QStringLiteral("en")); }
 
 QString resolve(const QString& choice) {
     const auto& langs = available();
@@ -286,7 +286,7 @@ void init() {
 
 void apply(const QString& choice) {
     auto& st = S();
-    st.choice = choice.isEmpty() ? QStringLiteral("system") : choice;
+    st.choice = choice.isEmpty() ? QStringLiteral("en") : choice;
     const QString want = resolve(st.choice);
     if (want == st.code) { emit st.notifier.changed(); return; }
     loadDictionary(want);

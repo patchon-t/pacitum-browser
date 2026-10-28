@@ -485,10 +485,10 @@ function secLanguages() {
   const langs = D.languages;
   const names = langs.slice(0, 2).map((l) => l.name.split(' · ').pop()).join(t(' and '));
   const cur = (D.uiLanguages || []).find((l) => l.code === D.uiLang);
-  const uiOpts = [['system', `System default (${cur ? cur.native : 'English'})`]].concat((D.uiLanguages || []).map((l) => [l.code, l.code === 'en' ? 'English' : `${l.native} · ${l.english}`]));
+  const uiOpts = [['system', `Same as system (${cur ? cur.native : 'English'})`]].concat((D.uiLanguages || []).map((l) => [l.code, l.code === 'en' ? 'English' : `${l.native} · ${l.english}`]));
   return `<h1>Languages</h1>
     <div class="card" data-keep>
-      ${row('Display language', 'Menus, dialogs and pages in Pacitum', select('ui_language', 'system', uiOpts, 'Display language'))}
+      ${row('Display language', 'Menus, dialogs and pages in Pacitum', select('ui_language', 'en', uiOpts, 'Display language'))}
     </div>
     <div class="box" style="gap:4px;padding:14px"><span class="t" style="padding:4px 8px 8px">Preferred languages</span>
       ${langs.map((l, i) => `<div draggable="true" data-drag="${i}" style="height:52px;display:flex;align-items:center;gap:12px;padding:0 6px 0 10px;border-radius:13px;background:${i === 0 ? 'var(--page)' : 'transparent'}">
