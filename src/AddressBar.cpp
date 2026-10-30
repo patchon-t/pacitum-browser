@@ -1,4 +1,5 @@
 #include "AddressBar.h"
+#include "Lang.h"
 #include "Widgets.h"
 #include "Motion.h"
 #include <QPainter>
@@ -678,11 +679,11 @@ public:
         updateGeometry(); update();
     }
     QString accessible() const {
-        if (m_chip.id == QLatin1String("request")) return QStringLiteral("Permission request pending%1 (F6)").arg(m_chip.badge ? QStringLiteral(", +%1 more").arg(m_chip.badge) : QString());
-        if (m_chip.id == QLatin1String("quiet")) return QStringLiteral("Notifications blocked");
-        if (m_chip.id == QLatin1String("inuse")) return m_chip.dot ? QStringLiteral("Camera and microphone in use") : QStringLiteral("In use: ") + m_chip.glyphs.join(QStringLiteral(", "));
-        if (m_chip.id == QLatin1String("popups")) return QStringLiteral("Pop-ups blocked");
-        return QStringLiteral("Blocked on this page");
+        if (m_chip.id == QLatin1String("request")) return Lang::tr(m_chip.badge ? QStringLiteral("Permission request pending, +%1 more (F6)").arg(m_chip.badge) : QStringLiteral("Permission request pending (F6)"));
+        if (m_chip.id == QLatin1String("quiet")) return Lang::tr(QStringLiteral("Notifications blocked"));
+        if (m_chip.id == QLatin1String("inuse")) return m_chip.dot ? Lang::tr(QStringLiteral("Camera and microphone in use")) : Lang::tr(QStringLiteral("In use: ")) + m_chip.glyphs.join(QStringLiteral(", "));
+        if (m_chip.id == QLatin1String("popups")) return Lang::tr(QStringLiteral("Pop-ups blocked"));
+        return Lang::tr(QStringLiteral("Blocked on this page"));
     }
     QSize sizeHint() const override {
         const int glyphs = qMax(1, int(m_chip.glyphs.size()));

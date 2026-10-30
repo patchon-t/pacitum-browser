@@ -152,7 +152,7 @@ tick(); setInterval(tick, 15000);
 // search + engine
 function engine() {
   $('#eng').innerHTML = esc(D.engine) + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
-  $('#q').placeholder = 'Search ' + D.engine + ' or type a web address';
+  $('#q').placeholder = t('Search %1 or type a web address', D.engine);
 }
 engine();
 $('#sf').onsubmit = function (e) { e.preventDefault(); go($('#q').value); };
@@ -201,7 +201,8 @@ function left() {
   var el = $('#ls');
   el.style.display = S.left ? '' : 'none';
   var when = L.at ? new Date(L.at * 1000) : null;
-  var sub = tabs.length ? (tabs.length + (tabs.length === 1 ? ' tab' : ' tabs') + (when ? ' · closed ' + (when.toDateString() === new Date().toDateString() ? when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : when.toLocaleDateString()) : '')) : (L.label || '');
+  var cnt = tabs.length === 1 ? t('1 tab') : t('%1 tabs', tabs.length);
+  var sub = tabs.length ? (when ? t('%1 · closed %2', cnt, (when.toDateString() === new Date().toDateString() ? when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : when.toLocaleDateString())) : cnt) : t(L.label || '');
   var html = '<div class="lh"><div style="display:flex;flex-direction:column;gap:2px;min-width:0"><h2 id="lsh">Where you left off</h2><span class="meta num">' + esc(sub) + '</span></div>' +
     (tabs.length ? '<button class="ink" id="restore">Restore all</button>' : '') + '</div>';
   html += tabs.length ? tabs.slice(0, 5).map(function (t) {
@@ -209,7 +210,7 @@ function left() {
     return '<a class="lrow" href="' + esc(t.u) + '"><span class="tile">' + letter(host(t.u)) + '</span><b>' + esc(name) + '</b><span>' + esc(host(t.u)) + '</span></a>';
   }).join('') : '<div class="empty">Tabs you close show up here, so you can pick up where you left off.</div>';
   if (D.asleep > 0) html += '<div class="asleep"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>' +
-    D.asleep + (D.asleep === 1 ? ' tab is asleep' : ' tabs are asleep') + ' to save memory</div>';
+    (D.asleep === 1 ? t('1 tab is asleep to save memory') : t('%1 tabs are asleep to save memory', D.asleep)) + '</div>';
   el.innerHTML = html;
   var r = $('#restore'); if (r) r.onclick = function () { act('restore'); D.left = { tabs: [] }; left(); };
   $('#grid').classList.toggle('one', !S.top || !S.left);
@@ -219,7 +220,7 @@ function left() {
 function footer() {
   var b = $('#blocked');
   var shield = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l7 3v5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9v-5z"/></svg>';
-  b.innerHTML = shield + (D.adblock ? (D.blocked === 1 ? '1 tracker blocked today' : (D.blocked || 0) + ' trackers blocked today') : 'Tracker blocking is off');
+  b.innerHTML = shield + (D.adblock ? (D.blocked === 1 ? t('1 tracker blocked today') : t('%1 trackers blocked today', D.blocked || 0)) : t('Tracker blocking is off'));
   b.onclick = function () { act('privacy'); };
 }
 

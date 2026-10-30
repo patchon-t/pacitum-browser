@@ -9,6 +9,7 @@
 #include <QCursor>
 #include "BrowserWindow.h"
 #include "SyncGuide.h"
+#include "Lang.h"
 #include "SyncManager.h"
 #include "Passwords.h"
 #include "BrowserTab.h"
@@ -144,6 +145,19 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent) {
     restoreOrNewTab();
     updateDownloadsButton();
     installPopupFactory();
+    // 2.0.1: the display language changed: the internal pages (New tab, Settings, Extensions ...) are translated
+    // when they load, so load them again. Everything made of widgets was retranslated by Lang itself.
+    QPointer<BrowserWindow> self(this);
+    QObject::connect(Lang::notifier(), &Lang::Notifier::changed, this, [self]{
+        if (!self) return;
+        QTimer::singleShot(250, self, [self]{
+            for (auto* tw : {self->m_tabs, self->m_splitTabs}) {
+                if (!tw) continue;
+                for (int i = 0; i < tw->count(); ++i)
+                    if (auto* t = qobject_cast<BrowserTab*>(tw->widget(i)); t && t->currentUrl().startsWith(QStringLiteral("pacitum://"))) t->reload();
+            }
+        });
+    });
     setupSync();
     qApp->installEventFilter(this);
     m_noBackgroundUpdates = qApp->arguments().contains(QStringLiteral("--smoke-test")) || qApp->arguments().contains(QStringLiteral("--stress-test")) || qApp->arguments().contains(QStringLiteral("--resize-test")) || qApp->arguments().contains(QStringLiteral("--permissions-test"));

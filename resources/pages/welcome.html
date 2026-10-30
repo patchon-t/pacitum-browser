@@ -227,11 +227,11 @@ h1:focus{outline:none}
   <div class="bar">
    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--pmuted)"><path d="M9 6l6 6-6 6"/></svg>
-   <div class="omni"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg><span>Search <i data-eng style="font-style:normal">Google</i> or type a web address</span></div>
+   <div class="omni"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg><span data-search></span></div>
    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="5.5" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="18.5" r="1.4" fill="currentColor"/></svg>
    <span class="pav" data-pav>P</span>
    <div class="sug">
-    <div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg><span>pacitum browser</span><em><i data-eng style="font-style:normal">Google</i> search</em></div>
+    <div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg><span>pacitum browser</span><em data-engsearch></em></div>
     <div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg><span>pacitum 2.0 release notes</span></div>
     <div style="color:var(--pmuted)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2"/></svg><span style="color:var(--pink)">Releases · pacitum-browser</span><em>github.com</em></div>
    </div>
@@ -239,7 +239,7 @@ h1:focus{outline:none}
   <div class="bms" data-bms></div>
   <div class="body">
    <svg class="wm" viewBox="395 710 3634 560" aria-hidden="true">%WORDMARK%</svg>
-   <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg><span>Search <i data-eng style="font-style:normal">Google</i> or type a web address</span></div>
+   <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg><span data-search></span></div>
    <div class="tiles"><span>G</span><span>Q</span><span>Y</span><span>C</span><span>M</span></div>
   </div>
  </div>
@@ -273,9 +273,10 @@ document.querySelectorAll('[data-bars]').forEach(function(b){for(var i=0;i<7;i++
 function setVars(prefix,c){var r=document.documentElement.style;for(var k in c)r.setProperty('--'+prefix+k,c[k]);}
 function pickedDark(){return st.theme?st.theme==='dark':st.dark;}
 function paintPreview(){setVars('p',pickedDark()?D:L);
- document.querySelectorAll('[data-eng]').forEach(function(e){e.textContent=st.engine;});
+ document.querySelectorAll('[data-search]').forEach(function(e){e.textContent=t('Search %1 or type a web address',st.engine);});
+ document.querySelectorAll('[data-engsearch]').forEach(function(e){e.textContent=t('%1 search',st.engine);});
  var src=sourceName(st.from),imp=st.from!=='none'&&st.what.bookmarks,h='';
- if(imp){h='<span><span style="display:flex;color:var(--pacc)">'+FOLDER+'</span>Imported from '+esc(src.replace('Google ','').replace('Microsoft ',''))+'</span>';
+ if(imp){h='<span><span style="display:flex;color:var(--pacc)">'+FOLDER+'</span>'+esc(t('Imported from %1',src.replace('Google ','').replace('Microsoft ','')))+'</span>';
   ['Work','Reading','Qt docs'].forEach(function(t){h+='<span><span style="display:flex;color:var(--pmuted)">'+FOLDER+'</span>'+t+'</span>';});}
  else h='<span style="color:var(--pmuted)">Bookmarks bar is empty</span>';
  document.querySelectorAll('[data-bms]').forEach(function(e){e.innerHTML=h;});
@@ -311,11 +312,11 @@ function renderSummary(){var s=st.sync,on=SYNC.filter(function(y){return s[y[0]]
  else if(st.importDone){var bad=st.importDone.filter(function(r){return !r.ok;});
   imp=esc(st.importedFrom)+(bad.length?' <small class="err" style="font-size:13px;font-weight:400">'+esc(bad[0].message||'Some items could not be imported')+'</small>':'');}
  else imp=esc(st.importedFrom);
- var rows=[['Look',(pickedDark()?'Dark':'Light'),1],['Imported',imp,2],['Search engine',esc(st.engine),3],['Sync',s.signedIn?on+' of 4 items on':'Off',5]];
+ var rows=[['Look',(pickedDark()?'Dark':'Light'),1],['Imported',imp,2],['Search engine',esc(st.engine),3],['Sync',s.signedIn?t('%1 of 4 items on',on):t('Off'),5]];
  $('sum').innerHTML=rows.map(function(m){return '<div class="mrow"><span class="k">'+m[0]+'</span><span class="v">'+m[1]+'</span><button class="small" data-go="'+m[2]+'">Change</button></div>';}).join('');
  $('sum').querySelectorAll('[data-go]').forEach(function(b){b.onclick=function(){go(+b.dataset.go);};});}
 
-function paintSteps(){document.querySelectorAll('[data-num]').forEach(function(e){e.textContent='Step '+(st.step+1)+' of 7';});
+function paintSteps(){document.querySelectorAll('[data-num]').forEach(function(e){e.textContent=t('Step %1 of 7',st.step+1);});
  document.querySelectorAll('[data-bars]').forEach(function(b){[].forEach.call(b.children,function(x,i){x.className=i<=st.step?'on':'';});});}
 function maybeImport(){if(st.from==='none'||st.importing)return;
  var types=WHAT.map(function(k){return k[0];}).filter(function(k){return st.what[k];});if(!types.length)return;

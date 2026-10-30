@@ -22,6 +22,7 @@
 #include <QMessageBox>
 #include <QThread>
 #include "PacitumScheme.h"
+#include "Lang.h"
 #include "WebProfile.h"
 #include "AppSettings.h"
 #include <QJsonDocument>
@@ -264,6 +265,8 @@ int main(int argc, char *argv[]) {
 
     QApplication app(argc, argv);
     pacitumLog(QStringLiteral("QApplication ready"));
+    Lang::init();   // 2.0.1: display language (Settings > Languages), before any window is built
+    pacitumLog(QStringLiteral("language: %1").arg(Lang::code()));
 #ifdef Q_OS_WIN
     // Lets the installer (AppMutex) detect a running instance before upgrading.
     CreateMutexW(nullptr, FALSE, L"PacitumBrowserRunning");
@@ -285,6 +288,7 @@ int main(int argc, char *argv[]) {
         f.setFamilies({QStringLiteral("Rubik"), QStringLiteral("Inter"), QStringLiteral("Segoe UI"), QStringLiteral("Cantarell"), f.family()});
         f.setPixelSize(13);
         app.setFont(f);
+        Lang::applyAppFont();   // 2.0.1: Thai / CJK faces in front, per the display language
     }
 
     // User data lives in %LOCALAPPDATA%/Pacitum/Pacitum Browser (survives upgrades/reinstalls).

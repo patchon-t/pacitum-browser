@@ -9,6 +9,26 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include "Lang.h"
+
+namespace {
+// 2.0.1: put the display language into an internal page: <html lang>, the dictionary and the translator.
+// Done last, so nothing in the dictionary is ever taken for a %TOKEN%.
+QString i18nize(QString html) {
+    const QString code = Lang::code();
+    html.replace(QStringLiteral("<html lang=\"en\">"), QStringLiteral("<html lang=\"%1\">").arg(code));
+    QString dict = QString::fromUtf8(Lang::dictionaryJson());
+    dict.replace(QStringLiteral("</"), QStringLiteral("<\\/")).replace(QChar(0x2028), QStringLiteral("\\u2028")).replace(QChar(0x2029), QStringLiteral("\\u2029"));
+    QFile f(QStringLiteral(":/pages/i18n.js"));
+    const QString js = f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()) : QString();
+    QString boot = QStringLiteral("<script>window.__I18N=%1;</script><script>%2</script>").arg(dict, js);
+    if (const QString stack = Lang::cssFontStack(); !stack.isEmpty())   // faces that carry Thai / CJK, ahead of Rubik
+        boot += QStringLiteral("<style>html body,html button,html input,html select,html textarea{font-family:%1,Rubik,\"Segoe UI\",sans-serif}</style>").arg(stack);
+    const int at = html.indexOf(QStringLiteral("<head>"));
+    if (at >= 0) html.insert(at + 6, boot);
+    return html;
+}
+}
 
 void PacitumSchemeHandler::registerScheme() {
     QWebEngineUrlScheme s("pacitum");
@@ -87,7 +107,7 @@ void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
         QFile logo(QStringLiteral(":/pages/logo.png"));
         if (logo.open(QIODevice::ReadOnly))
             html.replace(QStringLiteral("qrc:/pages/logo.png"), QStringLiteral("data:image/png;base64,") + QString::fromLatin1(logo.readAll().toBase64()));
-        body = html.toUtf8();
+        body = i18nize(html).toUtf8();
     } else if (host == QStringLiteral("welcome")) {
         // First-run flow (firstrun-spec.md). Self-contained: tokens, icons, logo and qwebchannel.js inlined.
         QFile f(QStringLiteral(":/pages/welcome.html"));
@@ -111,7 +131,7 @@ void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
         QFile logo(QStringLiteral(":/pages/logo.png"));
         if (logo.open(QIODevice::ReadOnly))
             html.replace(QStringLiteral("qrc:/pages/logo.png"), QStringLiteral("data:image/png;base64,") + QString::fromLatin1(logo.readAll().toBase64()));
-        body = html.toUtf8();
+        body = i18nize(html).toUtf8();
     } else if (host == QStringLiteral("settings") || host == QStringLiteral("extensions")) {
         // 2.0.1 Settings and the extension manager (design: "Settings · all sections", "Extension
         // manager", "About extension"). Both talk to SettingsBridge over QWebChannel.
@@ -127,7 +147,7 @@ void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
         mark.replace(QRegularExpression(QStringLiteral("<svg width=\"[0-9.]+\" height=\"[0-9.]+\"")), QStringLiteral("<svg"));
         mark.replace(QStringLiteral("<svg "), QStringLiteral("<svg class=\"mark\" style=\"height:16px;width:auto\" role=\"img\" aria-label=\"NEXT PROJECT\" "));
         html.replace(QStringLiteral("%NEXT_MARK%"), mark);
-        body = html.toUtf8();
+        body = i18nize(html).toUtf8();
     } else {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);
         return;

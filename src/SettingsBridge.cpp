@@ -11,6 +11,7 @@
 #include "ProfileManager.h"
 #include "Passwords.h"
 #include "SyncManager.h"
+#include "Lang.h"
 #include "SyncGuide.h"
 #include "Updater.h"
 #include "FirstRun.h"
@@ -183,6 +184,14 @@ QVariantMap SettingsBridge::state() const {
     QVariantList sites; for (const QString& og : store->origins()) sites << og;
     o["sites"] = sites;
 
+    // display language of Pacitum itself (Lang), separate from the languages sent to websites
+    o["uiLanguage"] = Lang::setting();
+    o["uiLang"] = Lang::code();
+    {
+        QVariantList ul;
+        for (const Lang::Info& i : Lang::available()) ul << QVariantMap{{"code", i.code}, {"native", i.native}, {"english", i.english}};
+        o["uiLanguages"] = ul;
+    }
     // languages
     QStringList langs;
     for (const auto& v : s.value(QStringLiteral("languages")).toArray()) langs << v.toString();
@@ -272,6 +281,13 @@ void SettingsBridge::set(const QString& key, const QVariant& value) {
         "theme_ntp", "search_shortcuts", "languages", "custom_theme", "ext_dev_mode"};
     if (key == QLatin1String("theme")) { if (m_h.setTheme) m_h.setTheme(value.toString()); emit changed(); return; }
     if (key == QLatin1String("accent")) { if (m_h.setAccent) m_h.setAccent(value.toString()); emit changed(); return; }
+    if (key == QLatin1String("ui_language")) {
+        AppSettings::set(key, QJsonValue::fromVariant(value));
+        Lang::apply(value.toString());
+        if (m_h.settingChanged) m_h.settingChanged(key);
+        emit changed();
+        return;
+    }
     if (key == QLatin1String("picker")) { ProfileManager::instance()->setShowPickerOnStartup(value.toBool()); emit changed(); return; }
     if (key.startsWith(QLatin1String("sync."))) { SyncManager::instance()->setSyncs(key.mid(5), value.toBool()); emit changed(); return; }
     if (!plain.contains(key)) return;

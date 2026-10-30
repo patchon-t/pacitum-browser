@@ -10,3 +10,4 @@ cmake-build-*/
 build/
 aqtinstall.log
 !examples/**/*.json
+!resources/lang/*.json

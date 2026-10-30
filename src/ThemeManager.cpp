@@ -1,5 +1,6 @@
 #include <QHash>
 #include "ThemeManager.h"
+#include "Lang.h"
 #include <QFile>
 #include <QPainter>
 #include <QPixmap>
@@ -214,7 +215,7 @@ QIcon ThemeManager::renderIcon(const QString& name, const QString& color, int /*
 QString ThemeManager::mainWindowStyle() const {
     const auto& p = m_pal;
     QString s = QStringLiteral(R"(
-QWidget { color: @text; font-family: "Rubik", "Inter", "Segoe UI", "Helvetica Neue", "Cantarell", sans-serif; font-size: 13px; }
+QWidget { color: @text; font-family: @fontstack"Rubik", "Inter", "Segoe UI", "Helvetica Neue", "Cantarell", sans-serif; font-size: 13px; }
 QMainWindow, QDialog { background: @page; }
 #TabStrip { background: @frame; }
 #TabStrip QToolButton { background: transparent; border: none; }
@@ -333,7 +334,8 @@ QHeaderView::section { background: @toolbar; color: @textSecondary; border: none
         {"@accentHover", p.accentHover}, {"@accentPressed", p.accentPressed}, {"@pressed", p.pressed}, {"@textSecondary", p.textSecondary}, {"@accentSoft", p.accentSoft},
         {"@onAccent", p.onAccent}, {"@tabHover", p.tabHover}, {"@frame", p.frame}, {"@toolbar", p.toolbar},
         {"@page", p.page}, {"@surface", p.surface}, {"@border", p.border}, {"@text", p.text},
-        {"@disabled", p.disabled}, {"@accent", p.accent}, {"@tab", p.tab},
+        {"@disabled", p.disabled}, {"@fontstack", Lang::cssFontStack().isEmpty() ? QString() : Lang::cssFontStack() + QStringLiteral(", ")},
+        {"@accent", p.accent}, {"@tab", p.tab},
         {"@onPrimary", p.onPrimary}, {"@primary", p.primary}, {"@focusRing", p.focusRing},
         {"@dangerSoft", p.dangerSoft}, {"@danger", p.danger}, {"@omnibox", p.omnibox},
         {"@segThumb", m_darkMode ? p.pressed : p.toolbar}};

@@ -560,7 +560,7 @@ SiteControls::SiteControls(QWidget* window, const QString& origin, const QIcon& 
     reset->setEnabled(nPerm > 0);
     l->addWidget(foot);
     auto* confirm = new QWidget(this); auto* cfl = new QHBoxLayout(confirm); cfl->setContentsMargins(12, 8, 6, 0); cfl->setSpacing(6);
-    auto* ctext = new QLabel(QStringLiteral("Reset %1 permission%2 for %3?").arg(nPerm).arg(nPerm == 1 ? "" : "s").arg(host.toHtmlEscaped()), confirm);
+    auto* ctext = new QLabel(nPerm == 1 ? QStringLiteral("Reset 1 permission for %1?").arg(host.toHtmlEscaped()) : QStringLiteral("Reset %1 permissions for %2?").arg(nPerm).arg(host.toHtmlEscaped()), confirm);
     ctext->setWordWrap(true); ctext->setStyleSheet(QStringLiteral("color:%1;font-size:12.5px;").arg(pal.text));
     auto* yes = new QPushButton(QStringLiteral("Reset"), confirm); yes->setProperty("primary", true);
     auto* no = new QPushButton(QStringLiteral("Cancel"), confirm);
