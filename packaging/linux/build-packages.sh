@@ -28,8 +28,8 @@ common=(-s dir -n pacitum-browser -v "$ver" --url "https://github.com/patchon-t/
 fpm "${common[@]}" -t deb -a amd64 -p "PacitumBrowser-$ver-linux-x86_64.deb" \
     -d libc6 -d libnss3 -d libxkbcommon-x11-0 -d libxcb-cursor0 -d libxcb-icccm4 -d libxcb-image0 -d libxcb-keysyms1 \
     -d libxcb-render-util0 -d libxcb-xinerama0 -d "libasound2 | libasound2t64" -d libgl1 -d libegl1 -d libopengl0 -d libglx0 -d libxcomposite1 -d libxdamage1 \
-    -d libxrandr2 -d libxtst6 -d libfontconfig1 -d libdbus-1-3 .
+    -d libxrandr2 -d libxtst6 -d libfontconfig1 -d libdbus-1-3 -d libgpg-error0 .
 fpm "${common[@]}" -t rpm -a x86_64 -p "PacitumBrowser-$ver-linux-x86_64.rpm" --no-rpm-autoreqprov \
     -d nss -d libxkbcommon-x11 -d xcb-util-cursor -d xcb-util-wm -d xcb-util-image -d xcb-util-keysyms -d xcb-util-renderutil \
-    -d alsa-lib -d mesa-libGL -d mesa-libEGL -d libglvnd-opengl -d libglvnd-glx -d libglvnd-egl -d libXcomposite -d libXdamage -d libXrandr -d libXtst -d fontconfig -d dbus-libs .
+    -d alsa-lib -d mesa-libGL -d mesa-libEGL -d libglvnd-opengl -d libglvnd-glx -d libglvnd-egl -d libXcomposite -d libXdamage -d libXrandr -d libXtst -d fontconfig -d dbus-libs -d libgpg-error .
 for f in PacitumBrowser-"$ver"-linux-x86_64.deb PacitumBrowser-"$ver"-linux-x86_64.rpm; do sha256sum "$f" > "$f.sha256"; ls -la "$f"; done
