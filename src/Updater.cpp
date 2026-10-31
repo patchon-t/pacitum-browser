@@ -169,7 +169,14 @@ void Updater::check(bool userInitiated) {
 #elif defined(Q_OS_MACOS)
         static const QRegularExpression setupRe(QStringLiteral("macos.*\\.dmg$"), QRegularExpression::CaseInsensitiveOption);
 #else
-        static const QRegularExpression setupRe(QStringLiteral("linux.*\\.appimage$"), QRegularExpression::CaseInsensitiveOption);
+        // 2.0.2: an install from the .deb / .rpm package (app in /opt/pacitum-browser, not an AppImage) takes the package
+        // of its own kind, so "Show file" hands over something it can install.
+        static const QRegularExpression setupRe = [] {
+            if (qEnvironmentVariableIsEmpty("APPIMAGE") && QCoreApplication::applicationDirPath().startsWith(QStringLiteral("/opt/pacitum-browser")))
+                return QRegularExpression(QFile::exists(QStringLiteral("/usr/bin/dpkg")) ? QStringLiteral("linux.*\\.deb$") : QStringLiteral("linux.*\\.rpm$"),
+                                          QRegularExpression::CaseInsensitiveOption);
+            return QRegularExpression(QStringLiteral("linux.*\\.appimage$"), QRegularExpression::CaseInsensitiveOption);
+        }();
 #endif
         // A release can hold more than one matching file (e.g. a hand-uploaded copy next to the CI
         // build). Prefer the one with its own .sha256, then the standard "PacitumBrowser-" name.

@@ -64,6 +64,7 @@ Get the file for your system from the [latest release](https://github.com/namo20
 - **Disk:** about 500 MB free, plus space for cache, profile data and extensions.
 - **Graphics:** Direct3D 11 (Windows), OpenGL (Linux) or Metal (macOS). With a broken driver, start with `PACITUM_DISABLE_GPU=1` for software rendering.
 - **Linux AppImage:** needs FUSE (`libfuse2`), or run it with `--appimage-extract-and-run`.
+- **Linux packages (2.0.2):** `PacitumBrowser-<version>-linux-x86_64.deb` (Debian, Ubuntu, Mint) installs with `sudo apt install ./PacitumBrowser-<version>-linux-x86_64.deb`; the `.rpm` (Fedora and other RPM distributions) with `sudo dnf install ./PacitumBrowser-<version>-linux-x86_64.rpm`. Both put the app in `/opt/pacitum-browser` and add a `pacitum-browser` command and a menu entry.
 - **macOS:** the app isn't notarized. The first time, right-click it and choose **Open**.
 
 ## Build from source
