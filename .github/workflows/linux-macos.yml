@@ -6,7 +6,7 @@ on:
   push:
     tags: ['v*']
   pull_request:
-    paths: ['src/**', 'include/**', 'resources/**', 'third_party/**', 'CMakeLists.txt', '.github/workflows/linux-macos.yml']
+    paths: ['src/**', 'include/**', 'resources/**', 'third_party/**', 'CMakeLists.txt', '.github/workflows/linux-macos.yml', 'packaging/**']
 permissions:
   contents: write   # tag builds attach the AppImage / dmg + .sha256 to an existing release (updater feed)
 jobs:
@@ -84,10 +84,37 @@ jobs:
             -d resources/linux/pacitum-browser.desktop -i resources/linux/pacitum-browser.png --plugin qt --output appimage
           sha256sum "$OUTPUT" > "$OUTPUT.sha256"
           ls -la "$OUTPUT"
+      - name: Packages (.deb + .rpm)
+        run: |
+          ver=$(cat build/pacitum-version.txt)
+          sudo apt-get install -y --no-install-recommends ruby rpm
+          sudo gem install --no-document fpm -v 1.16.0
+          bash packaging/linux/build-packages.sh "$ver" "$PWD/AppDir" "$PWD"
+          echo "--- deb"; dpkg-deb -I PacitumBrowser-$ver-linux-x86_64.deb | head -30
+          echo "--- rpm requires"; rpm -qp --requires PacitumBrowser-$ver-linux-x86_64.rpm
+      - name: Install the .deb and check that it starts
+        env:
+          QTWEBENGINE_DISABLE_SANDBOX: '1'
+        run: |
+          ver=$(cat build/pacitum-version.txt)
+          rm -rf "$HOME/.local/share/Pacitum"
+          sudo apt-get install -y --no-install-recommends ./PacitumBrowser-$ver-linux-x86_64.deb
+          test -x /usr/bin/pacitum-browser && test -f /usr/share/applications/pacitum-browser.desktop
+          xvfb-run -a -s "-screen 0 1440x900x24" /usr/bin/pacitum-browser --smoke-test || echo "exit code $?"
+          log="$HOME/.local/share/Pacitum/Pacitum Browser/startup.log"
+          tail -n 40 "$log" || true
+          grep -q "SMOKE OK" "$log"
+      - name: Install the .rpm on Fedora and check that it starts
+        run: |
+          ver=$(cat build/pacitum-version.txt)
+          docker run --rm -v "$PWD:/pkg:ro" fedora:41 bash /pkg/packaging/linux/test-rpm.sh "/pkg/PacitumBrowser-$ver-linux-x86_64.rpm"
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: PacitumBrowser-Linux-${{ matrix.line }}
-          path: PacitumBrowser-*.AppImage*
+          path: |
+            PacitumBrowser-*.AppImage*
+            PacitumBrowser-*.deb*
+            PacitumBrowser-*.rpm*
           retention-days: 3
       - name: Attach to the release (tag builds)
         if: startsWith(github.ref, 'refs/tags/v')
@@ -95,7 +122,7 @@ jobs:
         run: |
           [ "${{ github.ref_name }}" = "v$(cat build/pacitum-version.txt)" ] || { echo "tag is for the other line; skipping"; exit 0; }
           bash .github/ensure-release.sh "${{ github.ref_name }}" "${{ github.repository }}" || { echo "no release and no release-notes/${{ github.ref_name }}.md; skipping"; exit 0; }
-          gh release upload "${{ github.ref_name }}" PacitumBrowser-*.AppImage* --clobber --repo "${{ github.repository }}"
+          gh release upload "${{ github.ref_name }}" PacitumBrowser-*.AppImage* PacitumBrowser-*.deb* PacitumBrowser-*.rpm* --clobber --repo "${{ github.repository }}"
 
   macos:
     runs-on: macos-14   # Apple silicon
