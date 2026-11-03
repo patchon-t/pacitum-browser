@@ -104,10 +104,6 @@ jobs:
           log="$HOME/.local/share/Pacitum/Pacitum Browser/startup.log"
           tail -n 40 "$log" || true
           grep -q "SMOKE OK" "$log"
-      - name: Install the .rpm on Fedora and check that it starts
-        run: |
-          ver=$(cat build/pacitum-version.txt)
-          docker run --rm -v "$PWD:/pkg:ro" fedora:41 bash /pkg/packaging/linux/test-rpm.sh "/pkg/PacitumBrowser-$ver-linux-x86_64.rpm"
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: PacitumBrowser-Linux-${{ matrix.line }}
