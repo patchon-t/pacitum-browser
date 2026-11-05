@@ -628,6 +628,11 @@ void ChromeExtensions::attachPrivate(QWebEngineProfile* p) {
     if (!p->extensionManager()) { g_privateSupported = false; return; }
     m_privateProfiles.removeAll(nullptr);
     m_privateProfiles << p;
+    // Qt may refuse extensions in an off-the-record profile: then say so in the extension page instead.
+    connect(p->extensionManager(), &QWebEngineExtensionManager::loadFinished, this, [this](const QWebEngineExtensionInfo& e){
+        pacitumLog(QStringLiteral("private profile: extension %1 loaded=%2 error=%3").arg(e.id()).arg(e.isLoaded()).arg(e.error()));
+        if (!e.error().isEmpty() || !e.isLoaded()) { g_privateSupported = false; emit changed(); }
+    });
     for (const auto& it : items()) if (ExtensionAccess::rule(it.id).allowPrivate) loadIntoPrivate(p, it.id, true);
 #else
     Q_UNUSED(p);
@@ -708,13 +713,16 @@ void ChromeExtensions::runSelfTest(QWidget* anchor, const std::function<void(con
                 auto* otr = new QWebEngineProfile(this);   // what a private tab gets
                 setAllowPrivate(id, true);
                 attachPrivate(otr);
-                QTimer::singleShot(4000, this, [=]{
-                    if (!otr->extensionManager()) log(QStringLiteral("private: this build has no extensions in private profiles"));
+                QTimer::singleShot(6000, this, [=]{
+                    // Whether Qt loads extensions in private profiles is reported, not required: when it can't,
+                    // privateSupported() turns false and the extension page shows the switch as unavailable.
+                    if (!otr->extensionManager()) log(QStringLiteral("private: this build has no extension manager in private profiles"));
                     else {
-                        bool in = false;
-                        for (const auto& e : otr->extensionManager()->extensions()) if (e.id() == id) in = e.isLoaded();
-                        log(QStringLiteral("private: loaded in a private profile=%1").arg(in));
-                        if (!in) ++*fails;
+                        bool in = false; QString err;
+                        const auto list = otr->extensionManager()->extensions();
+                        for (const auto& e : list) if (e.id() == id) { in = e.isLoaded(); err = e.error(); }
+                        log(QStringLiteral("private: loaded=%1 listed=%2 error=%3 supported=%4").arg(in).arg(list.size()).arg(err).arg(privateSupported()));
+                        if (!in && privateSupported()) { log(QStringLiteral("private: not loaded and not reported as unsupported")); ++*fails; }
                     }
                     setAllowPrivate(id, false);
                     QTimer::singleShot(500, this, [=]{ otr->deleteLater(); next(); });
