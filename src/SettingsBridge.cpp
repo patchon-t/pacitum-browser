@@ -239,6 +239,7 @@ QVariantMap SettingsBridge::state() const {
             v["sites"] = r.sites;
             v["granted"] = ExtensionAccess::clickGranted(id);
             v["private"] = r.allowPrivate;
+            v["privateOk"] = v.value("kind").toString() == QLatin1String("script") || ChromeExtensions::privateSupported();
             v["asksAll"] = ExtensionAccess::patternsReachAll(requested);
             v["asksHosts"] = hosts;
             v["access"] = r.mode == ExtensionAccess::Mode::All ? asked
@@ -277,7 +278,6 @@ QVariantMap SettingsBridge::state() const {
         }
         o["extensions"] = exts;
         o["chromeExtensions"] = ChromeExtensions::available();
-        o["extPrivateOk"] = !ChromeExtensions::available() || ChromeExtensions::privateSupported();
     }
 
     // default browser, updates, sync
@@ -504,14 +504,12 @@ QVariant SettingsBridge::act(const QString& name, const QVariantMap& a) {
             emit changed();
             return QStringLiteral("Reload open pages to apply");
         }
-        if (name == QLatin1String("extPrivate")) {
-            if (chrome) ChromeExtensions::instance()->setAllowPrivate(id, a.value("on").toBool());
-            else {
-                ExtensionAccess::Rule r = ExtensionAccess::rule(id);
-                r.allowPrivate = a.value("on").toBool();
-                ExtensionAccess::setRule(id, r);
-                ExtensionManager::instance()->applyAccess();
-            }
+        if (name == QLatin1String("extPrivate")) {   // user scripts only (Qt can't load Chrome extensions in private tabs)
+            if (chrome && !ChromeExtensions::privateSupported()) return false;
+            ExtensionAccess::Rule r = ExtensionAccess::rule(id);
+            r.allowPrivate = a.value("on").toBool();
+            ExtensionAccess::setRule(id, r);
+            ExtensionManager::instance()->applyAccess();
             emit changed();
             return true;
         }

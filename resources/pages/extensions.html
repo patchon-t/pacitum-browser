@@ -205,8 +205,8 @@ function detailView(e) {
       <div class="div" style="margin:20px 0"></div>
       ${e.kind === 'chrome' ? `<div class="srow"><span class="rt"><b>Pin to toolbar</b><span>Show the ${esc(e.name)} button next to the address bar.</span></span>
         <button class="sw" role="switch" aria-checked="${!!e.pinned}" aria-label="Pin to toolbar" data-a="pin" data-v="${esc(e.id)}"><span></span></button></div>` : ''}
-      <div class="srow"><span class="rt"><b>Allow in private tabs</b><span>${D.extPrivateOk ? (e.private ? `${esc(e.name)} also runs in private tabs. It can see what you do there.` : 'Off: it doesn’t run in private tabs, so nothing it does there is kept.') : 'This version of Pacitum can’t load extensions in private tabs.'}</span></span>
-        <button class="sw" role="switch" aria-checked="${!!e.private}" ${D.extPrivateOk ? '' : 'disabled'} aria-label="Allow in private tabs" data-a="private" data-v="${esc(e.id)}"><span></span></button></div>
+      <div class="srow"><span class="rt"><b>Allow in private tabs</b><span>${e.privateOk ? (e.private ? `${esc(e.name)} also runs in private tabs. It can see what you do there.` : 'Off: it doesn’t run in private tabs, so nothing it does there is kept.') : 'Chrome extensions can’t run in private tabs in this version of Pacitum. User scripts can.'}</span></span>
+        <button class="sw" role="switch" aria-checked="${!!e.private}" ${e.privateOk ? '' : 'disabled'} aria-label="Allow in private tabs" data-a="private" data-v="${esc(e.id)}"><span></span></button></div>
       <div class="srow"><span class="rt"><b>Files</b><span class="mono" style="font-size:12px">${esc(e.path)}</span></span><button class="ob" style="height:36px" data-a="folder" data-v="${esc(e.path)}">Show folder</button></div>
     </div><div>
       <h3>Permissions</h3>

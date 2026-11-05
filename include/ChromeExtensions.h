@@ -53,12 +53,10 @@ public:
     // `pageUrl` / `reloadPage`: the active tab, for "When I click it" (2.0.3): the click allows that site and
     // reloads the page so the extension can work on it.
     void openPopup(const QString& id, QWidget* anchor, const QUrl& pageUrl = {}, const std::function<void()>& reloadPage = {});
-    // 2.0.3 site access and private tabs (see ExtensionAccess.h). setAccess rewrites the extension's manifest and
-    // loads it again; open pages pick the change up when they are reloaded.
+    // 2.0.3 site access (see ExtensionAccess.h). setAccess rewrites the extension's manifest and loads it again;
+    // open pages pick the change up when they are reloaded.
     void setAccess(const QString& id, int mode, const QStringList& sites);
-    void setAllowPrivate(const QString& id, bool on);
-    void attachPrivate(QWebEngineProfile* offTheRecord);   // a private tab's profile: load the allowed extensions
-    static bool privateSupported();                        // false when private profiles can't load extensions
+    static bool privateSupported();                        // Chrome extensions in private tabs (not in Qt 6.11)
     static QString webStoreId(const QUrl& url);     // "" when the URL isn't a store detail page
     static QStringList describePermissions(const QString& extensionDir);
     // CI (--extensions-test): add, enable, use, disable and remove extensions; logs EXTENSIONS OK|FAIL.
@@ -81,9 +79,7 @@ private:
     void downloadFromStore(const QString& id, const QString& name);   // no questions asked (callers ask)
     QPointer<QWebEngineProfile> m_profile;
     void applyAccess(const QString& id);
-    void loadIntoPrivate(QWebEngineProfile* p, const QString& id, bool on);
     QHash<QString, bool> m_reloading;               // id -> was enabled, while a site-access change reloads it
-    QList<QPointer<QWebEngineProfile>> m_privateProfiles;
     QNetworkAccessManager* m_net = nullptr;
     QStringList m_pending;                          // names being installed (for the notice)
 };

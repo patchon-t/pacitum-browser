@@ -20,7 +20,6 @@
 #include "FindBar.h"
 #include "PacitumScheme.h"
 #include "WebProfile.h"
-#include "ChromeExtensions.h"
 #include <functional>
 
 std::function<BrowserTab*(int)> BrowserTab::s_popupFactory;
@@ -170,7 +169,6 @@ BrowserTab::BrowserTab(const QString& url, bool privateMode, const QString& sear
         m_profile = new QWebEngineProfile(this);   // off-the-record
         m_profile->setPersistentCookiesPolicy(QWebEngineProfile::NoPersistentCookies);
         Pacitum::configureProfile(m_profile, false);
-        ChromeExtensions::instance()->attachPrivate(m_profile);   // 2.0.3: extensions allowed in private tabs
         m_page = new PacitumPage(m_profile, m_view);
     } else {
         m_page = new PacitumPage(Pacitum::mainProfile(), m_view);

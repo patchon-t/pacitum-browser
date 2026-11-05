@@ -140,13 +140,6 @@ void ChromeExtensions::attach(QWebEngineProfile* profile) {
             if (!e.error().isEmpty()) { pacitumLog(QStringLiteral("extension %1: reload after site-access change failed: %2").arg(e.id(), e.error())); emit message(e.error()); }
             else if (!wasOn) m_profile->extensionManager()->setExtensionEnabled(e, false);
             pacitumLog(QStringLiteral("extension %1: site access applied (%2)").arg(e.id(), ExtensionAccess::modeName(ExtensionAccess::rule(e.id()).mode)));
-            const QString id = e.id();
-            for (const auto& p : std::as_const(m_privateProfiles)) if (p) {   // private tabs: the same, a moment later
-                loadIntoPrivate(p, id, false);
-                QTimer::singleShot(400, this, [this, guard = QPointer<QWebEngineProfile>(p), id]{
-                    if (guard && ExtensionAccess::rule(id).allowPrivate) loadIntoPrivate(guard, id, true);
-                });
-            }
             emit accessApplied(e.id());
             emit changed();
             return;
@@ -448,7 +441,6 @@ void ChromeExtensions::uninstall(const QString& id) {
     if (!m_profile || !m_profile->extensionManager()) return;
     for (const auto& e : m_profile->extensionManager()->extensions())
         if (e.id() == id) {
-            for (const auto& p : std::as_const(m_privateProfiles)) if (p) loadIntoPrivate(p, id, false);
             ExtensionAccess::forget(id);
             m_profile->extensionManager()->uninstallExtension(e);
             break;
@@ -571,8 +563,10 @@ void ChromeExtensions::openPopup(const QString& id, QWidget* anchor, const QUrl&
 }
 
 // ============================================================================ 2.0.3 site access, private tabs
-namespace { bool g_privateSupported = true; }
-bool ChromeExtensions::privateSupported() { return available() && g_privateSupported; }
+// Private tabs: Qt WebEngine 6.11 does not load Chrome extensions into an off-the-record profile (the call is
+// accepted, nothing loads and no error comes back; seen in the Windows CI test). So "Allow in private tabs" is
+// offered for Pacitum user scripts only, and Chrome extensions never run in private tabs.
+bool ChromeExtensions::privateSupported() { return false; }
 
 void ChromeExtensions::setAccess(const QString& id, int mode, const QStringList& sites) {
     ExtensionAccess::Rule r = ExtensionAccess::rule(id);
@@ -599,43 +593,6 @@ void ChromeExtensions::applyAccess(const QString& id) {
     }
 #else
     Q_UNUSED(id);
-#endif
-}
-
-void ChromeExtensions::setAllowPrivate(const QString& id, bool on) {
-    ExtensionAccess::Rule r = ExtensionAccess::rule(id);
-    r.allowPrivate = on;
-    ExtensionAccess::setRule(id, r);
-    for (const auto& p : std::as_const(m_privateProfiles)) if (p) loadIntoPrivate(p, id, on);
-    emit changed();
-}
-
-void ChromeExtensions::loadIntoPrivate(QWebEngineProfile* p, const QString& id, bool on) {
-#ifdef PACITUM_CHROME_EXTENSIONS
-    auto* mgr = p ? p->extensionManager() : nullptr;
-    if (!mgr) return;
-    for (const auto& e : mgr->extensions()) if (e.id() == id) { if (on) return; mgr->unloadExtension(e); return; }
-    if (!on) return;
-    for (const auto& it : items()) if (it.id == id && it.enabled) { mgr->loadExtension(it.path); return; }
-#else
-    Q_UNUSED(p); Q_UNUSED(id); Q_UNUSED(on);
-#endif
-}
-
-void ChromeExtensions::attachPrivate(QWebEngineProfile* p) {
-#ifdef PACITUM_CHROME_EXTENSIONS
-    if (!p || !p->isOffTheRecord()) return;
-    if (!p->extensionManager()) { g_privateSupported = false; return; }
-    m_privateProfiles.removeAll(nullptr);
-    m_privateProfiles << p;
-    // Qt may refuse extensions in an off-the-record profile: then say so in the extension page instead.
-    connect(p->extensionManager(), &QWebEngineExtensionManager::loadFinished, this, [this](const QWebEngineExtensionInfo& e){
-        pacitumLog(QStringLiteral("private profile: extension %1 loaded=%2 error=%3").arg(e.id()).arg(e.isLoaded()).arg(e.error()));
-        if (!e.error().isEmpty() || !e.isLoaded()) { g_privateSupported = false; emit changed(); }
-    });
-    for (const auto& it : items()) if (ExtensionAccess::rule(it.id).allowPrivate) loadIntoPrivate(p, it.id, true);
-#else
-    Q_UNUSED(p);
 #endif
 }
 
@@ -679,8 +636,8 @@ void ChromeExtensions::runSelfTest(QWidget* anchor, const std::function<void(con
         const QString what = *waiting; waiting->clear();
         log(QStringLiteral("%1: install failed: %2").arg(what, e.error())); ++*fails; QTimer::singleShot(0, this, *runNext);
     });
-    // 2.0.3: site access and private tabs, on the unpacked test extension: narrow it to one site, check the
-    // manifest and that it loaded again under the same ID, put it back, then load it into a private profile.
+    // 2.0.3: site access, on the unpacked test extension: narrow it to one site, check the manifest and that it
+    // loaded again under the same ID, then put it back.
     auto accessCheck = [=](const QString& id, const std::function<void()>& next) {
         QString path;
         for (const auto& it : items()) if (it.id == id) path = it.path;
@@ -710,23 +667,7 @@ void ChromeExtensions::runSelfTest(QWidget* anchor, const std::function<void(con
                 const bool restored = manifestHas("<all_urls>");
                 log(QStringLiteral("access all: restored=%1").arg(restored));
                 if (!restored) ++*fails;
-                auto* otr = new QWebEngineProfile(this);   // what a private tab gets
-                setAllowPrivate(id, true);
-                attachPrivate(otr);
-                QTimer::singleShot(6000, this, [=]{
-                    // Whether Qt loads extensions in private profiles is reported, not required: when it can't,
-                    // privateSupported() turns false and the extension page shows the switch as unavailable.
-                    if (!otr->extensionManager()) log(QStringLiteral("private: this build has no extension manager in private profiles"));
-                    else {
-                        bool in = false; QString err;
-                        const auto list = otr->extensionManager()->extensions();
-                        for (const auto& e : list) if (e.id() == id) { in = e.isLoaded(); err = e.error(); }
-                        log(QStringLiteral("private: loaded=%1 listed=%2 error=%3 supported=%4").arg(in).arg(list.size()).arg(err).arg(privateSupported()));
-                        if (!in && privateSupported()) { log(QStringLiteral("private: not loaded and not reported as unsupported")); ++*fails; }
-                    }
-                    setAllowPrivate(id, false);
-                    QTimer::singleShot(500, this, [=]{ otr->deleteLater(); next(); });
-                });
+                next();
             });
             setAccess(id, int(ExtensionAccess::Mode::All), {});
         });
