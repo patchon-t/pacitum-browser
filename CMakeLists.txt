@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PacitumBrowser VERSION 2.0.2 LANGUAGES CXX)
+project(PacitumBrowser VERSION 2.0.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -74,6 +74,7 @@ set(SOURCES
     src/PermissionTest.cpp
     src/SplitView.cpp
     src/ExtensionManager.cpp
+    src/ExtensionAccess.cpp
     src/Tools.cpp
     src/TabOverview.cpp
     src/SyncManager.cpp
@@ -118,6 +119,7 @@ set(HEADERS
     include/PermissionSettings.h
     include/SplitView.h
     include/ExtensionManager.h
+    include/ExtensionAccess.h
     include/Tools.h
     include/TabOverview.h
     include/SyncManager.h

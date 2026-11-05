@@ -14,6 +14,10 @@ class QLabel;
 class QString;
 
 namespace Motion {
+// 2.0.3: drive every Qt animation (tab glide, pop-ups, fades) from a precise timer at the screen's refresh
+// rate (60–240 Hz) instead of Qt's default coarse ~60 Hz timer, so motion is smooth on 120/144 Hz displays.
+// Call once after the QApplication exists. PACITUM_ANIMATION_HZ overrides the rate (0 = Qt's default driver).
+void installRefreshRateClock();
 enum : int { Instant = 80, Fast = 120, Quick = 140, Base = 160, Exit = 180, Medium = 200, Enter = 240, Slow = 280 };
 int ms(int token);                 // movement: 0 with reduced motion
 int fadeMs(int token);             // opacity fades: capped at 120 ms with reduced motion

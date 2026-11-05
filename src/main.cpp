@@ -23,6 +23,7 @@
 #include <QThread>
 #include "PacitumScheme.h"
 #include "Lang.h"
+#include "Motion.h"
 #include "WebProfile.h"
 #include "AppSettings.h"
 #include <QJsonDocument>
@@ -43,6 +44,11 @@
 #include <ctime>
 #include <memory>
 #include <exception>
+#if defined(Q_OS_MACOS)
+#include <sys/sysctl.h>
+#elif !defined(Q_OS_WIN)
+#include <unistd.h>
+#endif
 #include <cstdio>
 
 #ifdef Q_OS_WIN
@@ -152,6 +158,22 @@ static QString detectGpu() {
 #endif
 }
 
+// Installed memory in whole GB (0 when unknown).
+static int totalRamGb() {
+#if defined(Q_OS_WIN)
+    MEMORYSTATUSEX st; st.dwLength = sizeof(st);
+    if (GlobalMemoryStatusEx(&st)) return int(st.ullTotalPhys / (1024ull * 1024 * 1024));
+    return 0;
+#elif defined(Q_OS_MACOS)
+    int64_t bytes = 0; size_t len = sizeof(bytes);
+    if (sysctlbyname("hw.memsize", &bytes, &len, nullptr, 0) == 0) return int(bytes / (1024ll * 1024 * 1024));
+    return 0;
+#else
+    const long pages = sysconf(_SC_PHYS_PAGES), size = sysconf(_SC_PAGE_SIZE);
+    return pages > 0 && size > 0 ? int((double(pages) * size) / (1024.0 * 1024 * 1024) + 0.5) : 0;
+#endif
+}
+
 static void setupEnvironment() {
     QString gpu = detectGpu();
     std::cout << "[Browser] " << gpu.toStdString() << std::endl;
@@ -177,7 +199,11 @@ static void setupEnvironment() {
     // cap share renderers; PACITUM_RENDERER_LIMIT overrides (0 = Chromium default).
     {
         bool ok = false; const int lim = qEnvironmentVariableIntValue("PACITUM_RENDERER_LIMIT", &ok);
-        if (!ok) flags += " --renderer-process-limit=8";
+        // 2.0.3: more renderers where there is memory for them. Tabs that share a renderer also share its main
+        // thread, so a busy page makes the others stutter; with 16 GB and up they get their own more often.
+        const int ram = totalRamGb();
+        const int def = ram >= 32 ? 16 : ram >= 16 ? 12 : 8;
+        if (!ok) flags += " --renderer-process-limit=" + QByteArray::number(def);
         else if (lim > 0) flags += " --renderer-process-limit=" + QByteArray::number(lim);
     }
     if (qEnvironmentVariableIsSet("QTWEBENGINE_CHROMIUM_FLAGS")) flags += ' ' + qgetenv("QTWEBENGINE_CHROMIUM_FLAGS");
@@ -267,6 +293,7 @@ int main(int argc, char *argv[]) {
     pacitumLog(QStringLiteral("QApplication ready"));
     Lang::init();   // 2.0.1: display language (Settings > Languages), before any window is built
     pacitumLog(QStringLiteral("language: %1").arg(Lang::code()));
+    Motion::installRefreshRateClock();   // 2.0.3: animations at the screen's refresh rate
 #ifdef Q_OS_WIN
     // Lets the installer (AppMutex) detect a running instance before upgrading.
     CreateMutexW(nullptr, FALSE, L"PacitumBrowserRunning");

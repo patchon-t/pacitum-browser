@@ -90,6 +90,11 @@ h3{margin:0 0 8px;font-size:16px;font-weight:600}
 .rm{margin-top:24px;height:42px;padding:0 18px;border:1px solid color-mix(in srgb,var(--danger) 35%,var(--border));border-radius:12px;background:transparent;color:var(--danger);font-weight:600;font-size:14px}
 .rm:hover{background:var(--dangersoft)}
 .note{font-size:12.5px;color:var(--sec);padding:6px 12px 0}
+.sites{margin:4px 0 6px 44px}
+.site{display:flex;align-items:center;justify-content:space-between;height:40px;padding:0 4px 0 12px;border-radius:10px;background:var(--surface);margin-bottom:6px}
+.addsite{display:flex;gap:8px;margin-top:4px}
+.addsite input{flex:1;height:36px;padding:0 12px;border:1px solid var(--border);border-radius:10px;background:var(--field);outline:0}
+.addsite input:focus{border-color:var(--accent)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--primary);color:var(--onprimary);padding:10px 16px;border-radius:12px;font-size:13.5px;font-weight:500;transition:.2s;pointer-events:none;z-index:60}
 .toast.on{opacity:1;transform:translateX(-50%)}
 .scrim{position:fixed;inset:0;background:rgba(10,8,9,.38);display:flex;align-items:center;justify-content:center;z-index:50}
@@ -115,12 +120,18 @@ let bridge = null, D = null;
 const st = { tab: 'all', q: '', id: '', shortcuts: false };
 const COLORS = ['#151112', '#2F5FD0', '#4B3FBF', '#1F7A57', '#D9141F', '#B8470F', '#0E7490', '#5C5450'];
 function color(id) { let n = 0; for (const ch of id) n = (n * 31 + ch.charCodeAt(0)) | 0; return COLORS[Math.abs(n) % COLORS.length]; }
+function siteOf(t) {   // "https://www.youtube.com/watch" -> "youtube.com"
+  t = (t || '').trim().toLowerCase(); if (!t) return '';
+  try { if (t.includes('://')) t = new URL(t).hostname; } catch (x) { return ''; }
+  t = t.split('/')[0].split(':')[0].replace(/^(\*\.)+/, '').replace(/^www\./, '');
+  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(t) ? t : '';
+}
 function call(name, args) { return new Promise((res) => bridge ? bridge.act(name, args || {}, res) : res(null)); }
 function toast(t) { if (!t) return; const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2600); }
 function sv(k, d) { const v = D && D.s ? D.s[k] : undefined; return v === undefined || v === null ? d : v; }
 function accessText(a) {
   if (a === 'all') return 'All sites';
-  if (a === 'click') return 'Current tab, on click';
+  if (a === 'click') return 'When you click it';
   if (a && a.startsWith('some:')) { const n = +a.slice(5); return n === 1 ? '1 site' : n + ' sites'; }
   return 'No site access';
 }
@@ -167,11 +178,18 @@ function listView() {
 }
 
 function detailView(e) {
-  const a = e.access;
-  const opts = [['click', 'When I click it', `${e.name} only runs after you click its icon in the toolbar.`],
-                ['some', 'On sites I choose', a.startsWith('some:') ? `${e.name} runs on ${accessText(a).toLowerCase()} it asks for.` : `${e.name} runs on sites you have added.`],
-                ['all', 'On all sites', `${e.name} runs on every page you open.`]];
-  const cur = a === 'all' ? 'all' : a.startsWith('some:') ? 'some' : 'click';
+  // 2.0.3: the user's rule (e.mode: all | sites | click), next to what the extension asks for.
+  const asks = e.asksAll ? 'all websites' : (e.asksHosts && e.asksHosts.length ? e.asksHosts.join(', ') : 'no websites');
+  const script = e.kind === 'script';
+  const opts = [['click', 'When I click it', script ? 'User scripts have no toolbar button, so they run nowhere until you add a site.' : `${e.name} runs on a site only after you click its icon in the toolbar there (until Pacitum closes).`],
+                ['sites', 'On sites I choose', `${e.name} runs only on the sites you add below.`],
+                ['all', 'On all sites', e.asksAll ? `${e.name} runs on every page you open.` : `${e.name} runs on every site it asks for: ${asks}.`]];
+  const cur = e.mode || 'all';
+  const sites = e.sites || [];
+  const granted = (e.granted || []).length ? `<div class="note">Allowed by a click this time: ${esc(e.granted.join(', '))}</div>` : '';
+  const siteEditor = cur !== 'sites' ? '' : `
+      <div class="sites">${sites.map((h) => `<div class="site"><span>${esc(h)}</span><button class="lk mut" data-a="siteDel" data-v="${esc(h)}" aria-label="Remove ${esc(h)}">Remove</button></div>`).join('') || '<div class="note" style="padding:6px 0 10px">No sites yet. The extension doesn’t run anywhere.</div>'}
+        <div class="addsite"><input id="siteIn" placeholder="Add a site, for example youtube.com" autocomplete="off" data-notr><button class="ob" style="height:36px" data-a="siteAdd">Add</button></div></div>`;
   const upd = e.updated ? new Date(e.updated).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
   return `<div class="detail">
     <button class="back" data-a="list">${ico('M15 6l-6 6 6 6', 14, 2.4)}All extensions</button>
@@ -181,13 +199,14 @@ function detailView(e) {
         <span style="font-weight:600">${e.enabled ? 'On' : 'Off'}</span><button class="sw" role="switch" aria-checked="${!!e.enabled}" aria-label="Turn ${esc(e.name)} on or off" data-a="toggle" data-v="${esc(e.id)}"><span></span></button></div></div>
     <div class="cols"><div>
       <h3>Site access</h3><p class="lead">Choose where ${esc(e.name)} is allowed to read and change pages.</p>
-      ${opts.map((o) => `<button class="radio" role="radio" aria-checked="${cur === o[0]}" disabled><span class="dot"></span><span class="rt"><b>${o[1]}</b><span>${esc(o[2])}</span></span></button>`).join('')}
-      <div class="note">Set by the extension. ${e.kind === 'script' ? 'Edit its manifest.json to change the sites.' : 'Pacitum can’t limit Chrome extensions to fewer sites yet.'}</div>
+      ${opts.map((o) => `<button class="radio" role="radio" aria-checked="${cur === o[0]}" data-a="access" data-v="${o[0]}"><span class="dot"></span><span class="rt"><b>${o[1]}</b><span>${esc(o[2])}</span></span></button>`).join('')}
+      ${siteEditor}${granted}
+      <div class="note">It asks for: ${esc(asks)}. It never gets a site it didn’t ask for. Reload open pages after a change.</div>
       <div class="div" style="margin:20px 0"></div>
       ${e.kind === 'chrome' ? `<div class="srow"><span class="rt"><b>Pin to toolbar</b><span>Show the ${esc(e.name)} button next to the address bar.</span></span>
         <button class="sw" role="switch" aria-checked="${!!e.pinned}" aria-label="Pin to toolbar" data-a="pin" data-v="${esc(e.id)}"><span></span></button></div>` : ''}
-      <div class="srow"><span class="rt"><b>Allow in private tabs</b><span>Extensions don’t run in private tabs, so nothing they do is kept.</span></span>
-        <button class="sw" role="switch" aria-checked="false" disabled aria-label="Allow in private tabs"><span></span></button></div>
+      <div class="srow"><span class="rt"><b>Allow in private tabs</b><span>${D.extPrivateOk ? (e.private ? `${esc(e.name)} also runs in private tabs. It can see what you do there.` : 'Off: it doesn’t run in private tabs, so nothing it does there is kept.') : 'This version of Pacitum can’t load extensions in private tabs.'}</span></span>
+        <button class="sw" role="switch" aria-checked="${!!e.private}" ${D.extPrivateOk ? '' : 'disabled'} aria-label="Allow in private tabs" data-a="private" data-v="${esc(e.id)}"><span></span></button></div>
       <div class="srow"><span class="rt"><b>Files</b><span class="mono" style="font-size:12px">${esc(e.path)}</span></span><button class="ob" style="height:36px" data-a="folder" data-v="${esc(e.path)}">Show folder</button></div>
     </div><div>
       <h3>Permissions</h3>
@@ -235,6 +254,15 @@ document.addEventListener('click', async (ev) => {
     case 'list': open(''); break;
     case 'toggle': { const e = ext(v); e.enabled = !e.enabled; render(); call('extToggle', { id: v, kind: e.kind, on: e.enabled }); break; }
     case 'pin': { const e = ext(v); e.pinned = !e.pinned; render(); call('extPin', { id: v, kind: e.kind, on: e.pinned }); break; }
+    case 'access': { const e = ext(st.id); if (!e || e.mode === v) break; e.mode = v; render();
+      toast(await call('extAccess', { id: e.id, kind: e.kind, mode: v, sites: e.sites || [] })); break; }
+    case 'siteAdd': { const e = ext(st.id); const i = $('#siteIn'); if (!e || !i) break;
+      const h = siteOf(i.value); if (!h) { toast('Type a site such as youtube.com'); break; }
+      e.sites = (e.sites || []).filter((x) => x !== h).concat([h]); render();
+      toast(await call('extAccess', { id: e.id, kind: e.kind, mode: 'sites', sites: e.sites })); break; }
+    case 'siteDel': { const e = ext(st.id); if (!e) break; e.sites = (e.sites || []).filter((x) => x !== v); render();
+      toast(await call('extAccess', { id: e.id, kind: e.kind, mode: 'sites', sites: e.sites })); break; }
+    case 'private': { const e = ext(v); if (!e) break; e.private = !e.private; render(); call('extPrivate', { id: v, kind: e.kind, on: e.private }); break; }
     case 'options': call('extOptions', { url: v }); break;
     case 'folder': call('extFolder', { path: v }); break;
     case 'loadUnpacked': toast(await call('extLoadUnpacked')); break;
@@ -249,6 +277,7 @@ document.addEventListener('click', async (ev) => {
     case 'close': if (ev.target === el || el.tagName === 'BUTTON') $('#layer').innerHTML = ''; break;
   }
 });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.id === 'siteIn') { const b = document.querySelector('[data-a="siteAdd"]'); if (b) b.click(); } });
 document.addEventListener('input', (ev) => { if (ev.target.id === 'q') { st.q = ev.target.value; render(); } });
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { if ($('#layer').innerHTML) $('#layer').innerHTML = ''; else if (st.id) open(''); } });
 function refresh() { bridge.state((s) => { D = s; applyPalette(D.palette); render(); }); }

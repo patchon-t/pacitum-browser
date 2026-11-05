@@ -5,6 +5,7 @@
 #include <QFileInfo>
 #include <QDirIterator>
 #include "ExtensionManager.h"
+#include "ExtensionAccess.h"
 #include "ChromeExtensions.h"
 #include "AppSettings.h"
 #include "ThemeManager.h"
@@ -225,11 +226,29 @@ QVariantMap SettingsBridge::state() const {
             QByteArray png; QBuffer b(&png); b.open(QIODevice::WriteOnly); ic.pixmap(64, 64).save(&b, "PNG");
             return QStringLiteral("data:image/png;base64,") + QString::fromLatin1(png.toBase64());
         };
+        // 2.0.3: the user's site-access rule and private-tab switch, next to what the extension asks for.
+        auto ruleFields = [](QVariantMap& v, const QString& id, const QStringList& requested, const QString& asked) {
+            const ExtensionAccess::Rule r = ExtensionAccess::rule(id);
+            QStringList hosts;
+            for (const QString& p : requested) {
+                QString h = p == QLatin1String("<all_urls>") ? QStringLiteral("*") : p.section(QStringLiteral("://"), 1).section(QLatin1Char('/'), 0, 0);
+                if (h.startsWith(QLatin1String("*."))) h = h.mid(2);
+                if (!h.isEmpty() && h != QLatin1String("*") && !hosts.contains(h)) hosts << h;
+            }
+            v["mode"] = ExtensionAccess::modeName(r.mode);
+            v["sites"] = r.sites;
+            v["granted"] = ExtensionAccess::clickGranted(id);
+            v["private"] = r.allowPrivate;
+            v["asksAll"] = ExtensionAccess::patternsReachAll(requested);
+            v["asksHosts"] = hosts;
+            v["access"] = r.mode == ExtensionAccess::Mode::All ? asked
+                        : r.mode == ExtensionAccess::Mode::Sites ? QStringLiteral("some:%1").arg(r.sites.size()) : QStringLiteral("click");
+        };
         QVariantList exts;
         if (ChromeExtensions::available()) {
             auto* ce = ChromeExtensions::instance();
             for (const auto& e : ce->items()) {
-                const QJsonObject m = readJson(e.path);
+                const QJsonObject m = ExtensionAccess::originalManifest(e.path);   // as installed, not as narrowed
                 QVariantList cmds;
                 const QJsonObject commands = m.value(QStringLiteral("commands")).toObject();
                 for (auto it = commands.begin(); it != commands.end(); ++it) {
@@ -237,23 +256,28 @@ QVariantMap SettingsBridge::state() const {
                     QString key = c.value(QStringLiteral("suggested_key")).toObject().value(QStringLiteral("default")).toString();
                     cmds << QVariantMap{{"name", c.value(QStringLiteral("description")).toString(it.key() == QLatin1String("_execute_action") ? QStringLiteral("Open the extension") : it.key())}, {"key", key}};
                 }
-                exts << QVariantMap{{"kind", "chrome"}, {"id", e.id}, {"name", e.name}, {"version", e.version}, {"desc", e.description}, {"enabled", e.enabled},
+                QVariantMap v{{"kind", "chrome"}, {"id", e.id}, {"name", e.name}, {"version", e.version}, {"desc", e.description}, {"enabled", e.enabled},
                                     {"error", e.error}, {"pinned", ce->pinned(e.id)}, {"icon", pngUrl(e.icon)}, {"permissions", e.permissions},
                                     {"options", e.optionsUrl.toString()}, {"popup", !e.popupUrl.isEmpty()}, {"access", access(m)},
                                     {"size", double(dirSize(e.path))}, {"updated", double(QFileInfo(e.path + QStringLiteral("/manifest.json")).lastModified().toMSecsSinceEpoch())},
                                     {"source", m.contains(QStringLiteral("update_url")) ? QStringLiteral("Chrome Web Store") : QStringLiteral("Added from a file or folder")},
                                     {"commands", cmds}, {"path", QDir::toNativeSeparators(e.path)}};
+                ruleFields(v, e.id, ExtensionAccess::requestedPatterns(m), access(m));
+                exts << v;
             }
         }
         for (const auto& e : ExtensionManager::instance()->extensions()) {
-            exts << QVariantMap{{"kind", "script"}, {"id", e.id}, {"name", e.name}, {"version", e.version}, {"desc", e.description}, {"enabled", e.enabled},
+            QVariantMap v{{"kind", "script"}, {"id", e.id}, {"name", e.name}, {"version", e.version}, {"desc", e.description}, {"enabled", e.enabled},
                                 {"error", QString()}, {"pinned", false}, {"icon", QString()}, {"permissions", QStringList{QStringLiteral("Read and change pages on: ") + e.sites.join(QStringLiteral(", "))}},
                                 {"options", QString()}, {"popup", false}, {"access", e.sites.contains(QStringLiteral("<all_urls>")) || e.sites.contains(QStringLiteral("*://*/*")) ? QStringLiteral("all") : QStringLiteral("some:%1").arg(e.sites.size())},
                                 {"size", double(dirSize(e.dir))}, {"updated", double(QFileInfo(e.dir + QStringLiteral("/manifest.json")).lastModified().toMSecsSinceEpoch())},
                                 {"source", QStringLiteral("Pacitum user script")}, {"commands", QVariantList{}}, {"path", QDir::toNativeSeparators(e.dir)}};
+            ruleFields(v, e.id, e.sites, v.value("access").toString());
+            exts << v;
         }
         o["extensions"] = exts;
         o["chromeExtensions"] = ChromeExtensions::available();
+        o["extPrivateOk"] = !ChromeExtensions::available() || ChromeExtensions::privateSupported();
     }
 
     // default browser, updates, sync
@@ -466,6 +490,31 @@ QVariant SettingsBridge::act(const QString& name, const QVariantMap& a) {
         const QString id = a.value("id").toString(), kind = a.value("kind").toString();
         const bool chrome = kind == QLatin1String("chrome") && ChromeExtensions::available();
         if (name == QLatin1String("extToggle")) { if (chrome) ChromeExtensions::instance()->setEnabled(id, a.value("on").toBool()); else ExtensionManager::instance()->setEnabled(id, a.value("on").toBool()); emit changed(); return true; }
+        if (name == QLatin1String("extAccess")) {   // 2.0.3 site access: {mode: all|sites|click, sites: [...]}
+            QStringList sites;
+            for (const auto& x : a.value("sites").toList()) if (const QString h = ExtensionAccess::normalizeHost(x.toString()); !h.isEmpty() && !sites.contains(h)) sites << h;
+            const auto mode = ExtensionAccess::modeFromName(a.value("mode").toString());
+            if (chrome) ChromeExtensions::instance()->setAccess(id, int(mode), sites);
+            else {
+                ExtensionAccess::Rule r = ExtensionAccess::rule(id);
+                r.mode = mode; r.sites = sites;
+                ExtensionAccess::setRule(id, r);
+                ExtensionManager::instance()->applyAccess();
+            }
+            emit changed();
+            return QStringLiteral("Reload open pages to apply");
+        }
+        if (name == QLatin1String("extPrivate")) {
+            if (chrome) ChromeExtensions::instance()->setAllowPrivate(id, a.value("on").toBool());
+            else {
+                ExtensionAccess::Rule r = ExtensionAccess::rule(id);
+                r.allowPrivate = a.value("on").toBool();
+                ExtensionAccess::setRule(id, r);
+                ExtensionManager::instance()->applyAccess();
+            }
+            emit changed();
+            return true;
+        }
         if (name == QLatin1String("extPin") && chrome) { ChromeExtensions::instance()->setPinned(id, a.value("on").toBool()); emit changed(); return true; }
         if (name == QLatin1String("extRemove")) { if (chrome) ChromeExtensions::instance()->uninstall(id); else ExtensionManager::instance()->remove(id); emit changed(); return true; }
         if (name == QLatin1String("extOptions")) { if (m_h.openUrl) m_h.openUrl(a.value("url").toString()); return true; }

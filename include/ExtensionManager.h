@@ -26,7 +26,8 @@ class ExtensionManager : public QObject {
     Q_OBJECT
 public:
     static ExtensionManager* instance();
-    void attach(QWebEngineProfile* profile);          // inject into this profile's pages
+    // Inject into this profile's pages. A private / guest profile only gets scripts allowed in private tabs (2.0.3).
+    void attach(QWebEngineProfile* profile, bool privateProfile = false);
     const QList<PacitumExtension>& extensions() const { return m_exts; }
     QString folder() const;                            // <profile>/extensions
     // Validates <sourceDir>/manifest.json; on success copies the folder and returns the new id.
@@ -35,6 +36,7 @@ public:
     void setEnabled(const QString& id, bool on);
     void remove(const QString& id);
     void reload();                                     // re-read every folder from disk
+    void applyAccess();                                // 2.0.3: site access / private rules changed
     static QString matchPatternToRegex(const QString& pattern);   // Chrome match pattern → JS regex source
 signals:
     void changed();
@@ -45,4 +47,5 @@ private:
     void inject();
     QList<PacitumExtension> m_exts;
     QList<QPointer<QWebEngineProfile>> m_profiles;
+    QList<bool> m_profilePrivate;                      // parallel to m_profiles
 };
