@@ -43,6 +43,7 @@ public:
     static QString themeAccent(const QString& id);   // the colour that comes with the theme
     // "Make your own theme": {name, strip, toolbar, bg, accent, dark}. Adds the "custom" theme id.
     static void setCustomTheme(const QString& name, const QString& strip, const QString& toolbar, const QString& bg, const QString& accent, bool dark);
+    static void clearCustomTheme();   // 2.0.5: a profile without a custom theme
     void setPrivate(bool p) { m_private = p; }
     void setAccent(const QString& accent) { m_accentOverride = accent; }
     const PacitumPalette& palette() const { return m_pal; }

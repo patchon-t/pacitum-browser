@@ -23,6 +23,7 @@
 #include <QThread>
 #include "PacitumScheme.h"
 #include "Lang.h"
+#include "ExtensionSafety.h"
 #include "Motion.h"
 #include "WebProfile.h"
 #include "AppSettings.h"
@@ -391,6 +392,8 @@ int main(int argc, char *argv[]) {
     // 1.9.1: the profile is created with its paths (Qt 6.9+). Setting them afterwards made Qt 6.11
     // rebuild the profile's preferences under the extension engine, and enabling an extension crashed.
     if (!guest) Pacitum::setMainProfileStorage(storagePath + QStringLiteral("/storage"), storagePath + QStringLiteral("/cache"));
+    // 2.0.5: an extension that crashed this profile last time is moved aside before the profile loads it.
+    if (!guest && !extTest) ExtensionSafety::beginStartup(logDir() + QStringLiteral("/crash.log"));
     auto* profile = Pacitum::mainProfile();
     if (!guest && !Pacitum::mainProfileBuiltWithStorage()) {   // Qt 6.8: no builder
         profile->setPersistentStoragePath(storagePath + QStringLiteral("/storage"));
@@ -452,6 +455,16 @@ int main(int argc, char *argv[]) {
         pacitumLog(QStringLiteral("window shown: visible=%1 geometry=%2,%3 %4x%5").arg(w.isVisible())
                    .arg(w.geometry().x()).arg(w.geometry().y()).arg(w.width()).arg(w.height()));
         QTimer::singleShot(0, &app, []{ pacitumLog(QStringLiteral("event loop running (startup time)")); });
+        // 2.0.5 extension crash safety: a minute of running, or a normal quit, clears the startup guard.
+        QTimer::singleShot(60000, &app, []{ ExtensionSafety::markHealthy(); });
+        QObject::connect(&app, &QCoreApplication::aboutToQuit, []{ ExtensionSafety::markHealthy(); });
+        QTimer::singleShot(1500, &w, [&w]{
+            const QString notice = ExtensionSafety::takeNotice();
+            if (notice.isEmpty()) return;
+            auto* box = new QMessageBox(QMessageBox::Information, QObject::tr("Extension turned off"), notice, QMessageBox::Ok, &w);
+            box->setAttribute(Qt::WA_DeleteOnClose);
+            box->open();
+        });
         // Time-to-window: first moment the native window is actually exposed (on screen).
         auto* exposeProbe = new QTimer(&app);
         exposeProbe->setInterval(15);

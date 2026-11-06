@@ -2,6 +2,7 @@
 #include "AppSettings.h"
 #include "ThemeManager.h"
 #include "ExtensionAccess.h"
+#include "ExtensionSafety.h"
 #include <QApplication>
 #include <QDir>
 #include <QFile>
@@ -105,6 +106,7 @@ void ChromeExtensions::attach(QWebEngineProfile* profile) {
     if (profile->isOffTheRecord()) return;   // Guest: nothing is installed or kept
     auto* mgr = profile->extensionManager();
     if (!mgr) return;
+    ExtensionSafety::rememberInstallPath(mgr->installPath());   // 2.0.5: where a crashing extension can be moved from
     connect(mgr, &QWebEngineExtensionManager::installFinished, this, [this](const QWebEngineExtensionInfo& e){
         const QByteArray key = m_keys.isEmpty() ? QByteArray() : m_keys.takeFirst();
         if (!e.error().isEmpty()) {
@@ -661,6 +663,7 @@ void ChromeExtensions::runSelfTest(QWidget* anchor, const std::function<void(con
         {QStringLiteral("unpacked test extension"), dir, {}},
         {QStringLiteral("store: Enhancer for YouTube"), {}, QStringLiteral("ponfpcnoihfmfllpaingbgckeeldkhle")},
         {QStringLiteral("store: uBlock Origin Lite"), {}, QStringLiteral("ddkjiahejlhfcafbddmgiahcphecmpfh")},
+        {QStringLiteral("store: Tampermonkey"), {}, QStringLiteral("dhdgffkkebhmkfjojejmpbldmpobfkfo")},   // 2.0.5: crashed a profile
     });
     auto mgr = m_profile->extensionManager();
     auto runNext = std::make_shared<std::function<void()>>();

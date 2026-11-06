@@ -1547,11 +1547,6 @@ void BrowserWindow::setupSettingsBridge() {
     m_settingsBridge = new SettingsBridge(h, this);
     m_settingsChannel = new QWebChannel(this);
     m_settingsChannel->registerObject(QStringLiteral("settings"), m_settingsBridge);
-    {   // a saved custom theme is available from the start
-        const QJsonObject c = readSettings().value(QStringLiteral("custom_theme")).toObject();
-        if (!c.isEmpty()) ThemeManager::setCustomTheme(c.value("name").toString(), c.value("strip").toString(), c.value("toolbar").toString(),
-                                                       c.value("bg").toString(), c.value("accent").toString(), c.value("dark").toBool());
-    }
 }
 
 void BrowserWindow::clearBrowsingData(bool history, bool cookies, bool cache) {
@@ -2337,6 +2332,13 @@ void BrowserWindow::writeSettingsFile(const QJsonObject& s) { AppSettings::write
 
 void BrowserWindow::loadSettings(){
     auto s=readSettings();
+    {   // 2.0.5: this profile's custom theme, before any applyTheme(). It used to be registered only once, late in
+        // window setup, so the first applyTheme() and every profile switch fell back to Pacitum Light / Dark.
+        const QJsonObject c = s.value(QStringLiteral("custom_theme")).toObject();
+        if (!c.isEmpty()) ThemeManager::setCustomTheme(c.value("name").toString(), c.value("strip").toString(), c.value("toolbar").toString(),
+                                                       c.value("bg").toString(), c.value("accent").toString(), c.value("dark").toBool());
+        else ThemeManager::clearCustomTheme();
+    }
     m_themeSetting = s.value(QStringLiteral("theme")).toString(s.contains(QStringLiteral("dark_mode")) ? (s.value(QStringLiteral("dark_mode")).toBool() ? QStringLiteral("Dark") : QStringLiteral("Light")) : QStringLiteral("System"));
     m_darkMode = m_themeSetting == QStringLiteral("Dark");
     m_accent = s.value(QStringLiteral("accent")).toString(QStringLiteral("#D9141F"));
