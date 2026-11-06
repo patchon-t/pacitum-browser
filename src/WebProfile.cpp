@@ -183,7 +183,7 @@ void GoogleSignInInterceptor::interceptRequest(QWebEngineUrlRequestInfo& info) {
 
 void configureProfile(QWebEngineProfile* profile, bool persistent) {
     if (!profile) return;
-    if (persistent) ExtensionManager::instance()->attach(profile);   // 1.8.5 mini extensions (not in private/guest)
+    ExtensionManager::instance()->attach(profile, !persistent);   // 1.8.5 mini extensions; 2.0.3: private/guest get the allowed ones
     const QString honest = profile->httpUserAgent();
     if (defaultUaStore().isEmpty()) defaultUaStore() = honest;
     profile->setHttpUserAgent(chromeUserAgent(honest));

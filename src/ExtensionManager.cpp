@@ -1,4 +1,5 @@
 #include "ExtensionManager.h"
+#include "ExtensionAccess.h"
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
@@ -191,6 +192,7 @@ void ExtensionManager::setEnabled(const QString& id, bool on) {
 }
 
 void ExtensionManager::remove(const QString& id) {
+    ExtensionAccess::forget(id);
     if (id.isEmpty() || id.contains(QLatin1Char('/')) || id.contains(QLatin1Char('\\')) || id.startsWith(QLatin1Char('.'))) return;
     QDir(folder() + QLatin1Char('/') + id).removeRecursively();
     load(); saveState(); inject(); emit changed();
@@ -198,24 +200,34 @@ void ExtensionManager::remove(const QString& id) {
 
 void ExtensionManager::reload() { load(); inject(); emit changed(); }
 
-void ExtensionManager::attach(QWebEngineProfile* profile) {
+void ExtensionManager::attach(QWebEngineProfile* profile, bool privateProfile) {
     if (!profile) return;
     for (const auto& p : std::as_const(m_profiles)) if (p == profile) return;
+    for (int i = m_profiles.size() - 1; i >= 0; --i) if (!m_profiles[i]) { m_profiles.removeAt(i); m_profilePrivate.removeAt(i); }
     m_profiles << profile;
+    m_profilePrivate << privateProfile;
     inject();
 }
 
+void ExtensionManager::applyAccess() { inject(); emit changed(); }
+
 void ExtensionManager::inject() {
     // Build the scripts once, then replace ours in every attached profile.
-    QList<QWebEngineScript> scripts;
+    QList<QWebEngineScript> scripts, privateScripts;
     for (const auto& e : std::as_const(m_exts)) {
         if (!e.enabled) continue;
         const QJsonObject m = readJson(e.dir + QStringLiteral("/manifest.json"));
+        const ExtensionAccess::Rule rule = ExtensionAccess::rule(e.id);
         int n = 0;
         for (const Group& g : groupsOf(m)) {
             if (g.matches.isEmpty() || (g.js.isEmpty() && g.css.isEmpty())) continue;
+            // 2.0.3 site access: only the sites the user allows (user scripts have no toolbar button, so "When I
+            // click it" allows nothing until a site is added).
+            const QStringList matches = rule.mode == ExtensionAccess::Mode::All ? g.matches
+                                      : ExtensionAccess::narrowPatterns(g.matches, ExtensionAccess::allowedHosts(e.id));
+            if (matches.isEmpty()) continue;
             QStringList inc, exc;
-            for (const QString& p : g.matches) inc << jsString(matchPatternToRegex(p));
+            for (const QString& p : matches) if (const QString r = matchPatternToRegex(p); !r.isEmpty()) inc << jsString(r);
             for (const QString& p : g.excludes) if (const QString r = matchPatternToRegex(p); !r.isEmpty()) exc << jsString(r);
             QString css;
             for (const QString& f : g.css) css += readText(safeFile(e.dir, f)) + QLatin1Char('\n');
@@ -240,12 +252,14 @@ void ExtensionManager::inject() {
                                 : g.runAt == QLatin1String("document_end") ? QWebEngineScript::DocumentReady
                                 : QWebEngineScript::Deferred);
             scripts << s;
+            if (rule.allowPrivate) privateScripts << s;
         }
     }
-    for (const auto& p : std::as_const(m_profiles)) {
+    for (int i = 0; i < m_profiles.size(); ++i) {
+        const auto& p = m_profiles[i];
         if (!p) continue;
         QWebEngineScriptCollection* col = p->scripts();
         for (const QWebEngineScript& s : col->toList()) if (s.name().startsWith(kPrefix)) col->remove(s);
-        for (const QWebEngineScript& s : std::as_const(scripts)) col->insert(s);
+        for (const QWebEngineScript& s : std::as_const(m_profilePrivate.value(i) ? privateScripts : scripts)) col->insert(s);
     }
 }

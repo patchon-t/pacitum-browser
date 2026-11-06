@@ -13,6 +13,8 @@
 #include <QStringList>
 #include <QUrl>
 #include <functional>
+#include <QHash>
+#include <QList>
 #include <QtWebEngineCore/qtwebenginecoreglobal.h>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0) && QT_CONFIG(webengine_extensions)
@@ -48,7 +50,13 @@ public:
     bool pinned(const QString& id) const;
     void setPinned(const QString& id, bool on);
     // The extension's toolbar pop-up (popup.html) under `anchor`, in the extension's own profile.
-    void openPopup(const QString& id, QWidget* anchor);
+    // `pageUrl` / `reloadPage`: the active tab, for "When I click it" (2.0.3): the click allows that site and
+    // reloads the page so the extension can work on it.
+    void openPopup(const QString& id, QWidget* anchor, const QUrl& pageUrl = {}, const std::function<void()>& reloadPage = {});
+    // 2.0.3 site access (see ExtensionAccess.h). setAccess rewrites the extension's manifest and loads it again;
+    // open pages pick the change up when they are reloaded.
+    void setAccess(const QString& id, int mode, const QStringList& sites);
+    static bool privateSupported();                        // Chrome extensions in private tabs (not in Qt 6.11)
     static QString webStoreId(const QUrl& url);     // "" when the URL isn't a store detail page
     static QStringList describePermissions(const QString& extensionDir);
     // CI (--extensions-test): add, enable, use, disable and remove extensions; logs EXTENSIONS OK|FAIL.
@@ -57,6 +65,7 @@ signals:
     void changed();
     void message(const QString& text);              // short notices ("Added uBlock Origin")
     void installed(const QString& id);              // added and ready (with its final ID)
+    void accessApplied(const QString& id);          // loaded again after a site-access change
 private:
     explicit ChromeExtensions(QObject* parent);
     QString crxToZip(const QString& crxPath, QString* error);   // also sets m_lastKey
@@ -69,6 +78,8 @@ private:
     QString m_expectId;                             // reloading under its store ID
     void downloadFromStore(const QString& id, const QString& name);   // no questions asked (callers ask)
     QPointer<QWebEngineProfile> m_profile;
+    void applyAccess(const QString& id);
+    QHash<QString, bool> m_reloading;               // id -> was enabled, while a site-access change reloads it
     QNetworkAccessManager* m_net = nullptr;
     QStringList m_pending;                          // names being installed (for the notice)
 };

@@ -1,6 +1,7 @@
 #include "ChromeExtensions.h"
 #include "AppSettings.h"
 #include "ThemeManager.h"
+#include "ExtensionAccess.h"
 #include <QApplication>
 #include <QDir>
 #include <QFile>
@@ -134,6 +135,15 @@ void ChromeExtensions::attach(QWebEngineProfile* profile) {
         emit changed();
     });
     connect(mgr, &QWebEngineExtensionManager::loadFinished, this, [this](const QWebEngineExtensionInfo& e){
+        if (m_reloading.contains(e.id())) {   // 2.0.3: loaded again with its narrowed / restored manifest
+            const bool wasOn = m_reloading.take(e.id());
+            if (!e.error().isEmpty()) { pacitumLog(QStringLiteral("extension %1: reload after site-access change failed: %2").arg(e.id(), e.error())); emit message(e.error()); }
+            else if (!wasOn) m_profile->extensionManager()->setExtensionEnabled(e, false);
+            pacitumLog(QStringLiteral("extension %1: site access applied (%2)").arg(e.id(), ExtensionAccess::modeName(ExtensionAccess::rule(e.id()).mode)));
+            emit accessApplied(e.id());
+            emit changed();
+            return;
+        }
         if (!m_expectId.isEmpty() && (e.id() == m_expectId || !e.error().isEmpty())) {
             const QString id = e.id();
             m_expectId.clear();
@@ -430,7 +440,11 @@ void ChromeExtensions::uninstall(const QString& id) {
 #ifdef PACITUM_CHROME_EXTENSIONS
     if (!m_profile || !m_profile->extensionManager()) return;
     for (const auto& e : m_profile->extensionManager()->extensions())
-        if (e.id() == id) { m_profile->extensionManager()->uninstallExtension(e); break; }
+        if (e.id() == id) {
+            ExtensionAccess::forget(id);
+            m_profile->extensionManager()->uninstallExtension(e);
+            break;
+        }
 #else
     Q_UNUSED(id);
 #endif
@@ -520,7 +534,20 @@ private:
 };
 }
 
-void ChromeExtensions::openPopup(const QString& id, QWidget* anchor) {
+void ChromeExtensions::openPopup(const QString& id, QWidget* anchor, const QUrl& pageUrl, const std::function<void()>& reloadPage) {
+    // 2.0.3 "When I click it": the click lets the extension work on this site (until Pacitum closes). The
+    // extension is loaded again with the site added, then the page is reloaded so its scripts run there.
+    if (ExtensionAccess::rule(id).mode == ExtensionAccess::Mode::Click && pageUrl.scheme().startsWith(QLatin1String("http"))
+        && ExtensionAccess::grantClick(id, pageUrl.host())) {
+        auto conn = std::make_shared<QMetaObject::Connection>();
+        *conn = connect(this, &ChromeExtensions::accessApplied, this, [conn, id, reloadPage](const QString& done){
+            if (done != id) return;
+            QObject::disconnect(*conn);
+            if (reloadPage) reloadPage();
+        });
+        applyAccess(id);
+        for (const auto& it : items()) if (it.id == id) emit message(tr("%1 can now work on %2").arg(it.name, ExtensionAccess::normalizeHost(pageUrl.host())));
+    }
     if (anchor) {   // second click on the button whose pop-up just closed: leave it closed
         const qint64 t = anchor->property("_pmPopupClosedAt").toLongLong();
         if (t && QDateTime::currentMSecsSinceEpoch() - t < 300 && anchor->rect().contains(anchor->mapFromGlobal(QCursor::pos()))) return;
@@ -533,6 +560,40 @@ void ChromeExtensions::openPopup(const QString& id, QWidget* anchor) {
         else emit message(tr("%1 works on its own and has no pop-up").arg(it.name));
         return;
     }
+}
+
+// ============================================================================ 2.0.3 site access, private tabs
+// Private tabs: Qt WebEngine 6.11 does not load Chrome extensions into an off-the-record profile (the call is
+// accepted, nothing loads and no error comes back; seen in the Windows CI test). So "Allow in private tabs" is
+// offered for Pacitum user scripts only, and Chrome extensions never run in private tabs.
+bool ChromeExtensions::privateSupported() { return false; }
+
+void ChromeExtensions::setAccess(const QString& id, int mode, const QStringList& sites) {
+    ExtensionAccess::Rule r = ExtensionAccess::rule(id);
+    r.mode = ExtensionAccess::Mode(mode);
+    r.sites = sites;
+    ExtensionAccess::setRule(id, r);
+    applyAccess(id);
+}
+
+void ChromeExtensions::applyAccess(const QString& id) {
+#ifdef PACITUM_CHROME_EXTENSIONS
+    if (!m_profile || !m_profile->extensionManager()) return;
+    auto* mgr = m_profile->extensionManager();
+    for (const auto& e : mgr->extensions()) {
+        if (e.id() != id) continue;
+        if (!ExtensionAccess::writeManifestForRule(e.path(), id)) {
+            emit message(tr("Couldn't change the site access of %1").arg(e.name()));
+            return;
+        }
+        m_reloading.insert(id, e.isEnabled());
+        mgr->unloadExtension(e);
+        mgr->loadExtension(e.path());   // finished in loadFinished
+        return;
+    }
+#else
+    Q_UNUSED(id);
+#endif
 }
 
 // ============================================================================ CI self test
@@ -575,10 +636,53 @@ void ChromeExtensions::runSelfTest(QWidget* anchor, const std::function<void(con
         const QString what = *waiting; waiting->clear();
         log(QStringLiteral("%1: install failed: %2").arg(what, e.error())); ++*fails; QTimer::singleShot(0, this, *runNext);
     });
+    // 2.0.3: site access, on the unpacked test extension: narrow it to one site, check the manifest and that it
+    // loaded again under the same ID, then put it back.
+    auto accessCheck = [=](const QString& id, const std::function<void()>& next) {
+        QString path;
+        for (const auto& it : items()) if (it.id == id) path = it.path;
+        auto manifestHas = [path](const char* needle){
+            QFile f(path + QStringLiteral("/manifest.json"));
+            return f.open(QIODevice::ReadOnly) && f.readAll().contains(needle);
+        };
+        auto waitApplied = [=](const QString& label, const std::function<void()>& then) {
+            auto conn = std::make_shared<QMetaObject::Connection>();
+            auto done = std::make_shared<bool>(false);
+            *conn = connect(this, &ChromeExtensions::accessApplied, this, [=](const QString& d){
+                if (d != id || *done) return;
+                *done = true; QObject::disconnect(*conn);
+                QTimer::singleShot(500, this, then);
+            });
+            QTimer::singleShot(20000, this, [=]{ if (!*done) { *done = true; QObject::disconnect(*conn); log(label + QStringLiteral(": no reload after 20 s")); ++*fails; then(); } });
+        };
+        log(QStringLiteral("access: only example.com"));
+        waitApplied(QStringLiteral("access sites"), [=]{
+            bool loaded = false;
+            for (const auto& it : items()) if (it.id == id) loaded = it.loaded || it.enabled;
+            const bool narrowed = manifestHas("example.com") && !manifestHas("<all_urls>");
+            log(QStringLiteral("access sites: narrowed=%1 loaded-again-with-same-id=%2").arg(narrowed).arg(loaded));
+            if (!narrowed || !loaded) ++*fails;
+            log(QStringLiteral("access: all sites again"));
+            waitApplied(QStringLiteral("access all"), [=]{
+                const bool restored = manifestHas("<all_urls>");
+                log(QStringLiteral("access all: restored=%1").arg(restored));
+                if (!restored) ++*fails;
+                next();
+            });
+            setAccess(id, int(ExtensionAccess::Mode::All), {});
+        });
+        setAccess(id, int(ExtensionAccess::Mode::Sites), {QStringLiteral("example.com")});
+    };
     connect(this, &ChromeExtensions::installed, this, [=](const QString& id){
         if (waiting->isEmpty()) return;
         const QString what = *waiting; waiting->clear();
         log(QStringLiteral("%1: installed id=%2").arg(what, id));
+        if (what.startsWith(QLatin1String("unpacked")) && !id.isEmpty() && !property("_pmAccessChecked").toBool()) {
+            setProperty("_pmAccessChecked", true);
+            *waiting = what;   // the access check runs first; the usual steps follow
+            accessCheck(id, [=]{ emit installed(id); });   // `waiting` is still set, so the usual steps run
+            return;
+        }
         QTimer::singleShot(500, this, [=]{
             log(QStringLiteral("%1: enabling").arg(what));
             setEnabled(id, true);   // the menu's "Enabled" item

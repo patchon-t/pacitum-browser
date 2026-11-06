@@ -658,7 +658,11 @@ void BrowserWindow::rebuildExtensionPins() {
         b->setIcon(e.icon.isNull() ? m_theme->secondaryIcon(QStringLiteral("puzzle"), 18) : e.icon);
         b->setIconSize(QSize(18, 18));
         const QString id = e.id;
-        connect(b, &QToolButton::clicked, this, [b, id]{ ChromeExtensions::instance()->openPopup(id, b); });
+        connect(b, &QToolButton::clicked, this, [this, b, id]{
+            BrowserTab* t = activeTab();
+            QPointer<BrowserTab> guard(t);
+            ChromeExtensions::instance()->openPopup(id, b, t ? QUrl(t->currentUrl()) : QUrl(), [guard]{ if (guard) guard->reload(); });
+        });
         l->addWidget(b);
     }
     m_extPins->setVisible(l->count() > 0);
@@ -705,7 +709,11 @@ void BrowserWindow::showExtensionsMenu() {
             sub->addSeparator();
             const QString id = e.id, name = e.name;
             if (e.popupUrl.isValid() && !e.popupUrl.isEmpty())
-                connect(sub->addAction(QStringLiteral("Open")), &QAction::triggered, this, [this, id]{ ChromeExtensions::instance()->openPopup(id, m_splitBtn); });
+                connect(sub->addAction(QStringLiteral("Open")), &QAction::triggered, this, [this, id]{
+                    BrowserTab* t = activeTab();
+                    QPointer<BrowserTab> guard(t);
+                    ChromeExtensions::instance()->openPopup(id, m_splitBtn, t ? QUrl(t->currentUrl()) : QUrl(), [guard]{ if (guard) guard->reload(); });
+                });
             if (e.optionsUrl.isValid())
                 connect(sub->addAction(QStringLiteral("Options")), &QAction::triggered, this, [this, u = e.optionsUrl]{ newTab(u.toString()); });
             auto* pin = sub->addAction(QStringLiteral("Pin to toolbar")); pin->setCheckable(true); pin->setChecked(ce->pinned(id));

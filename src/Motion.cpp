@@ -16,8 +16,59 @@
 #include <QGuiApplication>
 #include <QRadialGradient>
 #include <cmath>
+#include <QAbstractAnimation>
+#include <QElapsedTimer>
+
+namespace {
+// Ticks at the fastest connected screen's refresh rate on a precise timer. Qt's own driver uses a ~16 ms
+// coarse timer, which on Windows lands on a 15.6 ms grid: frames are uneven at 60 Hz and capped at 60 fps on
+// faster screens.
+class RefreshRateDriver : public QAnimationDriver {
+public:
+    explicit RefreshRateDriver(int forcedHz, QObject* parent) : QAnimationDriver(parent), m_forced(forcedHz) {
+        m_tick.setTimerType(Qt::PreciseTimer);
+        QObject::connect(&m_tick, &QTimer::timeout, this, [this]{ advance(); });
+        auto rescan = [this]{ updateRate(); };
+        QObject::connect(qApp, &QGuiApplication::screenAdded, this, rescan);
+        QObject::connect(qApp, &QGuiApplication::screenRemoved, this, rescan);
+        for (QScreen* s : QGuiApplication::screens()) QObject::connect(s, &QScreen::refreshRateChanged, this, rescan);
+        QObject::connect(qApp, &QGuiApplication::screenAdded, this, [this](QScreen* s){
+            QObject::connect(s, &QScreen::refreshRateChanged, this, [this]{ updateRate(); });
+        });
+        updateRate();
+    }
+    qint64 elapsed() const override { return m_clock.isValid() ? m_clock.elapsed() : 0; }
+    int hz() const { return m_hz; }
+protected:
+    void start() override { m_clock.start(); m_tick.start(); QAnimationDriver::start(); }
+    void stop() override { m_tick.stop(); QAnimationDriver::stop(); }
+private:
+    void updateRate() {
+        qreal hz = m_forced > 0 ? m_forced : 60.0;
+        if (m_forced <= 0) for (QScreen* s : QGuiApplication::screens()) hz = qMax(hz, s->refreshRate());
+        m_hz = int(qBound(60.0, hz, 240.0));
+        m_tick.setInterval(qMax(1, int(1000.0 / m_hz)));
+    }
+    QTimer m_tick;
+    QElapsedTimer m_clock;
+    int m_forced = 0, m_hz = 60;
+};
+}
+
+void pacitumLog(const QString& line);   // main.cpp (startup.log)
 
 namespace Motion {
+void installRefreshRateClock() {
+    bool set = false;
+    const int forced = qEnvironmentVariableIntValue("PACITUM_ANIMATION_HZ", &set);
+    if (set && forced == 0) return;   // Qt's own driver
+    static RefreshRateDriver* d = nullptr;
+    if (d) return;
+    d = new RefreshRateDriver(set ? forced : 0, qApp);
+    d->install();
+    pacitumLog(QStringLiteral("animations: %1 Hz clock").arg(d->hz()));
+}
+
 int ms(int token) { return Pacitum::motionMs(token); }
 // Opacity-only fades survive reduced motion, capped at 120 ms (shared kit: reduced = fade 120, no movement).
 int fadeMs(int token) { return Pacitum::reducedMotion() ? qMin(token, 120) : token; }
