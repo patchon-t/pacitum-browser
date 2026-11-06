@@ -120,8 +120,6 @@ QVariantMap SettingsBridge::state() const {
     o["dataDir"] = QDir::toNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
 #ifdef Q_OS_WIN
     o["os"] = QStringLiteral("windows");
-#elif defined(Q_OS_MACOS)
-    o["os"] = QStringLiteral("mac");
 #else
     o["os"] = QStringLiteral("linux");
 #endif
@@ -414,8 +412,6 @@ QVariant SettingsBridge::act(const QString& name, const QVariantMap& a) {
     if (name == QLatin1String("openProxy")) {
 #ifdef Q_OS_WIN
         QDesktopServices::openUrl(QUrl(QStringLiteral("ms-settings:network-proxy")));
-#elif defined(Q_OS_MACOS)
-        QDesktopServices::openUrl(QUrl(QStringLiteral("x-apple.systempreferences:com.apple.Network-Settings.extension")));
 #endif
         return true;
     }

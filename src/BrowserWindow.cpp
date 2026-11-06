@@ -200,7 +200,7 @@ void BrowserWindow::fadeInContent() {
     fadeVeil(Pacitum::guestMode() || m_privateMode ? Motion::Slow : Motion::Medium, 1.0, 30);   // kit #31 / #41
 }
 
-// Close / minimize / maximize on macOS and Linux: our frameless window gets no system animation
+// Close / minimize / maximize on Linux: our frameless window gets no system animation
 // there, so a snapshot shrinks away / drops / morphs while the real window has already changed.
 void BrowserWindow::animatedMinimize() {
     if (Motion::windowGhostsAllowed() && isVisible() && !isMinimized()) {
@@ -436,12 +436,7 @@ void BrowserWindow::setupUI() {
         connect(m_minBtn, &QToolButton::clicked, this, &BrowserWindow::animatedMinimize);
         connect(m_maxBtn, &QToolButton::clicked, this, &BrowserWindow::animatedToggleMaximize);
         connect(m_closeBtn, &QToolButton::clicked, this, &QWidget::close);
-#ifdef Q_OS_MACOS
-        // macOS order and place: close, minimise, zoom on the left, before the tabs
-        sl->insertWidget(0, m_closeBtn); sl->insertWidget(1, m_minBtn); sl->insertWidget(2, m_maxBtn); sl->insertSpacing(3, 12);
-#else
         sl->addWidget(m_minBtn); sl->addWidget(m_maxBtn); sl->addWidget(m_closeBtn);
-#endif
         m_tabStrip->installEventFilter(this);
         m_tabs->stripBar()->installEventFilter(this);
     }
@@ -2453,7 +2448,7 @@ void BrowserWindow::closeEvent(QCloseEvent* e){
             return;
         }
     }
-    // 1.9.0 / 1.8.11 (macOS, Linux): the window shrinks away (Windows animates it natively)
+    // 1.9.0 / 1.8.11 (Linux): the window shrinks away (Windows animates it natively)
     if (Motion::windowGhostsAllowed() && isVisible() && !isMinimized() && !m_chromeHidden) {
         const QRect from = frameGeometry();
         QRect to(QPoint(), from.size() * 0.9); to.moveCenter(from.center() + QPoint(0, 12));

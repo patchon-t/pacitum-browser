@@ -41,12 +41,6 @@ QList<Source> detectSources() {
     addChromium(QStringLiteral("edge"), QStringLiteral("Edge"), local + QStringLiteral("/Microsoft/Edge/User Data"));
     addChromium(QStringLiteral("brave"), QStringLiteral("Brave"), local + QStringLiteral("/BraveSoftware/Brave-Browser/User Data"));
     const QString ffRoot = roaming + QStringLiteral("/Mozilla/Firefox");
-#elif defined(Q_OS_MACOS)
-    const QString as = home() + QStringLiteral("/Library/Application Support");
-    addChromium(QStringLiteral("chrome"), QStringLiteral("Chrome"), as + QStringLiteral("/Google/Chrome"));
-    addChromium(QStringLiteral("edge"), QStringLiteral("Edge"), as + QStringLiteral("/Microsoft Edge"));
-    addChromium(QStringLiteral("brave"), QStringLiteral("Brave"), as + QStringLiteral("/BraveSoftware/Brave-Browser"));
-    const QString ffRoot = as + QStringLiteral("/Firefox");
 #else
     const QString cfg = home() + QStringLiteral("/.config");
     addChromium(QStringLiteral("chrome"), QStringLiteral("Chrome"), cfg + QStringLiteral("/google-chrome"));

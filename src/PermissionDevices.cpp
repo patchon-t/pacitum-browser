@@ -183,10 +183,6 @@ bool osDenied(Perm::Kind k) {
 QString osSettingsUrl(Perm::Kind k) {
 #if defined(Q_OS_WIN)
     return k == Perm::Kind::Camera ? QStringLiteral("ms-settings:privacy-webcam") : k == Perm::Kind::Microphone ? QStringLiteral("ms-settings:privacy-microphone") : QStringLiteral("ms-settings:privacy-location");
-#elif defined(Q_OS_MACOS)
-    return k == Perm::Kind::Camera ? QStringLiteral("x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")
-         : k == Perm::Kind::Microphone ? QStringLiteral("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
-         : QStringLiteral("x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices");
 #else
     Q_UNUSED(k); return {};
 #endif
@@ -194,8 +190,6 @@ QString osSettingsUrl(Perm::Kind k) {
 QString osName() {
 #if defined(Q_OS_WIN)
     return QStringLiteral("Windows");
-#elif defined(Q_OS_MACOS)
-    return QStringLiteral("macOS");
 #else
     return QStringLiteral("the system");
 #endif

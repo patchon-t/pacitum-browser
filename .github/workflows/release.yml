@@ -1,7 +1,7 @@
 name: Release
 # Actions → Release → Run workflow, with a tag such as v1.9.0 or v1.8.12:
 # creates the tag on this commit and the GitHub release (text from release-notes/<tag>.md), then
-# starts the Windows and Linux + macOS builds for that tag; they attach their files to the release.
+# starts the Windows and Linux builds for that tag; they attach their files to the release.
 # (A tag made with the workflow token doesn't start other workflows by itself, hence the dispatch.)
 on:
   workflow_dispatch:
@@ -28,4 +28,4 @@ jobs:
         env: { GH_TOKEN: "${{ github.token }}", TAG: "${{ inputs.tag }}" }
         run: |
           gh workflow run windows.yml --ref "$TAG" --repo "${{ github.repository }}"
-          gh workflow run linux-macos.yml --ref "$TAG" --repo "${{ github.repository }}"
+          gh workflow run linux.yml --ref "$TAG" --repo "${{ github.repository }}"

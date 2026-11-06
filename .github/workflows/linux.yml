@@ -1,14 +1,14 @@
-name: Build Linux + macOS
-# Not on every push: macOS runner minutes cost much more than Linux/Windows ones.
+name: Build Linux
+# Linux AppImage, .deb and .rpm. (2.0.4: the macOS build was removed.)
 # Runs for pull requests that touch the app, for version tags, and on demand (Actions → Run workflow).
 on:
   workflow_dispatch:
   push:
     tags: ['v*']
   pull_request:
-    paths: ['src/**', 'include/**', 'resources/**', 'third_party/**', 'CMakeLists.txt', '.github/workflows/linux-macos.yml', 'packaging/**']
+    paths: ['src/**', 'include/**', 'resources/**', 'third_party/**', 'CMakeLists.txt', '.github/workflows/linux.yml', 'packaging/**']
 permissions:
-  contents: write   # tag builds attach the AppImage / dmg + .sha256 to an existing release (updater feed)
+  contents: write   # tag builds attach the AppImage / .deb / .rpm + .sha256 to an existing release (updater feed)
 jobs:
   linux:
     runs-on: ubuntu-22.04   # older glibc = the AppImage runs on more distributions
@@ -119,63 +119,3 @@ jobs:
           [ "${{ github.ref_name }}" = "v$(cat build/pacitum-version.txt)" ] || { echo "tag is for the other line; skipping"; exit 0; }
           bash .github/ensure-release.sh "${{ github.ref_name }}" "${{ github.repository }}" || { echo "no release and no release-notes/${{ github.ref_name }}.md; skipping"; exit 0; }
           gh release upload "${{ github.ref_name }}" PacitumBrowser-*.AppImage* PacitumBrowser-*.deb* PacitumBrowser-*.rpm* --clobber --repo "${{ github.repository }}"
-
-  macos:
-    runs-on: macos-15   # Apple silicon (macos-14 images are retired: "macos-14-arm64-us-default is not supported")
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { line: main,   qt: '6.11.*' }
-    name: macos (${{ matrix.line }}, Qt ${{ matrix.qt }})
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: ${{ matrix.qt }}
-          host: mac
-          target: desktop
-          arch: clang_64
-          modules: 'qtwebengine qtwebchannel qtpositioning qtserialport qtconnectivity'
-          cache: true
-      - name: Build
-        env:
-          GOOGLE_ID: ${{ secrets.PACITUM_GOOGLE_CLIENT_ID }}
-          GOOGLE_SECRET: ${{ secrets.PACITUM_GOOGLE_CLIENT_SECRET }}
-        run: |
-          brew list ninja >/dev/null 2>&1 || brew install ninja
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 "-DPACITUM_GOOGLE_CLIENT_ID=$GOOGLE_ID" "-DPACITUM_GOOGLE_CLIENT_SECRET=$GOOGLE_SECRET"
-          cmake --build build
-      - name: Bundle Qt into the app + ad-hoc sign
-        run: |
-          macdeployqt build/PacitumBrowser.app -verbose=1
-          # Apple silicon refuses to run unsigned code; an ad-hoc signature is enough for a download build
-          codesign --force --deep --sign - build/PacitumBrowser.app
-          codesign --verify --deep build/PacitumBrowser.app
-      - name: Smoke test (window opens and stays up)
-        continue-on-error: true   # hosted macOS runners sometimes have no usable window server
-        run: |
-          build/PacitumBrowser.app/Contents/MacOS/PacitumBrowser --smoke-test || echo "exit code $?"
-          log="$HOME/Library/Application Support/Pacitum/Pacitum Browser/startup.log"
-          tail -n 40 "$log" || true
-          grep -q "SMOKE OK" "$log"
-      - name: Disk image
-        run: |
-          ver=$(cat build/pacitum-version.txt)   # 1.9.x (Qt 6.11) or 1.8.x (legacy, Qt 6.8)
-          out="PacitumBrowser-$ver-macOS-arm64.dmg"
-          mkdir dmg && cp -R build/PacitumBrowser.app "dmg/Pacitum Browser.app" && ln -s /Applications dmg/Applications
-          hdiutil create -volname "Pacitum Browser" -srcfolder dmg -ov -format UDZO "$out"
-          shasum -a 256 "$out" > "$out.sha256"
-          ls -la "$out"
-      - uses: actions/upload-artifact@v7.0.2
-        with:
-          name: PacitumBrowser-macOS-${{ matrix.line }}
-          path: PacitumBrowser-*.dmg*
-          retention-days: 3
-      - name: Attach to the release (tag builds)
-        if: startsWith(github.ref, 'refs/tags/v')
-        env: { GH_TOKEN: "${{ github.token }}" }
-        run: |
-          [ "${{ github.ref_name }}" = "v$(cat build/pacitum-version.txt)" ] || { echo "tag is for the other line; skipping"; exit 0; }
-          bash .github/ensure-release.sh "${{ github.ref_name }}" "${{ github.repository }}" || { echo "no release and no release-notes/${{ github.ref_name }}.md; skipping"; exit 0; }
-          gh release upload "${{ github.ref_name }}" PacitumBrowser-*.dmg* --clobber --repo "${{ github.repository }}"

@@ -173,7 +173,7 @@ function select(key, def, opts, label) {
   return `<select class="sel" aria-label="${esc(label)}" data-c="set:${key}">${opts.map((o) => `<option value="${esc(o[0])}"${String(o[0]) === cur ? ' selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`;
 }
 const isWin = () => D && D.os === 'windows';
-const osName = () => (D && D.os === 'mac' ? 'macOS' : D && D.os === 'linux' ? 'your system' : 'Windows');
+const osName = () => (D && D.os === 'linux' ? 'your system' : 'Windows');
 
 // ------------------------------------------------------------------ sections
 const NAV = [

@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(PacitumBrowser VERSION 2.0.4 LANGUAGES CXX)
+# 2.0.4: Pacitum is built for Windows and Linux only (the macOS port was removed).
+if(APPLE)
+    message(FATAL_ERROR "Pacitum supports Windows and Linux. The macOS port was removed in 2.0.4.")
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -138,14 +142,7 @@ if(WIN32)
     set(APP_RC ${CMAKE_BINARY_DIR}/app.rc)
 endif()
 
-set(APP_ICNS "")
-if(APPLE)
-    # macOS: a real .app bundle with the icon and the permission texts web pages need
-    set(APP_ICNS ${CMAKE_SOURCE_DIR}/resources/macos/pacitum.icns)
-    set_source_files_properties(${APP_ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-endif()
-
-add_executable(PacitumBrowser ${SOURCES} ${HEADERS} ${RESOURCES} ${APP_RC} ${APP_ICNS})
+add_executable(PacitumBrowser ${SOURCES} ${HEADERS} ${RESOURCES} ${APP_RC})
 target_compile_definitions(PacitumBrowser PRIVATE PACITUM_VERSION="${PACITUM_APP_VERSION}" PACITUM_UPDATE_TRACK="${PACITUM_UPDATE_TRACK}")
 # 1.8.8 Google Drive sync: a Google Cloud OAuth client of type "Desktop app" (see SYNC.md).
 # Leave empty to let users paste their own in Settings › Sync › Advanced.
@@ -190,16 +187,6 @@ if(WIN32)
 endif()
 
 # Platform specific
-if(APPLE)
-    set_target_properties(PacitumBrowser PROPERTIES
-        MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/resources/macos/Info.plist.in
-        MACOSX_BUNDLE_BUNDLE_NAME "Pacitum Browser"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.pacitum.browser"
-        MACOSX_BUNDLE_ICON_FILE pacitum.icns
-        MACOSX_BUNDLE_SHORT_VERSION_STRING ${PACITUM_APP_VERSION}
-        MACOSX_BUNDLE_BUNDLE_VERSION ${PACITUM_APP_VERSION})
-endif()
 if(WIN32)
     set_target_properties(PacitumBrowser PROPERTIES WIN32_EXECUTABLE TRUE)
     # Enable High DPI
@@ -212,8 +199,8 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/resources")
 endif()
 
 # Install
-install(TARGETS PacitumBrowser BUNDLE DESTINATION . RUNTIME DESTINATION bin)
-if(UNIX AND NOT APPLE)
+install(TARGETS PacitumBrowser RUNTIME DESTINATION bin)
+if(UNIX)
     # Linux: menu entry + icon (the AppImage build in CI uses the same files)
     install(FILES resources/linux/pacitum-browser.desktop DESTINATION share/applications)
     install(FILES resources/linux/pacitum-browser.png DESTINATION share/icons/hicolor/256x256/apps)
