@@ -74,8 +74,12 @@ QIcon manifestIcon(const QString& dir, const QJsonObject& m) {
     if (v.isUndefined()) v = m.value(QStringLiteral("browser_action")).toObject().value(QStringLiteral("default_icon"));
     if (v.isUndefined()) v = m.value(QStringLiteral("icons"));
     QIcon icon;
-    if (v.isString()) icon.addFile(dir + QLatin1Char('/') + v.toString());
-    else for (auto it = v.toObject().begin(); it != v.toObject().end(); ++it) {
+    if (v.isString()) { icon.addFile(dir + QLatin1Char('/') + v.toString()); return icon; }
+    // 2.0.5: iterate one named object. begin() and end() used to come from two temporary copies (v.toObject() twice),
+    // both destroyed before the loop body ran, so the loop read freed memory. It crashed Pacitum for extensions whose
+    // icon is a size map (Tampermonkey), every time the toolbar or the extensions page listed them.
+    const QJsonObject sizes = v.toObject();
+    for (auto it = sizes.begin(); it != sizes.end(); ++it) {
         const QString file = dir + QLatin1Char('/') + it.value().toString();
         if (QFileInfo::exists(file)) icon.addFile(file, QSize(it.key().toInt(), it.key().toInt()));
     }
