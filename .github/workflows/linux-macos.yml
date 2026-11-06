@@ -121,7 +121,7 @@ jobs:
           gh release upload "${{ github.ref_name }}" PacitumBrowser-*.AppImage* PacitumBrowser-*.deb* PacitumBrowser-*.rpm* --clobber --repo "${{ github.repository }}"
 
   macos:
-    runs-on: macos-14   # Apple silicon
+    runs-on: macos-15   # Apple silicon (macos-14 images are retired: "macos-14-arm64-us-default is not supported")
     strategy:
       fail-fast: false
       matrix:
