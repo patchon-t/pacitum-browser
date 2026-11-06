@@ -22,9 +22,7 @@ Pacitum is a calm, fast web browser written in C++17 on **Qt 6 WebEngine**. It r
 
 | Windows | Linux |
 |---|---|
-| `PacitumBrowser-Setup-<version>.exe` | `PacitumBrowser-<version>-linux-x86_64.AppImage`, `.deb` or `.rpm` |
-
-macOS is no longer supported (the port was removed in 2.0.4).
+| `PacitumBrowser-Setup-2.x.x.exe` | `PacitumBrowser-2.x.x-linux-x86_64.AppImage` |
 
 Get the file for your system from the [latest release](https://github.com/namo2024mntik-ops/pacitum-browser/releases/latest). Each file has a `.sha256` checksum next to it. Pacitum updates itself after that.
 
@@ -85,8 +83,9 @@ cmake --build build
 Pacitum started as a Python browser and was ported to C++ file by file.
 
 
-| Python (`safari_browser/*.py`) | C++ (`safari_browser_cpp/include|src/*.cpp`) |
-|---|---|
+
+| Python (`safari_browser/*.py`) | C++ (`safari_browser_cpp/include\|src/*.cpp`) |
+| --- | --- |
 | `main.py` | `src/main.cpp` |
 | `browser_window.py` | `BrowserWindow.h/cpp` |
 | `browser_tab.py` | `BrowserTab.h/cpp` |
@@ -104,6 +103,7 @@ Pacitum started as a Python browser and was ported to C++ file by file.
 | — | `WebProfile.h/cpp` (UA, Accept-Language, persistent profile) · `Widgets.h/cpp` (animated buttons, switches, spinner) |
 | `theme_manager.py` | `ThemeManager.h/cpp` (Pacitum design tokens → QSS, SVG icon tinting) |
 | — | `PacitumScheme.h/cpp` (`pacitum://newtab` internal page) |
+
 
 ## Documentation
 
