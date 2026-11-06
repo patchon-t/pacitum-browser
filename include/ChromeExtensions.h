@@ -59,6 +59,7 @@ public:
     static bool privateSupported();                        // Chrome extensions in private tabs (not in Qt 6.11)
     static QString webStoreId(const QUrl& url);     // "" when the URL isn't a store detail page
     static QStringList describePermissions(const QString& extensionDir);
+    static QStringList contentScriptPatterns(const QString& extensionDir);   // content_scripts[].matches
     // CI (--extensions-test): add, enable, use, disable and remove extensions; logs EXTENSIONS OK|FAIL.
     void runSelfTest(QWidget* anchor, const std::function<void(const QString&)>& openPage);
 signals:
@@ -66,6 +67,11 @@ signals:
     void message(const QString& text);              // short notices ("Added uBlock Origin")
     void installed(const QString& id);              // added and ready (with its final ID)
     void accessApplied(const QString& id);          // loaded again after a site-access change
+    // 2.0.4: open this in a browser tab (links in a pop-up, an options page when there is no pop-up).
+    void openTabRequested(const QUrl& url);
+    // 2.0.4: the extension was turned on, added or loaded again. Scripts it put into pages before that are
+    // cut off from it (chrome-extension://invalid/), so open pages it runs on should be reloaded.
+    void contentScriptsReloaded(const QStringList& matchPatterns);
 private:
     explicit ChromeExtensions(QObject* parent);
     QString crxToZip(const QString& crxPath, QString* error);   // also sets m_lastKey
@@ -79,6 +85,7 @@ private:
     void downloadFromStore(const QString& id, const QString& name);   // no questions asked (callers ask)
     QPointer<QWebEngineProfile> m_profile;
     void applyAccess(const QString& id);
+    void announceReload(const QString& id, int delayMs = 800);
     QHash<QString, bool> m_reloading;               // id -> was enabled, while a site-access change reloads it
     QNetworkAccessManager* m_net = nullptr;
     QStringList m_pending;                          // names being installed (for the notice)

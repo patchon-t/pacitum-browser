@@ -2,7 +2,7 @@
 #define AppName "Pacitum Browser"
 ; CI passes /DAppVer=<version from build/pacitum-version.txt> (1.9.x or legacy 1.8.x)
 #ifndef AppVer
-#define AppVer "2.0.3"
+#define AppVer "2.0.4"
 #endif
 #define AppExe "PacitumBrowser.exe"
 [Setup]
@@ -11,7 +11,7 @@ AppId={{FD3A16C9-4CF0-4B0B-BBEC-A5E3334D7CFE}
 AppName={#AppName}
 AppVersion={#AppVer}
 AppVerName={#AppName} {#AppVer}
-AppPublisher=Pacitum
+AppPublisher=Next PRJ
 DefaultDirName={autopf}\Pacitum Browser
 DefaultGroupName=Pacitum Browser
 UninstallDisplayIcon={app}\{#AppExe}
@@ -54,6 +54,9 @@ RestartApplications=yes
 AppMutex=PacitumBrowserRunning
 VersionInfoVersion={#AppVer}
 VersionInfoProductName={#AppName}
+VersionInfoCompany=Next PRJ
+VersionInfoDescription={#AppName} Setup
+VersionInfoCopyright=Copyright (C) 2026 Next PRJ
 LZMAUseSeparateProcess=yes
 ChangesAssociations=yes
 

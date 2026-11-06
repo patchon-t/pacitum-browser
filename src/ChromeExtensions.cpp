@@ -22,6 +22,7 @@
 #include <QWebEngineProfile>
 #include <QWebEnginePage>
 #include <QWebEngineView>
+#include <QWebEngineNewWindowRequest>
 #include <QtEndian>
 #include <QCryptographicHash>
 #include <QSaveFile>
@@ -128,6 +129,7 @@ void ChromeExtensions::attach(QWebEngineProfile* profile) {
         pacitumLog(QStringLiteral("extension installed: %1 (%2)").arg(e.name(), e.id()));
         emit message(tr("Added %1").arg(localized(e.path(), readManifest(e.path()), e.name())));
         emit installed(e.id());
+        announceReload(e.id());
         emit changed();
     });
     connect(mgr, &QWebEngineExtensionManager::uninstallFinished, this, [this](const QWebEngineExtensionInfo& e){
@@ -141,6 +143,7 @@ void ChromeExtensions::attach(QWebEngineProfile* profile) {
             else if (!wasOn) m_profile->extensionManager()->setExtensionEnabled(e, false);
             pacitumLog(QStringLiteral("extension %1: site access applied (%2)").arg(e.id(), ExtensionAccess::modeName(ExtensionAccess::rule(e.id()).mode)));
             emit accessApplied(e.id());
+            announceReload(e.id());
             emit changed();
             return;
         }
@@ -152,6 +155,7 @@ void ChromeExtensions::attach(QWebEngineProfile* profile) {
                 pacitumLog(QStringLiteral("extension ready with store id %1").arg(id));
                 emit message(tr("Added %1").arg(localized(e.path(), readManifest(e.path()), e.name())));
                 emit installed(id);
+                announceReload(id);
             }
         }
         emit changed();
@@ -430,6 +434,7 @@ void ChromeExtensions::setEnabled(const QString& id, bool on) {
     if (!m_profile || !m_profile->extensionManager()) return;
     for (const auto& e : m_profile->extensionManager()->extensions())
         if (e.id() == id) { m_profile->extensionManager()->setExtensionEnabled(e, on); break; }
+    if (on) announceReload(id);
     emit changed();
 #else
     Q_UNUSED(id); Q_UNUSED(on);
@@ -498,6 +503,12 @@ public:
             if (want != size()) { resize(want); place(); }
         });
         connect(page, &QWebEnginePage::windowCloseRequested, this, &QWidget::close);   // window.close() in the popup
+        // 2.0.4: links the pop-up opens (target=_blank, window.open, chrome.tabs.create) go to a browser tab.
+        connect(page, &QWebEnginePage::newWindowRequested, this, [this](QWebEngineNewWindowRequest& req){
+            const QUrl u = req.requestedUrl();
+            if (u.isValid() && !u.isEmpty()) emit ChromeExtensions::instance()->openTabRequested(u);
+            close();
+        });
         m_view->load(url);
         m_anchor = anchor;
         place();
@@ -555,11 +566,36 @@ void ChromeExtensions::openPopup(const QString& id, QWidget* anchor, const QUrl&
     for (const auto& it : items()) {
         if (it.id != id) continue;
         if (!it.enabled) { emit message(tr("%1 is turned off").arg(it.name)); return; }
-        if (it.popupUrl.isValid() && !it.popupUrl.isEmpty()) new ExtensionPopup(m_profile, it.popupUrl, anchor);
-        else if (it.optionsUrl.isValid()) emit message(tr("%1 has no pop-up; open its options from the extensions menu").arg(it.name));
+        QUrl popup = it.popupUrl;
+        if (popup.isEmpty()) {   // 2.0.4: Qt doesn't always report it; read the manifest like Chrome does
+            const QJsonObject m = readManifest(it.path);
+            QString page = m.value(QStringLiteral("action")).toObject().value(QStringLiteral("default_popup")).toString();
+            if (page.isEmpty()) page = m.value(QStringLiteral("browser_action")).toObject().value(QStringLiteral("default_popup")).toString();
+            if (!page.isEmpty()) popup = QUrl(QStringLiteral("chrome-extension://%1/%2").arg(it.id, page.startsWith(QLatin1Char('/')) ? page.mid(1) : page));
+        }
+        pacitumLog(QStringLiteral("extension %1: toolbar click, pop-up %2").arg(id, popup.isEmpty() ? QStringLiteral("(none)") : popup.toString()));
+        if (popup.isValid() && !popup.isEmpty()) new ExtensionPopup(m_profile, popup, anchor);
+        else if (it.optionsUrl.isValid()) emit openTabRequested(it.optionsUrl);   // like Chrome's "Options" for buttons without a pop-up
         else emit message(tr("%1 works on its own and has no pop-up").arg(it.name));
         return;
     }
+}
+
+QStringList ChromeExtensions::contentScriptPatterns(const QString& dir) {
+    QStringList out;
+    for (const auto& cs : readManifest(dir).value(QStringLiteral("content_scripts")).toArray())
+        for (const auto& v : cs.toObject().value(QStringLiteral("matches")).toArray()) if (!out.contains(v.toString())) out << v.toString();
+    return out;
+}
+
+void ChromeExtensions::announceReload(const QString& id, int delayMs) {
+    // Give Chromium a moment to register the new content scripts, then let the windows reload the pages.
+    QTimer::singleShot(delayMs, this, [this, id]{
+        for (const auto& it : items()) if (it.id == id && it.enabled) {
+            const QStringList p = contentScriptPatterns(it.path);
+            if (!p.isEmpty()) emit contentScriptsReloaded(p);
+        }
+    });
 }
 
 // ============================================================================ 2.0.3 site access, private tabs

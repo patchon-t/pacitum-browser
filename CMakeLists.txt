@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PacitumBrowser VERSION 2.0.3 LANGUAGES CXX)
+project(PacitumBrowser VERSION 2.0.4 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -131,8 +131,11 @@ qt_add_resources(RESOURCES resources/resources.qrc)
 # Executable
 set(APP_RC "")
 if(WIN32)
-    # Embeds resources/pacitum.ico as the executable icon
-    set(APP_RC ${CMAKE_SOURCE_DIR}/resources/app.rc)
+    # Embeds resources/pacitum.ico as the executable icon, plus version info (2.0.4: publisher "Next PRJ")
+    string(REPLACE "." "," PACITUM_RC_VERSION "${PACITUM_APP_VERSION}")
+    set(PACITUM_RC_ICON "${CMAKE_SOURCE_DIR}/resources/pacitum.ico")
+    configure_file(${CMAKE_SOURCE_DIR}/resources/app.rc.in ${CMAKE_BINARY_DIR}/app.rc @ONLY)
+    set(APP_RC ${CMAKE_BINARY_DIR}/app.rc)
 endif()
 
 set(APP_ICNS "")

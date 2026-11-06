@@ -544,6 +544,26 @@ void BrowserWindow::createToolbar() {
         if (auto* t = activeTab()) updateStoreButton(t->currentUrl());
     });
     connect(ChromeExtensions::instance(), &ChromeExtensions::message, this, [this](const QString& m){ if (isActiveWindow()) showNotice(m); });
+    // 2.0.4: links and options pages from an extension pop-up open in the window the user is in.
+    connect(ChromeExtensions::instance(), &ChromeExtensions::openTabRequested, this, [this](const QUrl& u){
+        bool mine = isActiveWindow();
+        if (!mine && !QApplication::activeWindow()) {   // nothing focused: the first browser window takes it
+            for (QWidget* w : QApplication::topLevelWidgets()) if (auto* bw = qobject_cast<BrowserWindow*>(w); bw && bw->isVisible()) { mine = bw == this; break; }
+        }
+        if (mine) newTab(u.toString());
+    });
+    // 2.0.4: an extension was turned on / added / loaded again: reload this window's pages it runs on, so its
+    // page scripts are connected to it again (otherwise they fail with chrome-extension://invalid/ and the
+    // extension's pop-up gets no answer from the page).
+    connect(ChromeExtensions::instance(), &ChromeExtensions::contentScriptsReloaded, this, [this](const QStringList& patterns){
+        QList<QRegularExpression> res;
+        for (const QString& p : patterns) if (const QString r = ExtensionManager::matchPatternToRegex(p); !r.isEmpty()) res << QRegularExpression(r);
+        for (auto* tw : {m_tabs, m_splitTabs}) if (tw) for (int i = 0; i < tw->count(); ++i) {
+            auto* t = qobject_cast<BrowserTab*>(tw->widget(i));
+            if (!t || !t->currentUrl().startsWith(QLatin1String("http"))) continue;
+            for (const auto& re : std::as_const(res)) if (re.match(t->currentUrl()).hasMatch()) { t->reload(); break; }
+        }
+    });
     QTimer::singleShot(1200, this, [this]{ rebuildExtensionPins(); });   // after the profile has loaded its extensions
     lay->addWidget(m_privateBadge); lay->addWidget(m_profileBtn); lay->addWidget(m_menuBtn);
 }
