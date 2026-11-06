@@ -537,17 +537,10 @@ void UpdateFlow::install() {
         inst->swap([this, inst, where]{
             inst->hero()->setMode(Hero::Check);
             inst->detail()->hide();
-#if defined(Q_OS_MACOS)
-            inst->title()->setText(tr("Almost done"));
-            inst->text()->setText(tr("The new version is open in Finder. Drag Pacitum Browser into Applications, then open it again."));
-            inst->setButtons(tr("Quit Pacitum"), tr("Later"));
-            connect(inst->primary(), &QPushButton::clicked, qApp, &QCoreApplication::quit);
-#else
             inst->title()->setText(tr("Install it yourself"));
             inst->text()->setText(tr("Pacitum couldn't replace itself here. The new version was saved to %1").arg(where));
             inst->setButtons(tr("Show file"), tr("Close"));
             connect(inst->primary(), &QPushButton::clicked, this, [where]{ QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(where).absolutePath())); });
-#endif
             connect(inst->secondary(), &QPushButton::clicked, inst, [inst]{ inst->popOut([inst]{ inst->deleteLater(); }); });
         });
         setPills(UpdatePill::Ready);

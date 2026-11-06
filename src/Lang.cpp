@@ -297,7 +297,7 @@ void apply(const QString& choice) {
 }
 
 QStringList fontFamilies() {
-    // Faces that carry the script, in order of preference per platform (Windows, macOS, Linux). Rubik / Inter only cover
+    // Faces that carry the script, in order of preference (Windows faces first, then Linux / other fallbacks). Rubik / Inter only cover
     // Latin and Cyrillic, so without these Thai and CJK text falls back to whatever the system picks (mismatched or missing glyphs).
     const QString c = S().code;
     if (c == QLatin1String("th")) return {QStringLiteral("Leelawadee UI"), QStringLiteral("Noto Sans Thai"), QStringLiteral("Thonburi"), QStringLiteral("Tahoma")};

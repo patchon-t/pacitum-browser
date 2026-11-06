@@ -44,9 +44,7 @@
 #include <ctime>
 #include <memory>
 #include <exception>
-#if defined(Q_OS_MACOS)
-#include <sys/sysctl.h>
-#elif !defined(Q_OS_WIN)
+#if !defined(Q_OS_WIN)
 #include <unistd.h>
 #endif
 #include <cstdio>
@@ -72,7 +70,7 @@ static QString logDir() {
     wchar_t buf[MAX_PATH]; DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", buf, MAX_PATH);
     QString base = n ? QString::fromWCharArray(buf, int(n)) : QDir::tempPath();
 #else
-    // Linux: ~/.local/share, macOS: ~/Library/Application Support (same place as the profile data)
+    // Linux: ~/.local/share (same place as the profile data)
     QString base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     if (base.isEmpty()) base = QDir::homePath() + QStringLiteral("/.local/share");
 #endif
@@ -163,10 +161,6 @@ static int totalRamGb() {
 #if defined(Q_OS_WIN)
     MEMORYSTATUSEX st; st.dwLength = sizeof(st);
     if (GlobalMemoryStatusEx(&st)) return int(st.ullTotalPhys / (1024ull * 1024 * 1024));
-    return 0;
-#elif defined(Q_OS_MACOS)
-    int64_t bytes = 0; size_t len = sizeof(bytes);
-    if (sysctlbyname("hw.memsize", &bytes, &len, nullptr, 0) == 0) return int(bytes / (1024ll * 1024 * 1024));
     return 0;
 #else
     const long pages = sysconf(_SC_PHYS_PAGES), size = sysconf(_SC_PAGE_SIZE);

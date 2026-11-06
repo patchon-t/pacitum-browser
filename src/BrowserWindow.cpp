@@ -200,7 +200,7 @@ void BrowserWindow::fadeInContent() {
     fadeVeil(Pacitum::guestMode() || m_privateMode ? Motion::Slow : Motion::Medium, 1.0, 30);   // kit #31 / #41
 }
 
-// Close / minimize / maximize on macOS and Linux: our frameless window gets no system animation
+// Close / minimize / maximize on Linux: our frameless window gets no system animation
 // there, so a snapshot shrinks away / drops / morphs while the real window has already changed.
 void BrowserWindow::animatedMinimize() {
     if (Motion::windowGhostsAllowed() && isVisible() && !isMinimized()) {
@@ -436,12 +436,7 @@ void BrowserWindow::setupUI() {
         connect(m_minBtn, &QToolButton::clicked, this, &BrowserWindow::animatedMinimize);
         connect(m_maxBtn, &QToolButton::clicked, this, &BrowserWindow::animatedToggleMaximize);
         connect(m_closeBtn, &QToolButton::clicked, this, &QWidget::close);
-#ifdef Q_OS_MACOS
-        // macOS order and place: close, minimise, zoom on the left, before the tabs
-        sl->insertWidget(0, m_closeBtn); sl->insertWidget(1, m_minBtn); sl->insertWidget(2, m_maxBtn); sl->insertSpacing(3, 12);
-#else
         sl->addWidget(m_minBtn); sl->addWidget(m_maxBtn); sl->addWidget(m_closeBtn);
-#endif
         m_tabStrip->installEventFilter(this);
         m_tabs->stripBar()->installEventFilter(this);
     }
@@ -544,6 +539,26 @@ void BrowserWindow::createToolbar() {
         if (auto* t = activeTab()) updateStoreButton(t->currentUrl());
     });
     connect(ChromeExtensions::instance(), &ChromeExtensions::message, this, [this](const QString& m){ if (isActiveWindow()) showNotice(m); });
+    // 2.0.4: links and options pages from an extension pop-up open in the window the user is in.
+    connect(ChromeExtensions::instance(), &ChromeExtensions::openTabRequested, this, [this](const QUrl& u){
+        bool mine = isActiveWindow();
+        if (!mine && !QApplication::activeWindow()) {   // nothing focused: the first browser window takes it
+            for (QWidget* w : QApplication::topLevelWidgets()) if (auto* bw = qobject_cast<BrowserWindow*>(w); bw && bw->isVisible()) { mine = bw == this; break; }
+        }
+        if (mine) newTab(u.toString());
+    });
+    // 2.0.4: an extension was turned on / added / loaded again: reload this window's pages it runs on, so its
+    // page scripts are connected to it again (otherwise they fail with chrome-extension://invalid/ and the
+    // extension's pop-up gets no answer from the page).
+    connect(ChromeExtensions::instance(), &ChromeExtensions::contentScriptsReloaded, this, [this](const QStringList& patterns){
+        QList<QRegularExpression> res;
+        for (const QString& p : patterns) if (const QString r = ExtensionManager::matchPatternToRegex(p); !r.isEmpty()) res << QRegularExpression(r);
+        for (auto* tw : {m_tabs, m_splitTabs}) if (tw) for (int i = 0; i < tw->count(); ++i) {
+            auto* t = qobject_cast<BrowserTab*>(tw->widget(i));
+            if (!t || !t->currentUrl().startsWith(QLatin1String("http"))) continue;
+            for (const auto& re : std::as_const(res)) if (re.match(t->currentUrl()).hasMatch()) { t->reload(); break; }
+        }
+    });
     QTimer::singleShot(1200, this, [this]{ rebuildExtensionPins(); });   // after the profile has loaded its extensions
     lay->addWidget(m_privateBadge); lay->addWidget(m_profileBtn); lay->addWidget(m_menuBtn);
 }
@@ -2433,7 +2448,7 @@ void BrowserWindow::closeEvent(QCloseEvent* e){
             return;
         }
     }
-    // 1.9.0 / 1.8.11 (macOS, Linux): the window shrinks away (Windows animates it natively)
+    // 1.9.0 / 1.8.11 (Linux): the window shrinks away (Windows animates it natively)
     if (Motion::windowGhostsAllowed() && isVisible() && !isMinimized() && !m_chromeHidden) {
         const QRect from = frameGeometry();
         QRect to(QPoint(), from.size() * 0.9); to.moveCenter(from.center() + QPoint(0, 12));

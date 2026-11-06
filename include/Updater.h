@@ -51,7 +51,7 @@ public:
     void download(const UpdateInfo& info);
     void cancelDownload();
     // Starts the install helper with these extra pop-up arguments (--cx/--cy/--colors…). False when
-    // nothing could be started: macOS opens the disk image instead, other cases keep the app open.
+    // nothing could be started: the app stays open and offers the downloaded file.
     bool startInstall(const QStringList& overlayArgs);
     static QString workDir();           // <temp>/PacitumUpdate: download, helper copy, hand-off files
     static QString readyFile() { return workDir() + QStringLiteral("/overlay-ready"); }    // helper's pop-up is on screen

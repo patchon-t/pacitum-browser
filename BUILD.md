@@ -1,6 +1,6 @@
 # Build — Pacitum Browser
 
-Pacitum builds on **Windows, Linux and macOS** with Qt 6.8+ (Qt WebEngine), CMake 3.16+ and a C++17 compiler.
+Pacitum builds on **Windows and Linux** with Qt 6.8+ (Qt WebEngine), CMake 3.16+ and a C++17 compiler.
 
 **Two editions from one source:** with Qt **6.11 or newer** you get Pacitum **1.9.x** (newer Chromium, Chrome extensions);
 with Qt **6.8 LTS** you get the **1.8.x legacy** edition (no Chrome extensions; its updater only offers 1.8.x releases).
@@ -25,24 +25,13 @@ cmake --build build
 ./build/PacitumBrowser
 sudo cmake --install build      # optional: binary, menu entry and icon under /usr/local
 ```
-An AppImage is produced by `.github/workflows/linux-macos.yml` (linuxdeploy + Qt plugin).
+The AppImage, `.deb` and `.rpm` are produced by `.github/workflows/linux.yml` (linuxdeploy + Qt plugin, fpm).
 Data and logs: `~/.local/share/Pacitum/Pacitum Browser`.
 
-## macOS (Apple silicon or Intel)
-```bash
-brew install ninja
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$HOME/Qt/6.8.3/macos" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
-cmake --build build
-open build/PacitumBrowser.app
-```
-To share the app: `macdeployqt build/PacitumBrowser.app` then `codesign --force --deep --sign - build/PacitumBrowser.app`
-(ad-hoc signature; Apple silicon won't run unsigned code). CI builds a `.dmg`.
-The download isn't notarized, so the first launch needs right-click → **Open**.
-Data and logs: `~/Library/Application Support/Pacitum/Pacitum Browser`.
+(macOS is not supported: the port was removed in 2.0.4, and CMake stops with an error on Apple systems.)
 
 ## Platform notes
-- **Window frame:** Pacitum draws its own title bar. Windows uses native snap/resize hit-testing; Linux and macOS move
-  and resize through the system (`startSystemMove` / `startSystemResize`). macOS shows red/yellow/green buttons on the left.
+- **Window frame:** Pacitum draws its own title bar. Windows uses native snap/resize hit-testing; Linux moves
+  and resizes through the system (`startSystemMove` / `startSystemResize`).
 - **Updates:** the built-in updater picks the asset for the running system: `*Setup*.exe` (Windows, installs and
-  restarts), `*linux*.AppImage` (replaces the running AppImage and restarts), `*macOS*.dmg` (opens the disk image).
-- **Shortcuts:** `Ctrl` shortcuts are `Cmd` on macOS (Qt maps them automatically).
+  restarts), `*linux*.AppImage` (replaces the running AppImage and restarts); installs from the .deb / .rpm get the package of their kind.

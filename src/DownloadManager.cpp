@@ -126,7 +126,7 @@ QString DownloadManager::kindColor(const QString& k) {
 // 1.9.0 / 1.8.11 security: the Windows "mark of the web" (Zone.Identifier stream, internet zone),
 // as Chrome writes it, so SmartScreen / Office Protected View check the file before it runs.
 // Survives the rename of a held dangerous file (NTFS keeps streams on rename). Other systems: no-op
-// (macOS quarantine needs the LaunchServices API; the held-file prompt still applies).
+// (the held-file prompt still applies).
 void DownloadManager::markFromInternet(const QString& path, const QString& url, const QString& referrer) {
 #ifdef Q_OS_WIN
     const QUrl u(url);

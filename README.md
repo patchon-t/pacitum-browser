@@ -14,7 +14,7 @@
 
 # Pacitum Browser 2.0
 
-Pacitum is a calm, fast web browser written in C++17 on **Qt 6 WebEngine**. It runs the same Chromium engine as Chrome and Edge, and keeps its own interface out of the way so the page gets the space. It runs on Windows, Linux and macOS.
+Pacitum is a calm, fast web browser written in C++17 on **Qt 6 WebEngine**. It runs the same Chromium engine as Chrome and Edge, and keeps its own interface out of the way so the page gets the space. It runs on Windows and Linux.
 
 **2.0.0 redraws the whole browser**: a new identity, and a new look for every screen from the tab strip to the smallest dialog.
 
@@ -62,13 +62,13 @@ Get the file for your system from the [latest release](https://github.com/namo20
 
 - **Memory:** 4 GB minimum, 8 GB recommended (each site runs in its own Chromium process; Pacitum caps this at 8).
 - **Disk:** about 500 MB free, plus space for cache, profile data and extensions.
-- **Graphics:** Direct3D 11 (Windows), OpenGL (Linux) or Metal (macOS). With a broken driver, start with `PACITUM_DISABLE_GPU=1` for software rendering.
+- **Graphics:** Direct3D 11 (Windows) or OpenGL (Linux). With a broken driver, start with `PACITUM_DISABLE_GPU=1` for software rendering.
 - **Linux AppImage:** needs FUSE (`libfuse2`), or run it with `--appimage-extract-and-run`.
 - **Linux packages (2.0.2):** `PacitumBrowser-<version>-linux-x86_64.deb` (Debian, Ubuntu, Mint) installs with `sudo apt install ./PacitumBrowser-<version>-linux-x86_64.deb`; the `.rpm` (Fedora and other RPM distributions) with `sudo dnf install ./PacitumBrowser-<version>-linux-x86_64.rpm`. Both put the app in `/opt/pacitum-browser` and add a `pacitum-browser` command and a menu entry.
 
 ## Build from source
 
-You need Qt 6.11 or newer with Qt WebEngine, Qt WebChannel and Qt Positioning, CMake 3.16+, Ninja and a C++17 compiler (MSVC 2019+, GCC 11+ or Apple Clang).
+You need Qt 6.11 or newer with Qt WebEngine, Qt WebChannel and Qt Positioning, CMake 3.16+, Ninja and a C++17 compiler (MSVC 2019+ or GCC 11+).
 
 ```bash
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="<path to Qt>/<version>/<kit>"
@@ -76,7 +76,7 @@ cmake --build build
 ./build/PacitumBrowser        # build\PacitumBrowser.exe on Windows
 ```
 
-[`BUILD.md`](BUILD.md) has the steps for each system, the Windows installer and the AppImage and dmg builds.
+[`BUILD.md`](BUILD.md) has the steps for each system, the Windows installer and the AppImage, .deb and .rpm builds.
 
 ## Source map
 
@@ -107,7 +107,7 @@ Pacitum started as a Python browser and was ported to C++ file by file.
 
 ## Documentation
 
-- [`BUILD.md`](BUILD.md): building on Windows, Linux and macOS
+- [`BUILD.md`](BUILD.md): building on Windows and Linux
 - [`SYNC.md`](SYNC.md): setting up Google sync
 - [`PERMISSIONS.md`](PERMISSIONS.md): site permissions
 - [`release-notes/`](release-notes): notes for every release

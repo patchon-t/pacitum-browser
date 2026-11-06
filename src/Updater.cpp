@@ -163,11 +163,9 @@ void Updater::check(bool userInitiated) {
         info.notes = rel.value(QStringLiteral("body")).toString();
         info.pageUrl = rel.value(QStringLiteral("html_url")).toString();
         const auto assets = rel.value(QStringLiteral("assets")).toArray();
-        // Each platform takes its own release asset: Windows Setup .exe, Linux AppImage, macOS .dmg.
+        // Each platform takes its own release asset: Windows Setup .exe, Linux AppImage / .deb / .rpm.
 #if defined(Q_OS_WIN)
         static const QRegularExpression setupRe(QStringLiteral("setup.*\\.exe$"), QRegularExpression::CaseInsensitiveOption);
-#elif defined(Q_OS_MACOS)
-        static const QRegularExpression setupRe(QStringLiteral("macos.*\\.dmg$"), QRegularExpression::CaseInsensitiveOption);
 #else
         // 2.0.2: an install from the .deb / .rpm package (app in /opt/pacitum-browser, not an AppImage) takes the package
         // of its own kind, so "Show file" hands over something it can install.
@@ -241,8 +239,6 @@ void Updater::download(const UpdateInfo& info) {
     name.remove(QRegularExpression(QStringLiteral("[^A-Za-z0-9._-]")));
 #if defined(Q_OS_WIN)
     if (name.isEmpty()) name = QStringLiteral("PacitumBrowser-Setup.exe");
-#elif defined(Q_OS_MACOS)
-    if (name.isEmpty()) name = QStringLiteral("PacitumBrowser-macOS.dmg");
 #else
     if (name.isEmpty()) name = QStringLiteral("PacitumBrowser-linux-x86_64.AppImage");
 #endif
@@ -457,12 +453,6 @@ bool Updater::startInstall(const QStringList& overlayArgs) {
         {QStringLiteral("-NoProfile"), QStringLiteral("-ExecutionPolicy"), QStringLiteral("Bypass"), QStringLiteral("-WindowStyle"), QStringLiteral("Hidden"), QStringLiteral("-Command"), script});
     logLine(QStringLiteral("update: installer helper (PowerShell) started=%1").arg(ok));
     return ok;
-#elif defined(Q_OS_MACOS)
-    // macOS: open the downloaded disk image; the user drags the new app over the old one.
-    const bool ok = QProcess::startDetached(QStringLiteral("/usr/bin/open"), {m_file});
-    Updater::logLine(QStringLiteral("update: opened %1 ok=%2").arg(m_file).arg(ok));
-    Q_UNUSED(args);
-    return false;
 #else
     // Linux AppImage: swap the AppImage file now; the new AppImage, started in --update-overlay
     // mode, shows the pop-up, waits for us to exit and starts itself normally.

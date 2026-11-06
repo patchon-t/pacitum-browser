@@ -168,11 +168,7 @@ void AnimatedToolButton::paintEvent(QPaintEvent*) {
 }
 
 WindowButton::WindowButton(Kind k, QWidget* parent) : AnimatedToolButton(parent), m_kind(k) {
-#ifdef Q_OS_MACOS
-    setFixedSize(20, 42); setRadius(0);   // macOS "traffic lights" (painted below), left of the tabs
-#else
     setFixedSize(46, 42); setRadius(0);
-#endif
     setFocusPolicy(Qt::TabFocus);   // reachable with Tab; Space/Enter activates
     const QString name = k == Minimize ? QStringLiteral("Minimize") : k == Maximize ? QStringLiteral("Maximize") : QStringLiteral("Close");
     setToolTip(name); setAccessibleName(name);
@@ -184,26 +180,6 @@ void WindowButton::keyPressEvent(QKeyEvent* e) {
 void WindowButton::paintEvent(QPaintEvent*) {
     QPainter p(this);
     const auto& pal = ThemeManager::current();
-#ifdef Q_OS_MACOS
-    {   // 12 px circles: red / yellow / green, grey when the window is inactive; glyph on hover
-        p.setRenderHint(QPainter::Antialiasing);
-        const bool active = window() && window()->isActiveWindow();
-        const QColor fill = !active && hoverLevel() < 0.01 ? QColor(QColor(pal.frame).lightness() < 128 ? 0x4A4E57 : 0xCDD2DA)
-                          : m_kind == Close ? QColor(0xFF5F57) : m_kind == Minimize ? QColor(0xFEBC2E) : QColor(0x28C840);
-        const QRectF c(width() / 2.0 - 6, height() / 2.0 - 6, 12, 12);
-        p.setPen(QPen(fill.darker(isDown() ? 140 : 115), 0.5)); p.setBrush(isDown() ? fill.darker(115) : fill);
-        p.drawEllipse(c);
-        if (hoverLevel() > 0.01) {
-            QColor g(0, 0, 0, int(150 * hoverLevel())); p.setPen(QPen(g, 1.2, Qt::SolidLine, Qt::RoundCap));
-            const QPointF m = c.center();
-            if (m_kind == Close) { p.drawLine(m + QPointF(-2.5, -2.5), m + QPointF(2.5, 2.5)); p.drawLine(m + QPointF(-2.5, 2.5), m + QPointF(2.5, -2.5)); }
-            else if (m_kind == Minimize) p.drawLine(m + QPointF(-3, 0), m + QPointF(3, 0));
-            else { p.drawLine(m + QPointF(-3, 0), m + QPointF(3, 0)); p.drawLine(m + QPointF(0, -3), m + QPointF(0, 3)); }
-        }
-        if (hasFocus()) { p.setPen(QPen(QColor(pal.accent), 2)); p.setBrush(Qt::NoBrush); p.drawEllipse(c.adjusted(-2, -2, 2, 2)); }
-        return;
-    }
-#endif
     const bool down = isDown() || m_forcedDown;
     const qreal lvl = hoverLevel();
     // Windows caption-button states: hover = surface / #E81123 (close), pressed = surfaceHover / #F1707A (close)
@@ -300,7 +276,7 @@ void SwatchButton::paintEvent(QPaintEvent*) {
 }
 
 namespace Pacitum {
-// Translucent popups need a compositor. Windows/macOS/Wayland always composite; on X11 ask the
+// Translucent popups need a compositor. Windows and Wayland always composite; on X11 ask the
 // server whether a compositing manager owns _NET_WM_CM_S<n> (libxcb is resolved at runtime, it is
 // already loaded by Qt's xcb platform plugin, so there is no new build dependency).
 static bool canCompositePopups() {

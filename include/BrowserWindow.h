@@ -169,7 +169,7 @@ private:
     void flyToDownloads();
     // built-in updater
     void setupUpdater();
-    void animatedMinimize();          // 1.9.0 window animations (ghost on macOS / Linux)
+    void animatedMinimize();          // 1.9.0 window animations (ghost on Linux)
     void animatedToggleMaximize();
     void showUpdatePrompt(const struct UpdateInfo& info);
     class Updater* m_updater = nullptr;

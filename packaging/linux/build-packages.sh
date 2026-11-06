@@ -23,7 +23,7 @@ S
 chmod +x "$PWD/after-install.sh"
 
 common=(-s dir -n pacitum-browser -v "$ver" --url "https://github.com/patchon-t/pacitum-browser"
-        --maintainer "Pacitum <noreply@users.noreply.github.com>" --category web
+        --maintainer "Next PRJ <noreply@users.noreply.github.com>" --vendor "Next PRJ" --category web
         --description "Pacitum Browser: a calm, fast web browser (Qt WebEngine / Chromium)." --after-install "$PWD/after-install.sh" -C "$root")
 fpm "${common[@]}" -t deb -a amd64 -p "PacitumBrowser-$ver-linux-x86_64.deb" \
     -d libc6 -d libnss3 -d libxkbcommon-x11-0 -d libxcb-cursor0 -d libxcb-icccm4 -d libxcb-image0 -d libxcb-keysyms1 \
