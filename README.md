@@ -20,9 +20,9 @@ Pacitum is a calm, fast web browser written in C++17 on **Qt 6 WebEngine**. It r
 
 ## Download
 
-| Windows | Linux | macOS (Apple silicon) |
-|---|---|---|
-| `PacitumBrowser-Setup-2.0.0.exe` | `PacitumBrowser-2.0.0-linux-x86_64.AppImage` | `PacitumBrowser-2.0.0-macOS-arm64.dmg` |
+| Windows | Linux |
+|---|---|
+| `PacitumBrowser-Setup-2.x.x.exe` | `PacitumBrowser-2.x.x-linux-x86_64.AppImage` |
 
 Get the file for your system from the [latest release](https://github.com/namo2024mntik-ops/pacitum-browser/releases/latest). Each file has a `.sha256` checksum next to it. Pacitum updates itself after that.
 
@@ -55,17 +55,16 @@ Get the file for your system from the [latest release](https://github.com/namo20
 
 ## System requirements
 
-| | Windows | Linux | macOS |
-|---|---|---|---|
-| **OS** | Windows 10 (1809+) or Windows 11, 64-bit | x86_64 with glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 36 or newer) | Apple silicon; may need a newer macOS than 12 |
-| **CPU** | x86_64 | x86_64 | Apple silicon (M1 or newer) |
+| | Windows | Linux |
+|---|---|---|
+| **OS** | Windows 10 (1809+) or Windows 11, 64-bit | x86_64 with glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 36 or newer) |
+| **CPU** | x86_64 | x86_64 |
 
 - **Memory:** 4 GB minimum, 8 GB recommended (each site runs in its own Chromium process; Pacitum caps this at 8).
 - **Disk:** about 500 MB free, plus space for cache, profile data and extensions.
 - **Graphics:** Direct3D 11 (Windows), OpenGL (Linux) or Metal (macOS). With a broken driver, start with `PACITUM_DISABLE_GPU=1` for software rendering.
 - **Linux AppImage:** needs FUSE (`libfuse2`), or run it with `--appimage-extract-and-run`.
 - **Linux packages (2.0.2):** `PacitumBrowser-<version>-linux-x86_64.deb` (Debian, Ubuntu, Mint) installs with `sudo apt install ./PacitumBrowser-<version>-linux-x86_64.deb`; the `.rpm` (Fedora and other RPM distributions) with `sudo dnf install ./PacitumBrowser-<version>-linux-x86_64.rpm`. Both put the app in `/opt/pacitum-browser` and add a `pacitum-browser` command and a menu entry.
-- **macOS:** the app isn't notarized. The first time, right-click it and choose **Open**.
 
 ## Build from source
 
@@ -84,8 +83,9 @@ cmake --build build
 Pacitum started as a Python browser and was ported to C++ file by file.
 
 
-| Python (`safari_browser/*.py`) | C++ (`safari_browser_cpp/include|src/*.cpp`) |
-|---|---|
+
+| Python (`safari_browser/*.py`) | C++ (`safari_browser_cpp/include\|src/*.cpp`) |
+| --- | --- |
 | `main.py` | `src/main.cpp` |
 | `browser_window.py` | `BrowserWindow.h/cpp` |
 | `browser_tab.py` | `BrowserTab.h/cpp` |
@@ -103,6 +103,7 @@ Pacitum started as a Python browser and was ported to C++ file by file.
 | — | `WebProfile.h/cpp` (UA, Accept-Language, persistent profile) · `Widgets.h/cpp` (animated buttons, switches, spinner) |
 | `theme_manager.py` | `ThemeManager.h/cpp` (Pacitum design tokens → QSS, SVG icon tinting) |
 | — | `PacitumScheme.h/cpp` (`pacitum://newtab` internal page) |
+
 
 ## Documentation
 
