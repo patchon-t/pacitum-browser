@@ -1,0 +1,69 @@
+name: Qt WebEngine build setup
+description: Tools, memory and the Qt WebEngine source for qtwebengine-codecs.yml (Qt itself is installed by the job).
+inputs:
+  name: { description: "windows or linux", required: true }
+  version: { description: "Qt version, e.g. 6.11.3", required: true }
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Tools (Linux)
+      if: inputs.name == 'linux'
+      shell: bash
+      run: |
+        # Chromium needs ~40 GB: drop SDKs this job never uses
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift
+        sudo docker image prune --all --force >/dev/null 2>&1 || true
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends ninja-build gperf bison flex python3-html5lib \
+          libnss3-dev libnspr4-dev libdbus-1-dev libxkbfile-dev libxcomposite-dev libxdamage-dev libxrandr-dev libxtst-dev \
+          libxshmfence-dev libxkbcommon-dev libxkbcommon-x11-dev libdrm-dev libgbm-dev libasound2-dev libpulse-dev libcups2-dev \
+          libfontconfig1-dev libfreetype6-dev libglib2.0-dev libegl1-mesa-dev libgl1-mesa-dev libx11-xcb-dev libxcursor-dev \
+          libxi-dev libxss-dev libkrb5-dev libudev-dev libxcb1-dev libxcb-glx0-dev libxcb-keysyms1-dev libxcb-image0-dev \
+          libxcb-shm0-dev libxcb-icccm4-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-shape0-dev libxcb-randr0-dev \
+          libxcb-render-util0-dev libxcb-util-dev libxcb-xinerama0-dev libxcb-xkb-dev libxcb-cursor-dev libxrender-dev
+        python3 -m pip install --quiet html5lib || true
+        # Jumbo-compiled Blink files need several GB each: 16 GB of RAM ran out (the runner shut down at 70%).
+        # Build on the large /mnt disk and add 16 GB of swap there.
+        sudo fallocate -l 16G /mnt/swapfile && sudo chmod 600 /mnt/swapfile && sudo mkswap /mnt/swapfile && sudo swapon /mnt/swapfile
+        sudo mkdir -p /mnt/w && sudo chown -R "$USER" /mnt/w
+        free -m; df -h / /mnt
+    - name: Tools (Windows)
+      if: inputs.name == 'windows'
+      shell: pwsh
+      run: |
+        choco install -y --no-progress winflexbison3 gperf ninja
+        # choco's win_bison / win_flex on PATH are launcher shims: use the real programs, named bison / flex
+        $tools = "C:\ProgramData\chocolatey\lib\winflexbison3\tools"
+        Copy-Item "$tools\win_bison.exe" "$tools\bison.exe" -Force
+        Copy-Item "$tools\win_flex.exe" "$tools\flex.exe" -Force
+        Add-Content $env:GITHUB_PATH $tools
+        & "$tools\bison.exe" --version | Select-Object -First 1
+        python -m pip install --quiet html5lib
+        git config --system core.longpaths true
+    - name: Page file (Windows)
+      if: inputs.name == 'windows'
+      uses: al-cheb/configure-pagefile-action@v1.4
+      with:
+        minimum-size: 16GB
+        maximum-size: 24GB
+        disk-root: "C:"
+    - uses: ilammy/msvc-dev-cmd@v1
+      if: inputs.name == 'windows'
+    - name: Source
+      shell: bash
+      run: |
+        ver=${{ inputs.version }}; mm=${ver%.*}
+        src="${{ inputs.name == 'windows' && 'C:/w' || '/mnt/w/src' }}"
+        mkdir -p "$src"
+        curl -fsSL --retry 4 -o "$RUNNER_TEMP/we.tar.xz" "https://download.qt.io/official_releases/qt/$mm/$ver/submodules/qtwebengine-everywhere-src-$ver.tar.xz"
+        tar --force-local -xJf "$RUNNER_TEMP/we.tar.xz" -C "$src" --strip-components=1   # --force-local: "D:\\..." is a path, not a host
+        rm "$RUNNER_TEMP/we.tar.xz"
+        echo "WE_SRC=$src" >> "$GITHUB_ENV"
+    - name: Build folders
+      shell: bash
+      run: |
+        echo "WE_BUILD=${{ inputs.name == 'windows' && 'C:/b' || '/mnt/w/b' }}" >> "$GITHUB_ENV"
+        echo "WE_STAGE=${{ inputs.name == 'windows' && 'C:/stage' || '/mnt/w/stage' }}" >> "$GITHUB_ENV"
