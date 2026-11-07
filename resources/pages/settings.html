@@ -122,6 +122,27 @@ textarea.in{height:80px;padding:10px 12px;resize:vertical}
 .mark{color:var(--text)}
 .ok{color:var(--ok)}
 .warn{color:var(--warnfg)}
+/* 2.0.6 settings: grouped sidebar, section header, Updates */
+.ngroup{font-size:12.5px;font-weight:500;color:var(--sec);padding:12px 12px 4px}
+.nfoot{margin-top:auto;padding:14px 12px 0;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;font-size:13px;color:var(--sec);flex:none}
+.badge.beta{color:var(--danger);background:var(--dangersoft)}
+.shead{display:flex;align-items:center;gap:16px}
+.stile{width:52px;height:52px;border-radius:16px;background:var(--card);box-shadow:0 0 0 1px var(--border);display:flex;align-items:center;justify-content:center;flex:none}
+.ssub{font-size:15px;color:var(--sec)}
+.utile{width:64px;height:64px;border-radius:20px;display:flex;align-items:center;justify-content:center;flex:none}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.radio{width:22px;height:22px;min-height:22px;max-height:22px;flex:0 0 22px;align-self:center;box-sizing:border-box;border-radius:50%;border:2px solid var(--ter);background:transparent;padding:0;transition:box-shadow .15s}
+.radio[aria-checked=true]{border-color:var(--primary);box-shadow:inset 0 0 0 5px var(--primary)}
+.chip{font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--field);color:var(--text);margin-left:8px}
+.chip.danger{background:var(--dangersoft);color:var(--danger)}
+.chip.ink{background:var(--primary);color:var(--onprimary);margin-left:0}
+.warnbox{margin:0 -6px 16px;padding:18px 20px;border-radius:14px;background:var(--dangersoft);display:flex;gap:16px}
+.warnbox ul,.notes{margin:0;padding-left:18px;font-size:13.5px;line-height:1.6}
+.betabtn{background:var(--danger);color:#FFFFFF}
+.betabtn:hover{filter:brightness(1.08);background:var(--danger)}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+body.still .spin{animation:none}
 @media (max-width:820px){nav{width:220px}main{padding:24px 20px 40px 8px}.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}}
 </style>
 </head>
@@ -177,21 +198,22 @@ const osName = () => (D && D.os === 'linux' ? 'your system' : 'Windows');
 
 // ------------------------------------------------------------------ sections
 const NAV = [
-  { id: 'you', label: 'You and Pacitum', d: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20c1.4-3.6 4.2-5.5 7.5-5.5s6.1 1.9 7.5 5.5', k: 'profile name picture import bookmarks sync google account picker' },
-  { id: 'passwords', label: 'Passwords', d: 'M14.5 9.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zM13.2 12.7L20 19.5M17 16.5l2-2', k: 'password sign in login save autofill pin hello export import check' },
-  { id: 'autofill', label: 'Addresses and payments', d: 'M3.5 6.5h17v11h-17zM3.5 10h17M7 14.5h4', k: 'address card payment credit autofill phone email' },
-  { id: 'privacy', label: 'Privacy and security', d: 'M12 3.5l7 3v5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9v-5z', k: 'clear history cookies cache safe browsing https trackers ads site permissions camera microphone location notifications pop-ups do not track' },
-  { id: 'appearance', label: 'Appearance', d: 'M12 20.5a8.5 8.5 0 1 1 8.5-8.5c0 2.2-1.8 3-3.5 3h-1.8a1.7 1.7 0 0 0-1.2 2.9c.9.9.3 2.6-2 2.6zM7.5 11h.01M10 7.5h.01M14.5 7.5h.01', k: 'theme dark light accent colour color tab size font zoom bookmarks bar home button' },
-  { id: 'search', label: 'Search and address bar', d: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20', k: 'search engine google bing duckduckgo brave yahoo suggestions typing hints shortcuts keyword' },
-  { id: 'default', label: 'Default browser', d: 'M3.5 5h17v14h-17zM3.5 9h17', k: 'default browser links' },
-  { id: 'startup', label: 'On startup', d: 'M12 3.5v8M7 6.5a7 7 0 1 0 10 0', k: 'startup start continue where you left off pages home page' },
-  { id: 'downloads', label: 'Downloads', d: 'M12 4v11M7 10l5 5 5-5M5 20h14', k: 'downloads folder location ask save' },
-  { id: 'languages', label: 'Languages', d: 'M4 5.5h10M9 3.5v2M6 5.5c1 4 4 7 8 8.5M12 5.5c-1 4-4 7-8 8.5M13 20l4-9 4 9M14.5 17h5', k: 'language translate spell check' },
-  { id: 'access', label: 'Accessibility', d: 'M12 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 8.5l7 1.5 7-1.5M12 10v4.5l-3 6M12 14.5l3 6', k: 'accessibility focus ring motion animations caret cursor font size minimum' },
-  { id: 'system', label: 'System and performance', d: 'M7 7h10v10H7zM10 3.5v3.5M14 3.5v3.5M10 17v3.5M14 17v3.5M3.5 10H7M3.5 14H7M17 10h3.5M17 14h3.5', k: 'memory saver sleep tabs graphics acceleration gpu background proxy performance' },
-  { id: 'reset', label: 'Reset settings', d: 'M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5', k: 'reset restore defaults' },
-  { id: 'about', label: 'About Pacitum', d: 'M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zM12 11v5.5M12 7.5v.5', k: 'about version update updates licences source github user agent' },
-  { id: 'themes', label: 'Themes', d: 'M12 20.5a8.5 8.5 0 1 1 8.5-8.5c0 2.2-1.8 3-3.5 3h-1.8a1.7 1.7 0 0 0-1.2 2.9c.9.9.3 2.6-2 2.6zM7.5 11h.01M10 7.5h.01M14.5 7.5h.01', k: 'themes midnight forest sakura sand graphite high contrast custom colours new tab', chev: true }
+  { id: 'you', g: 'You', sub: 'Your profile, sign-in and what syncs.', label: 'You and Pacitum', d: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20c1.4-3.6 4.2-5.5 7.5-5.5s6.1 1.9 7.5 5.5', k: 'profile name picture import bookmarks sync google account picker' },
+  { id: 'passwords', g: 'You', sub: 'Saved passwords, and a check for weak and reused ones.', label: 'Passwords', d: 'M14.5 9.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zM13.2 12.7L20 19.5M17 16.5l2-2', k: 'password sign in login save autofill pin hello export import check' },
+  { id: 'autofill', g: 'You', sub: 'Fill forms with details you saved.', label: 'Addresses and payments', d: 'M3.5 6.5h17v11h-17zM3.5 10h17M7 14.5h4', k: 'address card payment credit autofill phone email' },
+  { id: 'privacy', g: 'Browsing', sub: 'Cookies, trackers, HTTPS and what each site may do.', label: 'Privacy and security', d: 'M12 3.5l7 3v5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9v-5z', k: 'clear history cookies cache safe browsing https trackers ads site permissions camera microphone location notifications pop-ups do not track' },
+  { id: 'search', g: 'Browsing', sub: 'What runs when you search from the address bar.', label: 'Search and address bar', d: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20', k: 'search engine google bing duckduckgo brave yahoo suggestions typing hints shortcuts keyword' },
+  { id: 'startup', g: 'Browsing', sub: 'What Pacitum opens when it starts.', label: 'On startup', d: 'M12 3.5v8M7 6.5a7 7 0 1 0 10 0', k: 'startup start continue where you left off pages home page' },
+  { id: 'downloads', g: 'Browsing', sub: 'Where files go and how Pacitum asks.', label: 'Downloads', d: 'M12 4v11M7 10l5 5 5-5M5 20h14', k: 'downloads folder location ask save' },
+  { id: 'default', g: 'Browsing', sub: 'Open links from other apps in Pacitum.', label: 'Default browser', d: 'M3.5 5h17v14h-17zM3.5 9h17', k: 'default browser links' },
+  { id: 'appearance', g: 'Look and feel', sub: 'Light or dark, tab size, fonts and the tab switcher.', label: 'Appearance', d: 'M12 20.5a8.5 8.5 0 1 1 8.5-8.5c0 2.2-1.8 3-3.5 3h-1.8a1.7 1.7 0 0 0-1.2 2.9c.9.9.3 2.6-2 2.6zM7.5 11h.01M10 7.5h.01M14.5 7.5h.01', k: 'theme dark light accent colour color tab size font zoom bookmarks bar home button' },
+  { id: 'themes', g: 'Look and feel', sub: 'A theme recolours tabs, toolbar, menus and pages.', label: 'Themes', d: 'M12 20.5a8.5 8.5 0 1 1 8.5-8.5c0 2.2-1.8 3-3.5 3h-1.8a1.7 1.7 0 0 0-1.2 2.9c.9.9.3 2.6-2 2.6zM7.5 11h.01M10 7.5h.01M14.5 7.5h.01', k: 'themes midnight forest sakura sand graphite high contrast custom colours new tab', chev: true },
+  { id: 'languages', g: 'Look and feel', sub: 'The language Pacitum speaks, translation and spell check.', label: 'Languages', d: 'M4 5.5h10M9 3.5v2M6 5.5c1 4 4 7 8 8.5M12 5.5c-1 4-4 7-8 8.5M13 20l4-9 4 9M14.5 17h5', k: 'language translate spell check' },
+  { id: 'access', g: 'Look and feel', sub: 'Make Pacitum easier to see and use.', label: 'Accessibility', d: 'M12 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 8.5l7 1.5 7-1.5M12 10v4.5l-3 6M12 14.5l3 6', k: 'accessibility focus ring motion animations caret cursor font size minimum' },
+  { id: 'system', g: 'Pacitum', sub: 'Memory, graphics and the background.', label: 'System and performance', d: 'M7 7h10v10H7zM10 3.5v3.5M14 3.5v3.5M10 17v3.5M14 17v3.5M3.5 10H7M3.5 14H7M17 10h3.5M17 14h3.5', k: 'memory saver sleep tabs graphics acceleration gpu background proxy performance' },
+  { id: 'updates', g: 'Pacitum', sub: 'Stable releases, or beta builds from GitHub pre-releases.', label: 'Updates', d: 'M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5', k: 'update updates beta stable channel pre-release version check automatically' },
+  { id: 'reset', g: 'Pacitum', sub: 'Start over without losing bookmarks, history or passwords.', label: 'Reset settings', d: 'M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5', k: 'reset restore defaults' },
+  { id: 'about', g: 'Pacitum', sub: 'Version, publisher and source.', label: 'About Pacitum', d: 'M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zM12 11v5.5M12 7.5v.5', k: 'about version update updates licences source github user agent' }
 ];
 
 function renderNav() {
@@ -202,9 +224,10 @@ function renderNav() {
   $('#nav').innerHTML = `<span class="ntitle">Settings</span>
     <label class="nsearch" for="set-search">${ico('M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20', 15, 2.4, 'chev')}
       <input id="set-search" placeholder="Search settings" value="${esc(st.q)}" data-i="navq" autocomplete="off"></label>
-    ${items.map((n) => `<button class="nrow" data-a="go:${n.id}" aria-current="${st.section === n.id ? 'page' : 'false'}">${ico(n.d, 18, 2)}<span class="l">${n.label}</span>${
-      n.id === 'passwords' && issues ? `<span class="badge">${issues}</span>` : ''}${n.chev ? CHEV : ''}</button>`).join('')}
-    ${items.length ? '' : `<span class="nempty">No settings match “${esc(st.q)}”.</span>`}`;
+    ${['You', 'Browsing', 'Look and feel', 'Pacitum'].map((g) => { const its = items.filter((n) => n.g === g); return its.length ? `<span class="ngroup">${g}</span>` + its.map((n) => `<button class="nrow" data-a="go:${n.id}" aria-current="${st.section === n.id ? 'page' : 'false'}">${ico(n.d, 18, 2)}<span class="l">${n.label}</span>${
+      n.id === 'passwords' && issues ? `<span class="badge">${issues}</span>` : ''}${n.id === 'updates' && betaOn() ? '<span class="badge beta">Beta</span>' : ''}${n.chev ? CHEV : ''}</button>`).join('') : ''; }).join('')}
+    ${items.length ? '' : `<span class="nempty">No settings match “${esc(st.q)}”.</span>`}
+    <span class="nfoot"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="#151112"/><path d="M8.5 17V7h4a3 3 0 0 1 0 6h-2.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 7v10" stroke="#FF0000" stroke-width="2.6" stroke-linecap="round"/></svg><span class="num">Pacitum ${esc(D ? D.version : '')}</span>${D && D.update && D.update.isBeta ? '<span class="badge beta">Beta</span>' : ''}</span>`;
   if (focusSearch) { const i = $('#set-search'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
 }
 
@@ -380,6 +403,7 @@ function secAppearance() {
       <div class="row"><span class="tx"><span class="t">Accent colour</span><span class="d">Used for the active tab, the cursor and your profile</span></span>
         <div style="display:flex;gap:8px">${ACCENTS.map((w) => `<button class="swatch" aria-label="${w[0]}" aria-pressed="${w[1] === '#D9141F' ? def : acc === w[1]}" style="background:${w[1]};--ring:${w[1]}" data-a="accent" data-v="${w[1]}"></button>`).join('')}</div></div>
       ${row('Tab size', 'Compact fits more tabs', seg('tab_size', 'comfy', [['compact', 'Compact'], ['comfy', 'Comfortable']], 'sm'))}
+      ${row('Tab overview style', 'Ctrl + Shift + Space shows your tabs as 3D cards', seg('switcher_style', 'carousel', [['carousel', 'Carousel'], ['stack', 'Stack'], ['grid', 'Grid']], 'sm'))}
       ${row('Font size', '', select('default_font_size', 16, [[9, 'Very small'], [12, 'Small'], [16, 'Medium (recommended)'], [20, 'Large'], [24, 'Very large']], 'Font size'))}
       ${row('Page zoom', '', select('default_zoom', 100, [50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200].map((z) => [z, z + '%']), 'Page zoom'))}
       ${row('Show bookmarks bar', 'Ctrl+Shift+B', sw('show_bookmarks_bar', true, 'Show bookmarks bar'))}
@@ -397,6 +421,12 @@ const T = {
   sakura: { strip: '#F3D3DA', stripChip: '#E8BBC5', toolbar: '#FFF8F9', bg: '#FCEFF2', card: '#FFFFFF', text: '#2A1418', field: '#F7E3E8', accent: '#D6336C' },
   sand: { strip: '#E6D8C1', stripChip: '#D7C5A8', toolbar: '#FBF7F0', bg: '#F3ECDF', card: '#FFFDF9', text: '#2B2117', field: '#EEE4D3', accent: '#C2410C' },
   graphite: { strip: '#1F2026', stripChip: '#3A3B43', toolbar: '#2E2F36', bg: '#24252B', card: '#2E2F36', text: '#F2F2F4', field: '#3B3C44', accent: '#FF7A45' },
+  ocean: { strip: '#CFE3F7', stripChip: '#B4D2F0', toolbar: '#F7FBFF', bg: '#EAF3FC', card: '#FFFFFF', text: '#0F1E2E', field: '#E1ECF8', accent: '#2F6FEB' },
+  mint: { strip: '#CDEDE3', stripChip: '#B0E0D1', toolbar: '#F6FCFA', bg: '#E8F6F1', card: '#FFFFFF', text: '#0E2420', field: '#DDF1EA', accent: '#0F9F86' },
+  lavender: { strip: '#E2D8F3', stripChip: '#CFC0EC', toolbar: '#FBF9FF', bg: '#F2EDFB', card: '#FFFFFF', text: '#1D1528', field: '#EAE3F7', accent: '#7A4FD6' },
+  sunset: { strip: '#F8D9C4', stripChip: '#F2C2A2', toolbar: '#FFF9F5', bg: '#FCEEE4', card: '#FFFFFF', text: '#2B1709', field: '#F8E4D6', accent: '#E8590C' },
+  rose: { strip: '#1F0E15', stripChip: '#3B1D29', toolbar: '#2C1520', bg: '#231018', card: '#2C1520', text: '#FBEFF4', field: '#3B1D29', accent: '#FF5C9A' },
+  ocean_dark: { strip: '#06141F', stripChip: '#163447', toolbar: '#0E2332', bg: '#091B27', card: '#0E2332', text: '#E6F3FB', field: '#163447', accent: '#3CC4E6' },
   contrast: { strip: '#000000', stripChip: '#FFFFFF', toolbar: '#000000', bg: '#000000', card: '#000000', text: '#FFFFFF', field: '#1A1A1A', accent: '#FFD400' }
 };
 function secThemes() {
@@ -408,7 +438,7 @@ function secThemes() {
   const acc = String(sv('accent', '') || '').toUpperCase();
   const baseAcc = (cur.accent || '#D9141F').toUpperCase();
   const custom = acc && acc !== baseAcc && acc !== '#D9141F' && acc !== '#2DD4BF';
-  const sws = [['Theme default', baseAcc], ['Red', '#D9141F'], ['Blue', '#2F6FEB'], ['Green', '#1F8F5F'], ['Purple', '#6D5BD0'], ['Orange', '#E8590C']];
+  const sws = [['Theme default', baseAcc], ['Red', '#D9141F'], ['Orange', '#E8590C'], ['Yellow', '#D4A20B'], ['Green', '#1F8F5F'], ['Teal', '#0F9F86'], ['Blue', '#2F6FEB'], ['Indigo', '#4B3FBF'], ['Purple', '#7A4FD6'], ['Pink', '#D6336C']];
   return `<div style="display:flex;align-items:flex-end;gap:12px">
       <div style="flex:1;display:flex;flex-direction:column;gap:6px"><h1>Themes</h1><span style="font-size:14px;color:var(--sec)">Changes the tab strip, toolbar, menus and Pacitum's own pages. Websites keep their own colours.</span></div>
       <button class="btn lg" style="height:38px" data-a="themeReset">Reset to default</button></div>
@@ -422,7 +452,7 @@ function secThemes() {
         ${on ? `<span class="ck"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--onacc)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>` : ''}</span></button>`; }).join('')}</div>
     <div class="card">
       <div class="row" style="min-height:64px"><span class="tx"><span class="t">Accent colour</span><span class="d">${custom ? t('Custom colour on top of %1', esc(t(cur.name))) : t('Using the colour that comes with %1', esc(t(cur.name)))}</span></span>
-        <div style="display:flex;gap:8px">${sws.map((w, i) => `<button class="swatch" aria-label="${w[0]}" aria-pressed="${i === 0 ? !custom : custom && acc === w[1]}" style="background:${w[1]};--ring:${w[1]}" data-a="accent" data-v="${i === 0 ? '' : w[1]}"></button>`).join('')}</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:380px">${sws.map((w, i) => `<button class="swatch" aria-label="${w[0]}" aria-pressed="${i === 0 ? !custom : custom && acc === w[1]}" style="background:${w[1]};--ring:${w[1]}" data-a="accent" data-v="${i === 0 ? '' : w[1]}"></button>`).join('')}</div></div>
       ${row(`Follow ${osName()} light and dark`, 'Switch between Pacitum Light and Pacitum Dark with the system', sw(follow, false, 'Follow system light and dark', { act: 'follow' }))}
       ${row('Use theme on the new tab page', 'Background and shortcut tiles take the theme colours', sw('theme_ntp', true, 'Use theme on the new tab page'))}
       <div class="row" style="min-height:64px"><span class="tx"><span class="t">Private tabs</span><span class="d">Always use Pacitum Dark so they are easy to spot</span></span>
@@ -562,8 +592,6 @@ function secAbout() {
     </div>
     <h2>Advanced</h2>
     <div class="card">
-      ${row('Check for updates automatically', 'Looks for a new version a few times a day and asks before installing', sw('auto_check_updates', true, 'Check for updates automatically'))}
-      ${row('Update feed', 'A URL returning a GitHub-style release JSON. Leave empty for the default.', `<input class="in" style="width:300px" data-c="setText:update_feed_url" value="${esc(sv('update_feed_url', ''))}" placeholder="Default">`)}
       ${row('User agent', `<span class="mono" style="font-size:12px;user-select:text">${esc(D.ua)}</span>`, '')}
       ${row('Profile folder', `<span class="mono" style="font-size:12px;user-select:text">${esc(D.dataDir)}</span>`, `<button class="btn" data-a="openFolder" data-v="${esc(D.dataDir)}">Open</button>`)}
     </div>
@@ -573,8 +601,57 @@ function secAbout() {
     </div>`;
 }
 
+// ---------------------------------------------------------------- Updates (2.0.6)
+function betaOn() { return !!(D && D.update && D.update.channel === 'beta'); }
+function secUpdates() {
+  const u = D.update || {}, beta = betaOn();
+  const status = String(u.status || '') || t('Pacitum %1 is installed.', esc(D.version));
+  const avail = /available|new version|download/i.test(status) && !/up to date/i.test(status);
+  const failed = /couldn|fail|error|offline/i.test(status);
+  const head = u.busy ? 'Checking for updates…' : avail ? 'An update is ready' : failed ? 'Couldn’t check for updates' : beta ? 'Beta channel is on' : 'Pacitum is up to date';
+  const when = u.last ? t('Last checked %1', new Date(u.last).toLocaleString()) : '';
+  const tileBg = u.busy ? 'var(--field)' : failed ? 'var(--danger)' : beta ? 'var(--danger)' : 'var(--primary)';
+  const tileFg = u.busy ? 'var(--text)' : beta || failed ? '#FFFFFF' : 'var(--onprimary)';
+  const opt = (id, title, desc, chip, danger) => `<div class="row"><button class="radio" role="radio" aria-checked="${(beta ? 'beta' : 'stable') === id}" aria-label="${esc(title)}" data-a="chan" data-v="${id}"></button>
+      <span class="tx"><span class="t">${title}<span class="chip${danger ? ' danger' : ''}">${chip}</span></span><span class="d">${desc}</span></span></div>`;
+  const pre = (u.pre || []);
+  return `<h1>Updates</h1>
+    <div class="hero" style="gap:20px;padding:24px">
+      <span class="utile" style="background:${tileBg};color:${tileFg}">${u.busy ? '<span class="spin"></span>' : ico(failed ? 'M12 8v5M12 16.5v.5M10.3 4.2L2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z' : avail ? 'M12 4v11M7 10l5 5 5-5M5 20h14' : 'M5 12.5l4.5 4.5L19 7.5', 30, 2.8)}</span>
+      <span class="tx" style="gap:4px"><span style="font-size:21px;font-weight:600;letter-spacing:-.01em">${head}</span>
+        <span class="num" style="font-size:14.5px">${t('Version %1 · %2', esc(D.version), beta ? t('Beta channel') : t('Stable channel'))}</span>
+        <span style="font-size:13px;color:var(--sec)">${esc(failed || avail ? status : when)}</span></span>
+      <button class="btn ink lg" data-a="checkUpdates"${u.busy ? ' disabled' : ''}>${u.busy ? 'Checking…' : 'Check for updates'}</button></div>
+    <h2>Update channel</h2>
+    <div class="card">
+      ${opt('stable', 'Stable', 'Tested releases. Recommended for everyday browsing.', 'Recommended')}
+      ${opt('beta', 'Beta', 'Pre-releases from GitHub, a few weeks before Stable. New features first; things may break.', 'Take your own risk', true)}
+      ${st.betaAsk && !beta ? `<div class="warnbox">
+        <span style="color:var(--danger);display:flex;flex:none;margin-top:2px">${ico('M12 4l9 16H3zM12 10v4.5M12 17.5v.5', 22, 2.2)}</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+          <span style="font-size:16px;font-weight:600">Beta builds are tested less. Use them at your own risk.</span>
+          <ul><li>Pacitum may crash, freeze or close without warning.</li><li>In rare cases you can lose open tabs or recent settings.</li><li>An extension may stop working until the next build.</li></ul>
+          <label class="chk"><input type="checkbox" data-c="betaAck"${st.betaAck ? ' checked' : ''}> I understand and want beta builds anyway</label>
+          <div style="display:flex;gap:10px;margin-top:4px"><button class="btn lg betabtn" data-a="betaYes"${st.betaAck ? '' : ' disabled'}>Switch to Beta</button><button class="btn lg" style="background:transparent" data-a="betaNo">Stay on Stable</button></div>
+        </div></div>` : ''}
+    </div>
+    ${beta ? `<div style="display:flex;align-items:baseline;gap:12px;margin:10px 4px 0"><h2 style="margin:0">Pre-releases</h2><span class="mono" style="font-size:12.5px;color:var(--sec)">github.com/patchon-t/pacitum-browser/releases</span></div>
+    <div class="card">${pre.length ? pre.map((b, i) => `<div class="row" style="align-items:flex-start;padding:16px 0">
+        <span class="tx" style="gap:6px"><span style="display:flex;align-items:center;gap:10px"><span class="num" style="font-size:16px;font-weight:600">${esc(b.version)}</span><span class="chip danger">Pre-release</span>${i === 0 ? '<span class="chip ink">Newest</span>' : ''}</span>
+          <span class="num" style="font-size:13px;color:var(--sec)">${esc(b.date ? new Date(b.date).toLocaleDateString() : '')}</span>
+          ${(b.notes || []).length ? `<ul class="notes">${b.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}</span>
+        <button class="btn lg${i === 0 && b.newer ? ' ink' : ''}" data-a="${i === 0 && b.newer ? 'checkUpdates' : 'open'}" data-v="${esc(b.url)}">${i === 0 && b.newer ? 'Install' : 'Release notes'}</button></div>`).join('')
+      : row('No pre-releases right now', 'When a beta is published on GitHub it shows up here, and Pacitum offers it like any update.', '')}</div>
+    <span style="font-size:13px;line-height:1.5;color:var(--sec);padding:0 4px">To leave Beta, choose Stable. Pacitum then waits for the next stable version newer than your beta, so nothing is downgraded and your data stays.</span>` : ''}
+    <h2>Options</h2>
+    <div class="card">
+      ${row('Check for updates automatically', 'Looks for a new version a few times a day and asks before installing', sw('auto_check_updates', true, 'Check for updates automatically'))}
+      ${row('Update feed', 'A URL returning a GitHub-style release JSON. Leave empty for the default.', `<input class="in" style="width:300px" data-c="setText:update_feed_url" value="${esc(sv('update_feed_url', ''))}" placeholder="Default">`)}
+    </div>`;
+}
+
 const SECTIONS = { you: secYou, passwords: secPasswords, autofill: secAutofill, privacy: secPrivacy, appearance: secAppearance, themes: secThemes, search: secSearch,
-  default: secDefault, startup: secStartup, downloads: secDownloads, languages: secLanguages, access: secAccess, system: secSystem, reset: secReset, about: secAbout };
+  default: secDefault, startup: secStartup, downloads: secDownloads, languages: secLanguages, access: secAccess, system: secSystem, updates: secUpdates, reset: secReset, about: secAbout };
 
 function render() {
   if (!D) return;
@@ -582,7 +659,11 @@ function render() {
   document.body.classList.toggle('still', !!sv('reduce_motion', !sv('animations', true)));
   renderNav();
   const a = document.activeElement, id = a && a.id, pos = a && a.selectionStart;
-  $('#content').innerHTML = `<div class="col">${(SECTIONS[st.section] || secYou)()}</div>`;
+  const nav = NAV.find((n) => n.id === st.section) || NAV[0];
+  let html = (SECTIONS[st.section] || secYou)();
+  // 2.0.6 header: icon tile, title and a line on what the section is for (Themes keeps its own line)
+  html = html.replace(/<h1>([^<]*)<\/h1>/, (m, title) => `<header class="shead"><span class="stile">${ico(nav.d, 24, 2)}</span><span class="tx"><h1>${title}</h1>${st.section === 'themes' ? '' : `<span class="ssub">${esc(nav.sub || '')}</span>`}</span></header>`);
+  $('#content').innerHTML = `<div class="col">${html}</div>`;
   if (id && id !== 'set-search') { const e = document.getElementById(id); if (e) { e.focus(); try { e.setSelectionRange(pos, pos); } catch (x) {} } }
   wireDrag();
   document.title = t('Settings · %1', t((NAV.find((n) => n.id === st.section) || NAV[0]).label));
@@ -814,7 +895,10 @@ async function onAction(a, v, el) {
     case 'chooseDl': call('chooseDownloadDir'); break;
     case 'openDl': call('openFolder', { path: D.downloadDir }); break;
     case 'openFolder': call('openFolder', { path: v }); break;
-    case 'checkUpdates': D.update = { busy: true, status: 'Checking for updates…' }; render(); call('checkUpdates'); break;
+    case 'checkUpdates': D.update = Object.assign({}, D.update, { busy: true, status: 'Checking for updates…' }); render(); call('checkUpdates'); break;
+    case 'chan': if (v === 'beta' && !betaOn()) { st.betaAsk = true; st.betaAck = false; render(); } else if (v === 'stable') { st.betaAsk = false; D.update.channel = 'stable'; bridge.set('update_channel', 'stable'); render(); } break;
+    case 'betaYes': if (st.betaAck) { st.betaAsk = false; D.update.channel = 'beta'; bridge.set('update_channel', 'beta'); render(); } break;
+    case 'betaNo': st.betaAsk = false; st.betaAck = false; render(); break;
     case 'resetAsk': st.resetAsk = true; render(); break;
     case 'resetNo': st.resetAsk = false; render(); break;
     case 'resetYes': st.resetAsk = false; await call('resetSettings'); toast('Settings reset'); break;
@@ -847,6 +931,7 @@ document.addEventListener('change', (e) => {
   const [cmd, arg] = c.split(/:(.*)/s);
   if (cmd === 'set') setKey(arg, isNaN(+e.target.value) ? e.target.value : +e.target.value);
   else if (cmd === 'setText') setKey(arg, e.target.value.trim());
+  else if (cmd === 'betaAck') { st.betaAck = e.target.checked; render(); }
   else if (cmd === 'permSite') { const [key, o] = arg.split('|'); call('permSite', { key, origin: o, decision: +e.target.value }); }
 });
 document.addEventListener('keydown', (e) => {

@@ -44,6 +44,13 @@ constexpr int kFirstCheckMs = 45 * 1000;            // well after startup: never
 constexpr int kIntervalMs = 6 * 60 * 60 * 1000;     // every 6 h while running
 constexpr qint64 kMinCheckGapSecs = 12 * 60 * 60;   // background checks at most twice a day across restarts
 
+// The part after the numbers: "2.1.0-beta.2" -> "beta.2" ("" for a release).
+QString preRelease(QString v) {
+    v = v.trimmed();
+    if (v.startsWith(QLatin1Char('v'), Qt::CaseInsensitive)) v.remove(0, 1);
+    const int at = v.indexOf(QRegularExpression(QStringLiteral("[^0-9.]")));
+    return at < 0 ? QString() : v.mid(at).remove(QRegularExpression(QStringLiteral("^[\\-_. +]+")));
+}
 QVector<int> versionParts(QString v) {
     v = v.trimmed();
     if (v.startsWith(QLatin1Char('v'), Qt::CaseInsensitive)) v.remove(0, 1);
@@ -100,7 +107,29 @@ int Updater::compareVersions(const QString& a, const QString& b) {
         const int p = i < x.size() ? x[i] : 0, q = i < y.size() ? y[i] : 0;
         if (p != q) return p < q ? -1 : 1;
     }
+    // 2.0.6: pre-releases ("2.1.0-beta.2") come before the release of the same number, and in order among themselves.
+    const QString sa = preRelease(a), sb = preRelease(b);
+    if (sa.isEmpty() || sb.isEmpty()) return sa.isEmpty() == sb.isEmpty() ? 0 : (sa.isEmpty() ? 1 : -1);
+    const QStringList pa = sa.split(QRegularExpression(QStringLiteral("[.\\-_ ]+")), Qt::SkipEmptyParts);
+    const QStringList pb = sb.split(QRegularExpression(QStringLiteral("[.\\-_ ]+")), Qt::SkipEmptyParts);
+    for (int i = 0; i < qMax(pa.size(), pb.size()); ++i) {
+        if (i >= pa.size()) return -1;
+        if (i >= pb.size()) return 1;
+        bool na = false, nb = false;
+        const int ia = pa[i].toInt(&na), ib = pb[i].toInt(&nb);
+        if (na && nb) { if (ia != ib) return ia < ib ? -1 : 1; continue; }
+        if (na != nb) return na ? -1 : 1;   // numbers before words
+        const int c = pa[i].compare(pb[i], Qt::CaseInsensitive);   // alpha < beta < rc
+        if (c) return c < 0 ? -1 : 1;
+    }
     return 0;
+}
+
+QString Updater::channel() {
+    return AppSettings::get(QStringLiteral("update_channel")).toString() == QLatin1String("beta") ? QStringLiteral("beta") : QStringLiteral("stable");
+}
+void Updater::setChannel(const QString& c) {
+    AppSettings::set(QStringLiteral("update_channel"), c == QLatin1String("beta") ? QStringLiteral("beta") : QStringLiteral("stable"));
 }
 
 void Updater::setStatus(const QString& s) { m_status = s; emit statusChanged(s); }
@@ -118,7 +147,7 @@ void Updater::setAutoCheck(bool on) {
 void Updater::check(bool userInitiated) {
     if (m_reply) return;
     emit checking();
-    Updater::logLine(QStringLiteral("update check: %1 (%2)").arg(feedUrl().toString(), userInitiated ? QStringLiteral("user") : QStringLiteral("background")));
+    Updater::logLine(QStringLiteral("update check: %1 (%2, %3 channel)").arg(feedUrl().toString(), userInitiated ? QStringLiteral("user") : QStringLiteral("background"), channel()));
     setStatus(tr("Checking for updates…"));
     auto* reply = m_net->get(apiRequest(feedUrl()));
     m_reply = reply;
@@ -138,11 +167,20 @@ void Updater::check(bool userInitiated) {
         AppSettings::set(QStringLiteral("update_last_check"), double(QDateTime::currentSecsSinceEpoch()));
         const auto doc = QJsonDocument::fromJson(reply->readAll());
         QJsonObject rel = doc.object();
-        if (doc.isArray()) {   // a ".../releases" list: the highest non-draft, non-prerelease version of our line
+        const bool beta = channel() == QLatin1String("beta");
+        if (doc.isArray()) {   // a ".../releases" list: the highest non-draft version of our line (pre-releases on Beta only)
             QString best;
+            m_preReleases.clear();
             for (const auto& v : doc.array()) {
                 const auto o = v.toObject();
-                if (o.value(QStringLiteral("draft")).toBool() || o.value(QStringLiteral("prerelease")).toBool()) continue;
+                if (o.value(QStringLiteral("prerelease")).toBool() && !o.value(QStringLiteral("draft")).toBool() && m_preReleases.size() < 5) {
+                    const QString tag = o.value(QStringLiteral("tag_name")).toString();
+                    const QString pv = tag.startsWith(QLatin1Char('v'), Qt::CaseInsensitive) ? tag.mid(1) : tag;
+                    if (onTrack(pv)) m_preReleases << QVariantMap{{"version", pv}, {"name", o.value(QStringLiteral("name")).toString()},
+                        {"date", o.value(QStringLiteral("published_at")).toString()}, {"url", o.value(QStringLiteral("html_url")).toString()},
+                        {"notes", noteLines(o.value(QStringLiteral("body")).toString(), 3)}, {"newer", compareVersions(pv, currentVersion()) > 0}};
+                }
+                if (o.value(QStringLiteral("draft")).toBool() || (o.value(QStringLiteral("prerelease")).toBool() && !beta)) continue;
                 QString ver = o.value(QStringLiteral("tag_name")).toString();
                 if (ver.startsWith(QLatin1Char('v'), Qt::CaseInsensitive)) ver.remove(0, 1);
                 if (!onTrack(ver)) continue;
@@ -158,6 +196,7 @@ void Updater::check(bool userInitiated) {
         }
         UpdateInfo info;
         info.tag = rel.value(QStringLiteral("tag_name")).toString();
+        info.prerelease = rel.value(QStringLiteral("prerelease")).toBool();
         info.version = info.tag.startsWith(QLatin1Char('v'), Qt::CaseInsensitive) ? info.tag.mid(1) : info.tag;
         info.name = rel.value(QStringLiteral("name")).toString(info.tag);
         info.notes = rel.value(QStringLiteral("body")).toString();

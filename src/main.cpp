@@ -310,6 +310,12 @@ int main(int argc, char *argv[]) {
         QFont f = app.font();
         f.setFamilies({QStringLiteral("Rubik"), QStringLiteral("Inter"), QStringLiteral("Segoe UI"), QStringLiteral("Cantarell"), f.family()});
         f.setPixelSize(13);
+#ifdef Q_OS_WIN
+        // 2.0.6: snap glyphs to whole pixels. Qt's default (vertical-only hinting) left UI text soft and
+        // smudged on Windows, worst at 125% / 150% scaling and in menus and pop-ups.
+        f.setHintingPreference(QFont::PreferFullHinting);
+#endif
+        f.setStyleStrategy(QFont::StyleStrategy(QFont::PreferAntialias | QFont::PreferQuality));
         app.setFont(f);
         Lang::applyAppFont();   // 2.0.1: Thai / CJK faces in front, per the display language
     }

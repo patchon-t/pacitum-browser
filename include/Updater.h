@@ -4,6 +4,8 @@
 #include <QUrl>
 #include <QPointer>
 #include <QStringList>
+#include <QVariantList>
+#include <QVariantMap>
 
 class QNetworkAccessManager;
 #include <QNetworkReply>
@@ -29,6 +31,7 @@ struct UpdateInfo {
     QString name;
     QString notes;          // markdown
     QString pageUrl;
+    bool prerelease = false;   // 2.0.6: a GitHub pre-release (Beta channel)
     QUrl installerUrl;
     QString installerName;
     qint64 installerSize = -1;
@@ -46,6 +49,10 @@ public:
     static QUrl feedUrl();
     static int compareVersions(const QString& a, const QString& b);   // <0, 0, >0
     static QString currentVersion();
+    // 2.0.6 update channel (setting "update_channel"): "stable" or "beta" (GitHub pre-releases too).
+    // Leaving Beta never downgrades: Stable then waits for a release newer than the installed beta.
+    static QString channel();
+    static void setChannel(const QString& c);
 
     void check(bool userInitiated);
     void download(const UpdateInfo& info);
@@ -68,6 +75,7 @@ public:
 
     void setAutoCheck(bool on);         // periodic background check (setting "auto_check_updates")
     QString lastStatus() const { return m_status; }
+    QVariantList preReleases() const { return m_preReleases; }   // 2.0.6: newest GitHub pre-releases from the last check
 
 signals:
     void checking();
@@ -91,4 +99,5 @@ private:
     QString m_file;
     qint64 m_helperPid = 0;
     QString m_status;
+    QVariantList m_preReleases;
 };

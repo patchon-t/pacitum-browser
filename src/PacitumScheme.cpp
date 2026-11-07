@@ -24,8 +24,16 @@ QString i18nize(QString html) {
     QString boot = QStringLiteral("<script>window.__I18N=%1;</script><script>%2</script>").arg(dict, js);
     if (const QString stack = Lang::cssFontStack(); !stack.isEmpty())   // faces that carry Thai / CJK, ahead of Rubik
         boot += QStringLiteral("<style>html body,html button,html input,html select,html textarea{font-family:%1,Rubik,\"Segoe UI\",sans-serif}</style>").arg(stack);
-    const int at = html.indexOf(QStringLiteral("<head>"));
-    if (at >= 0) html.insert(at + 6, boot);
+    // 2.0.6: after <meta charset> (it must stay in the first 1024 bytes, or Chromium guesses the encoding and Thai
+    // turns into "à¸..."); the reply also names UTF-8 itself.
+    static const QRegularExpression meta(QStringLiteral("<meta\\s+charset=[\"']?utf-8[\"']?\\s*/?>"), QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpressionMatch m = meta.match(html);
+    int at = m.hasMatch() ? int(m.capturedEnd()) : -1;
+    if (at < 0) {
+        at = html.indexOf(QStringLiteral("<head>"));
+        if (at >= 0) { html.insert(at + 6, QStringLiteral("<meta charset=\"utf-8\">")); at += 6 + 22; }
+    }
+    if (at >= 0) html.insert(at, boot);
     return html;
 }
 }
@@ -49,7 +57,7 @@ void PacitumSchemeHandler::install(QWebEngineProfile* profile) {
 void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
     const QString host = job->requestUrl().host();
     QByteArray body;
-    QByteArray mime = "text/html";
+    QByteArray mime = "text/html; charset=utf-8";   // 2.0.6: never let Chromium guess (Thai showed as "à¸...")
     auto svg = [](const QString& name, const QString& cls) {
         QFile s(QStringLiteral(":/icons/ui/%1.svg").arg(name));
         if (!s.open(QIODevice::ReadOnly)) return QString();
@@ -67,7 +75,7 @@ void PacitumSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job) {
         if (initiator.isEmpty() || initiator.startsWith(QStringLiteral("pacitum:")) || initiator == QStringLiteral("null"))
             emit homeAction(name, args);
         auto* buf = new QBuffer(job); buf->setData("ok");
-        job->reply("text/plain", buf);
+        job->reply("text/plain; charset=utf-8", buf);
         return;
     }
     if (host == QStringLiteral("fonts")) {
