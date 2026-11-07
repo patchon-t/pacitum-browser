@@ -89,7 +89,7 @@ jobs:
           src="${{ matrix.name == 'windows' && 'C:/w' || '/home/runner/w' }}"
           mkdir -p "$src"
           curl -fsSL --retry 4 -o "$RUNNER_TEMP/we.tar.xz" "https://download.qt.io/official_releases/qt/$mm/$ver/submodules/qtwebengine-everywhere-src-$ver.tar.xz"
-          tar -xJf "$RUNNER_TEMP/we.tar.xz" -C "$src" --strip-components=1
+          tar --force-local -xJf "$RUNNER_TEMP/we.tar.xz" -C "$src" --strip-components=1   # --force-local: "D:\\..." is a path, not a host
           rm "$RUNNER_TEMP/we.tar.xz"
           echo "WE_SRC=$src" >> "$GITHUB_ENV"
       - name: Configure

@@ -38,7 +38,7 @@ jobs:
           tag="qtwebengine-$ver-codecs"
           if [ "$RUNNER_OS" = Windows ]; then asset="$tag-windows.7z"; else asset="$tag-linux.tar.xz"; fi
           if gh release download "$tag" -R "$GITHUB_REPOSITORY" -p "$asset" -D "$RUNNER_TEMP" 2>/dev/null; then
-            if [ "$RUNNER_OS" = Windows ]; then 7z x -y -o"$QT_ROOT_DIR" "$RUNNER_TEMP/$asset" >/dev/null; else tar -xJf "$RUNNER_TEMP/$asset" -C "$QT_ROOT_DIR"; fi
+            if [ "$RUNNER_OS" = Windows ]; then 7z x -y -o"$QT_ROOT_DIR" "$RUNNER_TEMP/$asset" >/dev/null; else tar --force-local -xJf "$RUNNER_TEMP/$asset" -C "$QT_ROOT_DIR"; fi
             echo "Qt WebEngine $ver with proprietary codecs"
           else
             echo "::warning::No codecs build for Qt $ver yet: H.264 / AAC (YouTube live, Twitch) won't play. Run 'Qt WebEngine with codecs'."
