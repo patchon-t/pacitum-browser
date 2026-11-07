@@ -72,11 +72,12 @@ jobs:
         shell: pwsh
         run: |
           choco install -y --no-progress winflexbison3 gperf ninja
-          $bin = "C:\fb"; New-Item -ItemType Directory -Force $bin | Out-Null
-          $wb = (Get-Command win_bison.exe).Source; $wf = (Get-Command win_flex.exe).Source
-          Copy-Item $wb "$bin\bison.exe"; Copy-Item $wf "$bin\flex.exe"
-          Copy-Item (Join-Path (Split-Path $wb) 'data') "$bin\data" -Recurse -ErrorAction SilentlyContinue
-          Add-Content $env:GITHUB_PATH $bin
+          # choco's win_bison / win_flex on PATH are launcher shims: use the real programs, named bison / flex
+          $tools = "C:\ProgramData\chocolatey\lib\winflexbison3\tools"
+          Copy-Item "$tools\win_bison.exe" "$tools\bison.exe" -Force
+          Copy-Item "$tools\win_flex.exe" "$tools\flex.exe" -Force
+          Add-Content $env:GITHUB_PATH $tools
+          & "$tools\bison.exe" --version | Select-Object -First 1
           python -m pip install --quiet html5lib
           git config --system core.longpaths true
       - uses: ilammy/msvc-dev-cmd@v1
