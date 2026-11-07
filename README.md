@@ -111,6 +111,7 @@ Pacitum started as a Python browser and was ported to C++ file by file.
 - [`SYNC.md`](SYNC.md): setting up Google sync
 - [`PERMISSIONS.md`](PERMISSIONS.md): site permissions
 - [`release-notes/`](release-notes): notes for every release
+- [`discord-bot/`](discord-bot): the Pacitum Discord bot (release notes, bug reports, suggestions)
 
 <details>
 <summary><b>Version history (1.1 to 1.9.1)</b></summary>
