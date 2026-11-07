@@ -1,0 +1,33 @@
+name: Discord bot
+
+on:
+  push:
+    paths: ["discord-bot/**", ".github/workflows/discord-bot.yml", "release-notes/**"]
+  pull_request:
+    paths: ["discord-bot/**", ".github/workflows/discord-bot.yml"]
+  workflow_dispatch:
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: discord-bot
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Compile
+        run: python -m py_compile pacitum_bot.py test_bot.py
+      - name: Tests
+        run: python test_bot.py
+      - name: Docker image
+        run: docker build -t pacitum-bot .
+      - name: Start check (no token must exit with a clear message)
+        run: |
+          out=$(docker run --rm -e DISCORD_TOKEN= pacitum-bot 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "DISCORD_TOKEN is missing"
