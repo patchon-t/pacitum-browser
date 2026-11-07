@@ -218,6 +218,9 @@ void configureProfile(QWebEngineProfile* profile, bool persistent) {
         profile->setHttpCacheMaximumSize(512 * 1024 * 1024);   // 1.8.8: more repeat visits come from disk
     }
     auto* s = profile->settings();
+    // 2.0.6: pages that don't say their encoding are read as UTF-8 (the Windows default, e.g. windows-874 or
+    // windows-1252, turned Thai and other non-Latin text into "à¸..."); pages that do say keep theirs.
+    s->setDefaultTextEncoding(QStringLiteral("UTF-8"));
     s->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
     s->setAttribute(QWebEngineSettings::WebGLEnabled, true);
     s->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);

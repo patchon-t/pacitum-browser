@@ -52,6 +52,13 @@ const ThemeDef kThemes[] = {
     {"sakura", "Sakura", false, "#F3D3DA", "#FFF8F9", "#FCEFF2", "#FFFFFF", "#2A1418", "#85565F", "#F7E3E8", "#F0D9DF", "#D6336C", "#FFFFFF"},
     {"sand", "Sand", false, "#E6D8C1", "#FBF7F0", "#F3ECDF", "#FFFDF9", "#2B2117", "#76664F", "#EEE4D3", "#E6DAC6", "#C2410C", "#FFFFFF"},
     {"graphite", "Graphite", true, "#1F2026", "#2E2F36", "#24252B", "#2E2F36", "#F2F2F4", "#A8A9B3", "#3B3C44", "#3B3C44", "#FF7A45", "#1F2026"},
+    // 2.0.6 colour themes
+    {"ocean", "Ocean", false, "#CFE3F7", "#F7FBFF", "#EAF3FC", "#FFFFFF", "#0F1E2E", "#4F6276", "#E1ECF8", "#D4E2F1", "#2F6FEB", "#FFFFFF"},
+    {"mint", "Mint", false, "#CDEDE3", "#F6FCFA", "#E8F6F1", "#FFFFFF", "#0E2420", "#4D6A63", "#DDF1EA", "#CFE7DE", "#0F9F86", "#FFFFFF"},
+    {"lavender", "Lavender", false, "#E2D8F3", "#FBF9FF", "#F2EDFB", "#FFFFFF", "#1D1528", "#625775", "#EAE3F7", "#DFD5EF", "#7A4FD6", "#FFFFFF"},
+    {"sunset", "Sunset", false, "#F8D9C4", "#FFF9F5", "#FCEEE4", "#FFFFFF", "#2B1709", "#7A5C49", "#F8E4D6", "#F1D8C6", "#E8590C", "#FFFFFF"},
+    {"rose", "Rose", true, "#1F0E15", "#2C1520", "#231018", "#2C1520", "#FBEFF4", "#C9A5B4", "#3B1D29", "#45232F", "#FF5C9A", "#1F0E15"},
+    {"ocean_dark", "Deep sea", true, "#06141F", "#0E2332", "#091B27", "#0E2332", "#E6F3FB", "#9CB7C7", "#163447", "#1C3C51", "#3CC4E6", "#06141F"},
     {"contrast", "High contrast", true, "#000000", "#000000", "#000000", "#000000", "#FFFFFF", "#FFFFFF", "#1A1A1A", "#FFFFFF", "#FFD400", "#000000"},
 };
 QString mixHex(const QString& a, const QString& b, qreal t) {

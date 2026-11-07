@@ -283,7 +283,9 @@ QVariantMap SettingsBridge::state() const {
     // default browser, updates, sync
     o["isDefault"] = FirstRunBridge::isDefaultBrowserStatic();
     auto* up = Updater::instance();
-    o["update"] = QVariantMap{{"status", up->lastStatus()}, {"busy", up->busy()}};
+    o["update"] = QVariantMap{{"status", up->lastStatus()}, {"busy", up->busy()}, {"channel", Updater::channel()},
+                              {"pre", up->preReleases()}, {"isBeta", Updater::currentVersion().contains(QLatin1Char('-'))},
+                              {"last", AppSettings::get(QStringLiteral("update_last_check")).toDouble() * 1000.0}};
     auto* sm = SyncManager::instance();
     o["sync"] = QVariantMap{{"signedIn", sm->signedIn()}, {"email", sm->account().email}, {"hasClient", sm->hasClient()}, {"busy", sm->busy()},
                             {"status", sm->status()}, {"last", sm->lastSync().isValid() ? QLocale().toString(sm->lastSync(), QLocale::ShortFormat) : QString()},
@@ -302,7 +304,13 @@ void SettingsBridge::set(const QString& key, const QVariant& value) {
         "gpu_acceleration", "run_in_background", "cookie_mode", "safe_browsing", "https_only", "adblock_enabled", "do_not_track",
         "clear_on_exit", "clear_cookies_on_exit", "tab_size", "startup", "startup_pages", "homepage", "auto_check_updates", "update_feed_url",
         "passwords_offer", "passwords_autosignin", "passwords_pin", "passwords_suggest", "autofill_addresses", "autofill_payments",
-        "theme_ntp", "search_shortcuts", "languages", "custom_theme", "ext_dev_mode"};
+        "theme_ntp", "search_shortcuts", "languages", "custom_theme", "ext_dev_mode", "switcher_style"};
+    if (key == QLatin1String("update_channel")) {   // 2.0.6: Stable / Beta, then look again at once
+        Updater::setChannel(value.toString());
+        if (m_h.checkUpdates) m_h.checkUpdates();
+        emit changed();
+        return;
+    }
     if (key == QLatin1String("crash_reports")) { CrashReporter::setConsent(value.toBool() ? QStringLiteral("on") : QStringLiteral("off")); emit changed(); return; }
     if (key == QLatin1String("theme")) { if (m_h.setTheme) m_h.setTheme(value.toString()); emit changed(); return; }
     if (key == QLatin1String("accent")) { if (m_h.setAccent) m_h.setAccent(value.toString()); emit changed(); return; }

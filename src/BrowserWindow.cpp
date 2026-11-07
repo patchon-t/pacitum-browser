@@ -885,6 +885,7 @@ void BrowserWindow::showTabOverview() {
         TabOverview::Card c;
         c.title = m_tabs->tabText(i);
         c.icon = m_tabs->tabIcon(i);
+        if (auto* bt = qobject_cast<BrowserTab*>(w)) { c.url = bt->currentUrl(); c.asleep = bt->isDiscarded(); }
         c.shot = m_thumbs.value(w);
         if (c.shot.isNull() && w && w->isVisible() && !qobject_cast<BrowserTab*>(w)) c.shot = w->grab();   // settings / downloads page
         cards << c;

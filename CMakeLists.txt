@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PacitumBrowser VERSION 2.0.5 LANGUAGES CXX)
+project(PacitumBrowser VERSION 2.0.6 LANGUAGES CXX)
 # 2.0.4: Pacitum is built for Windows and Linux only (the macOS port was removed).
 if(APPLE)
     message(FATAL_ERROR "Pacitum supports Windows and Linux. The macOS port was removed in 2.0.4.")
@@ -28,8 +28,14 @@ else()
     set(PACITUM_APP_VERSION 1.8.12)
     set(PACITUM_UPDATE_TRACK "1.8")
 endif()
-message(STATUS "Pacitum ${PACITUM_APP_VERSION} with Qt ${Qt6Core_VERSION}")
-file(WRITE ${CMAKE_BINARY_DIR}/pacitum-version.txt ${PACITUM_APP_VERSION})   # read by CI (installer / AppImage / dmg names)
+# 2.0.6: a beta build (GitHub pre-release) names its stage, e.g. -DPACITUM_PRERELEASE=beta.1 -> "2.1.0-beta.1".
+set(PACITUM_PRERELEASE "" CACHE STRING "Pre-release stage for a beta build (empty for a release)")
+set(PACITUM_FULL_VERSION ${PACITUM_APP_VERSION})
+if(PACITUM_PRERELEASE)
+    set(PACITUM_FULL_VERSION "${PACITUM_APP_VERSION}-${PACITUM_PRERELEASE}")
+endif()
+message(STATUS "Pacitum ${PACITUM_FULL_VERSION} with Qt ${Qt6Core_VERSION}")
+file(WRITE ${CMAKE_BINARY_DIR}/pacitum-version.txt ${PACITUM_FULL_VERSION})   # read by CI (installer / AppImage / dmg names)
 
 # Include dirs
 include_directories(${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party/qrcodegen)
@@ -147,7 +153,7 @@ if(WIN32)
 endif()
 
 add_executable(PacitumBrowser ${SOURCES} ${HEADERS} ${RESOURCES} ${APP_RC})
-target_compile_definitions(PacitumBrowser PRIVATE PACITUM_VERSION="${PACITUM_APP_VERSION}" PACITUM_UPDATE_TRACK="${PACITUM_UPDATE_TRACK}")
+target_compile_definitions(PacitumBrowser PRIVATE PACITUM_VERSION="${PACITUM_FULL_VERSION}" PACITUM_UPDATE_TRACK="${PACITUM_UPDATE_TRACK}")
 # 1.8.8 Google Drive sync: a Google Cloud OAuth client of type "Desktop app" (see SYNC.md).
 # Leave empty to let users paste their own in Settings › Sync › Advanced.
 set(PACITUM_GOOGLE_CLIENT_ID "" CACHE STRING "Google OAuth client ID (Desktop app) for sync")
