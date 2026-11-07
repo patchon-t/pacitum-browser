@@ -173,7 +173,8 @@ void Updater::check(bool userInitiated) {
             m_preReleases.clear();
             for (const auto& v : doc.array()) {
                 const auto o = v.toObject();
-                if (o.value(QStringLiteral("prerelease")).toBool() && !o.value(QStringLiteral("draft")).toBool() && m_preReleases.size() < 5) {
+                if (o.value(QStringLiteral("prerelease")).toBool() && !o.value(QStringLiteral("draft")).toBool() && m_preReleases.size() < 5
+                    && o.value(QStringLiteral("tag_name")).toString().contains(QRegularExpression(QStringLiteral("^[vV]?\\d")))) {
                     const QString tag = o.value(QStringLiteral("tag_name")).toString();
                     const QString pv = tag.startsWith(QLatin1Char('v'), Qt::CaseInsensitive) ? tag.mid(1) : tag;
                     if (onTrack(pv)) m_preReleases << QVariantMap{{"version", pv}, {"name", o.value(QStringLiteral("name")).toString()},
@@ -181,6 +182,8 @@ void Updater::check(bool userInitiated) {
                         {"notes", noteLines(o.value(QStringLiteral("body")).toString(), 3)}, {"newer", compareVersions(pv, currentVersion()) > 0}};
                 }
                 if (o.value(QStringLiteral("draft")).toBool() || (o.value(QStringLiteral("prerelease")).toBool() && !beta)) continue;
+                // 2.0.6: releases that aren't Pacitum versions (e.g. "qtwebengine-6.11.1-codecs", a CI build input)
+                if (!o.value(QStringLiteral("tag_name")).toString().contains(QRegularExpression(QStringLiteral("^[vV]?\\d")))) continue;
                 QString ver = o.value(QStringLiteral("tag_name")).toString();
                 if (ver.startsWith(QLatin1Char('v'), Qt::CaseInsensitive)) ver.remove(0, 1);
                 if (!onTrack(ver)) continue;

@@ -1,0 +1,124 @@
+name: Qt WebEngine with codecs
+# 2.0.6: YouTube live streams (AAC audio only), Twitch and most MP4 video need the H.264 / AAC decoders,
+# which Qt's ready-made WebEngine leaves out (issue #52). This builds Qt WebEngine with proprietary codecs
+# for the exact Qt version CI installs and publishes it on the release "qtwebengine-<version>-codecs"
+# (not marked latest, so neither the updater nor the Discord bot takes it for a Pacitum release).
+# windows.yml and linux.yml lay it over the installed Qt when it exists.
+# Runs when this file changes, or by hand (Actions > Qt WebEngine with codecs > Run workflow).
+# Building Chromium takes hours; a version that is already published is skipped.
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/qtwebengine-codecs.yml']
+permissions:
+  contents: write
+jobs:
+  webengine:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows, os: windows-latest, host: windows, arch: win64_msvc2022_64, aqt: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b' }
+          - { name: linux, os: ubuntu-22.04, host: linux, arch: linux_gcc_64, aqt: 'aqtinstall' }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    name: webengine (${{ matrix.name }})
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.*'
+          host: ${{ matrix.host }}
+          target: desktop
+          arch: ${{ matrix.arch }}
+          aqtsource: ${{ matrix.aqt }}
+          modules: 'qtwebchannel qtpositioning'
+          cache: true
+      - name: Version and whether it is already built
+        id: v
+        shell: bash
+        run: |
+          ver=$("$QT_ROOT_DIR/bin/qmake" -query QT_VERSION | tr -d '\r')
+          tag="qtwebengine-$ver-codecs"
+          if [ "${{ matrix.name }}" = windows ]; then asset="$tag-windows.7z"; else asset="$tag-linux.tar.xz"; fi
+          echo "ver=$ver" >> "$GITHUB_OUTPUT"; echo "tag=$tag" >> "$GITHUB_OUTPUT"; echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "$asset"; then
+            echo "done=1" >> "$GITHUB_OUTPUT"; echo "Already published: $asset"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.v.outputs.done != '1'
+        with:
+          node-version: '20'
+      - name: Tools (Linux)
+        if: matrix.name == 'linux' && steps.v.outputs.done != '1'
+        run: |
+          # Chromium needs ~40 GB: drop SDKs this job never uses
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build gperf bison flex python3-html5lib \
+            libnss3-dev libnspr4-dev libdbus-1-dev libxkbfile-dev libxcomposite-dev libxdamage-dev libxrandr-dev libxtst-dev \
+            libxshmfence-dev libxkbcommon-dev libxkbcommon-x11-dev libdrm-dev libgbm-dev libasound2-dev libpulse-dev libcups2-dev \
+            libfontconfig1-dev libfreetype6-dev libglib2.0-dev libegl1-mesa-dev libgl1-mesa-dev libx11-xcb-dev libxcursor-dev \
+            libxi-dev libxss-dev libkrb5-dev libudev-dev libxcb1-dev libxcb-glx0-dev libxcb-keysyms1-dev libxcb-image0-dev \
+            libxcb-shm0-dev libxcb-icccm4-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-shape0-dev libxcb-randr0-dev \
+            libxcb-render-util0-dev libxcb-util-dev libxcb-xinerama0-dev libxcb-xkb-dev libxcb-cursor-dev libxrender-dev
+          python3 -m pip install --quiet html5lib || true
+          df -h / | tail -1
+      - name: Tools (Windows)
+        if: matrix.name == 'windows' && steps.v.outputs.done != '1'
+        shell: pwsh
+        run: |
+          choco install -y --no-progress winflexbison3 gperf ninja
+          $bin = "C:\fb"; New-Item -ItemType Directory -Force $bin | Out-Null
+          $wb = (Get-Command win_bison.exe).Source; $wf = (Get-Command win_flex.exe).Source
+          Copy-Item $wb "$bin\bison.exe"; Copy-Item $wf "$bin\flex.exe"
+          Copy-Item (Join-Path (Split-Path $wb) 'data') "$bin\data" -Recurse -ErrorAction SilentlyContinue
+          Add-Content $env:GITHUB_PATH $bin
+          python -m pip install --quiet html5lib
+          git config --system core.longpaths true
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: matrix.name == 'windows' && steps.v.outputs.done != '1'
+      - name: Source
+        if: steps.v.outputs.done != '1'
+        shell: bash
+        run: |
+          ver=${{ steps.v.outputs.ver }}; mm=${ver%.*}
+          src="${{ matrix.name == 'windows' && 'C:/w' || '/home/runner/w' }}"
+          mkdir -p "$src"
+          curl -fsSL --retry 4 -o "$RUNNER_TEMP/we.tar.xz" "https://download.qt.io/official_releases/qt/$mm/$ver/submodules/qtwebengine-everywhere-src-$ver.tar.xz"
+          tar -xJf "$RUNNER_TEMP/we.tar.xz" -C "$src" --strip-components=1
+          rm "$RUNNER_TEMP/we.tar.xz"
+          echo "WE_SRC=$src" >> "$GITHUB_ENV"
+      - name: Configure
+        if: steps.v.outputs.done != '1'
+        shell: bash
+        run: |
+          b="${{ matrix.name == 'windows' && 'C:/b' || '/home/runner/b' }}"; stage="${{ matrix.name == 'windows' && 'C:/stage' || '/home/runner/stage' }}"
+          echo "WE_BUILD=$b" >> "$GITHUB_ENV"; echo "WE_STAGE=$stage" >> "$GITHUB_ENV"
+          cmake -S "$WE_SRC" -B "$b" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DCMAKE_INSTALL_PREFIX="$stage" -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF \
+            -DFEATURE_webengine_proprietary_codecs=ON -DFEATURE_qtpdf_build=OFF -DFEATURE_qtwebengine_quick_build=OFF \
+            -DFEATURE_webengine_jumbo_build=ON
+          grep -i "proprietary" "$b/config.summary" || true
+      - name: Build (hours)
+        if: steps.v.outputs.done != '1'
+        shell: bash
+        run: |
+          cores=$(nproc 2>/dev/null || echo "$NUMBER_OF_PROCESSORS")
+          cmake --build "$WE_BUILD" --parallel "$cores"
+          cmake --install "$WE_BUILD"
+      - name: Publish
+        if: steps.v.outputs.done != '1'
+        shell: bash
+        run: |
+          tag=${{ steps.v.outputs.tag }}; asset=${{ steps.v.outputs.asset }}
+          cd "$WE_STAGE"
+          if [ "${{ matrix.name }}" = windows ]; then 7z a -t7z -mx=7 "$RUNNER_TEMP/$asset" . >/dev/null; else tar -cJf "$RUNNER_TEMP/$asset" .; fi
+          ls -la "$RUNNER_TEMP/$asset"
+          gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$tag" -R "$GITHUB_REPOSITORY" --latest=false --title "Qt WebEngine ${{ steps.v.outputs.ver }} with H.264 / AAC (build input)" \
+              --notes "Qt WebEngine ${{ steps.v.outputs.ver }} built with proprietary codecs, used by Pacitum's CI. Not a Pacitum release."
+          gh release upload "$tag" "$RUNNER_TEMP/$asset" -R "$GITHUB_REPOSITORY" --clobber

@@ -28,6 +28,21 @@ jobs:
           arch: linux_gcc_64
           modules: 'qtwebengine qtwebchannel qtpositioning qtserialport qtconnectivity'
           cache: true
+      - name: Qt WebEngine with H.264 / AAC (when built)
+        # YouTube live, Twitch and MP4 video (issue #52). Published by qtwebengine-codecs.yml for this exact Qt version.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver=$("$QT_ROOT_DIR/bin/qmake" -query QT_VERSION | tr -d '\r')
+          tag="qtwebengine-$ver-codecs"
+          if [ "$RUNNER_OS" = Windows ]; then asset="$tag-windows.7z"; else asset="$tag-linux.tar.xz"; fi
+          if gh release download "$tag" -R "$GITHUB_REPOSITORY" -p "$asset" -D "$RUNNER_TEMP" 2>/dev/null; then
+            if [ "$RUNNER_OS" = Windows ]; then 7z x -y -o"$QT_ROOT_DIR" "$RUNNER_TEMP/$asset" >/dev/null; else tar -xJf "$RUNNER_TEMP/$asset" -C "$QT_ROOT_DIR"; fi
+            echo "Qt WebEngine $ver with proprietary codecs"
+          else
+            echo "::warning::No codecs build for Qt $ver yet: H.264 / AAC (YouTube live, Twitch) won't play. Run 'Qt WebEngine with codecs'."
+          fi
       - name: System packages
         run: |
           sudo apt-get update
