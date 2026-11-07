@@ -522,6 +522,7 @@ function secSystem() {
       ${row('Memory saver', "Sleep tabs you haven't used for 10 minutes. They wake up when you go back.", sw('freeze_background_tabs', true, 'Memory saver'))}
       ${row('Use graphics acceleration', 'Turn off if pages flicker. Needs a restart.' + (st.restartNeeded ? ` <a href="#" data-a="restart" style="font-weight:600;color:var(--text)">Restart now</a>` : ''), sw('gpu_acceleration', true, 'Use graphics acceleration'))}
       ${row('Keep running in the background', 'Lets downloads finish after you close the window', sw('run_in_background', false, 'Keep running in the background'))}
+      ${D.crashReports && D.crashReports.available ? row('Send crash reports', 'When Pacitum closes unexpectedly, send what went wrong and its log (page addresses shortened to the site name) to the developers.', sw(D.crashReports.consent === 'on', false, 'Send crash reports', { act: 'crashReports' })) : ''}
       ${D.os !== 'linux' ? row('Proxy settings', '', `<button class="btn" data-a="proxy">Open in ${osName()}${ico('M14 4h6v6M20 4l-8 8M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4', 13, 2.4)}</button>`) : ''}
     </div>`;
 }
@@ -808,6 +809,7 @@ async function onAction(a, v, el) {
     case 'font': { const n = Math.max(0, Math.min(24, (+sv('min_font_size', 0) || (arg > 0 ? 5 : 0)) + (+arg))); setKey('min_font_size', n < 6 ? 0 : n); break; }
     case 'restart': call('restart'); break;
     case 'proxy': call('openProxy'); break;
+    case 'crashReports': { const on = !(D.crashReports && D.crashReports.consent === 'on'); D.crashReports.consent = on ? 'on' : 'off'; bridge.set('crash_reports', on); render(); break; }
     case 'makeDefault': call('makeDefault'); toast(isWin() ? 'Choose Pacitum in Windows Settings' : 'Choose Pacitum in your system settings'); break;
     case 'chooseDl': call('chooseDownloadDir'); break;
     case 'openDl': call('openFolder', { path: D.downloadDir }); break;

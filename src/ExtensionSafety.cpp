@@ -21,6 +21,7 @@ void writeGuard(const QJsonObject& o) {
     if (f.open(QIODevice::WriteOnly)) { f.write(QJsonDocument(o).toJson(QJsonDocument::Compact)); f.commit(); }
 }
 QString g_notice;
+bool g_abrupt = false;
 
 // The extension's display name from its manifest ("__MSG_…" names fall back to the folder name).
 QString extensionName(const QString& dir) {
@@ -35,6 +36,7 @@ void beginStartup(const QString& crashLog) {
     QJsonObject g = readGuard();
     const qint64 started = qint64(g.value(QStringLiteral("started")).toDouble());
     const bool crashed = g.value(QStringLiteral("running")).toBool(false);
+    g_abrupt = crashed;
     int strikes = crashed ? g.value(QStringLiteral("strikes")).toInt() + 1 : 0;
     const QFileInfo cl(crashLog);
     const bool crashLogged = crashed && cl.exists() && cl.lastModified().toMSecsSinceEpoch() >= started;
@@ -81,6 +83,8 @@ void markHealthy() {
     g.insert(QStringLiteral("strikes"), 0);
     writeGuard(g);
 }
+
+bool lastRunEndedAbruptly() { return g_abrupt; }
 
 QString takeNotice() { const QString n = g_notice; g_notice.clear(); return n; }
 }

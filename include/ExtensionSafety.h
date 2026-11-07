@@ -15,6 +15,8 @@ void beginStartup(const QString& crashLog);
 void rememberInstallPath(const QString& path);
 // The run got past the risky part (a minute in) or is quitting normally.
 void markHealthy();
+// The last run ended without a normal quit (known after beginStartup).
+bool lastRunEndedAbruptly();
 // What was turned off at this start, for the user ("" when nothing was).
 QString takeNotice();
 }

@@ -80,6 +80,7 @@ set(SOURCES
     src/ExtensionManager.cpp
     src/ExtensionAccess.cpp
     src/ExtensionSafety.cpp
+    src/CrashReporter.cpp
     src/Tools.cpp
     src/TabOverview.cpp
     src/SyncManager.cpp
@@ -126,6 +127,7 @@ set(HEADERS
     include/ExtensionManager.h
     include/ExtensionAccess.h
     include/ExtensionSafety.h
+    include/CrashReporter.h
     include/Tools.h
     include/TabOverview.h
     include/SyncManager.h
@@ -150,6 +152,11 @@ target_compile_definitions(PacitumBrowser PRIVATE PACITUM_VERSION="${PACITUM_APP
 # Leave empty to let users paste their own in Settings › Sync › Advanced.
 set(PACITUM_GOOGLE_CLIENT_ID "" CACHE STRING "Google OAuth client ID (Desktop app) for sync")
 set(PACITUM_GOOGLE_CLIENT_SECRET "" CACHE STRING "Google OAuth client secret for sync")
+# 2.0.5 crash reports: a Discord webhook URL (repository secret PACITUM_CRASH_WEBHOOK in CI). Empty = never sent.
+set(PACITUM_CRASH_WEBHOOK "" CACHE STRING "Discord webhook URL that receives crash reports")
+if(PACITUM_CRASH_WEBHOOK)
+    target_compile_definitions(PacitumBrowser PRIVATE PACITUM_CRASH_WEBHOOK="${PACITUM_CRASH_WEBHOOK}")
+endif()
 if(PACITUM_GOOGLE_CLIENT_ID)
     target_compile_definitions(PacitumBrowser PRIVATE
         PACITUM_GOOGLE_CLIENT_ID="${PACITUM_GOOGLE_CLIENT_ID}" PACITUM_GOOGLE_CLIENT_SECRET="${PACITUM_GOOGLE_CLIENT_SECRET}")
