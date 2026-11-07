@@ -6,6 +6,7 @@
 #include <QDirIterator>
 #include "ExtensionManager.h"
 #include "ExtensionAccess.h"
+#include "CrashReporter.h"
 #include "ChromeExtensions.h"
 #include "AppSettings.h"
 #include "ThemeManager.h"
@@ -123,6 +124,7 @@ QVariantMap SettingsBridge::state() const {
 #else
     o["os"] = QStringLiteral("linux");
 #endif
+    o["crashReports"] = QVariantMap{{"available", CrashReporter::available()}, {"consent", CrashReporter::consent()}};   // 2.0.5
     o["downloadDir"] = QDir::toNativeSeparators(s.value(QStringLiteral("download_path")).toString(QStandardPaths::writableLocation(QStandardPaths::DownloadLocation)));
 
     // profile
@@ -301,6 +303,7 @@ void SettingsBridge::set(const QString& key, const QVariant& value) {
         "clear_on_exit", "clear_cookies_on_exit", "tab_size", "startup", "startup_pages", "homepage", "auto_check_updates", "update_feed_url",
         "passwords_offer", "passwords_autosignin", "passwords_pin", "passwords_suggest", "autofill_addresses", "autofill_payments",
         "theme_ntp", "search_shortcuts", "languages", "custom_theme", "ext_dev_mode"};
+    if (key == QLatin1String("crash_reports")) { CrashReporter::setConsent(value.toBool() ? QStringLiteral("on") : QStringLiteral("off")); emit changed(); return; }
     if (key == QLatin1String("theme")) { if (m_h.setTheme) m_h.setTheme(value.toString()); emit changed(); return; }
     if (key == QLatin1String("accent")) { if (m_h.setAccent) m_h.setAccent(value.toString()); emit changed(); return; }
     if (key == QLatin1String("ui_language")) {

@@ -102,6 +102,7 @@
 #include <QLineEdit>
 #include "SplitView.h"
 #include "ExtensionManager.h"
+#include "CrashReporter.h"
 #include "ChromeExtensions.h"
 #include "Tools.h"
 #include "TabOverview.h"
@@ -1765,7 +1766,10 @@ void BrowserWindow::showMenu() {
         auto* hp = sub(QStringLiteral("Help and about Pacitum"));
         add(hp, QStringLiteral("About Pacitum"), QString(), [this]{ showSettings(QStringLiteral("about")); });
         add(hp, QStringLiteral("What's new"), QString(), [this]{ newTab(QStringLiteral("https://github.com/patchon-t/pacitum-browser/releases")); });
-        add(hp, QStringLiteral("Report a problem"), QString(), [this]{ newTab(QStringLiteral("https://github.com/patchon-t/pacitum-browser/issues/new")); });
+        add(hp, QStringLiteral("Report a problem"), QString(), [this]{   // 2.0.5: straight to the developers when reports are built in
+            if (CrashReporter::available()) CrashReporter::reportProblem(this);
+            else newTab(QStringLiteral("https://github.com/patchon-t/pacitum-browser/issues/new"));
+        });
         add(hp, QStringLiteral("Check for updates"), QString(), [this]{ if (m_updater) m_updater->check(true); });
     }
     m.addSeparator();

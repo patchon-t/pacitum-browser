@@ -38,8 +38,9 @@ jobs:
         env:   # Google sync OAuth client (repo secrets; empty = users paste their own in Settings)
           GOOGLE_ID: ${{ secrets.PACITUM_GOOGLE_CLIENT_ID }}
           GOOGLE_SECRET: ${{ secrets.PACITUM_GOOGLE_CLIENT_SECRET }}
+          CRASH_WEBHOOK: ${{ secrets.PACITUM_CRASH_WEBHOOK }}   # 2.0.5 crash reports (empty = off)
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr "-DPACITUM_GOOGLE_CLIENT_ID=$GOOGLE_ID" "-DPACITUM_GOOGLE_CLIENT_SECRET=$GOOGLE_SECRET"
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr "-DPACITUM_GOOGLE_CLIENT_ID=$GOOGLE_ID" "-DPACITUM_GOOGLE_CLIENT_SECRET=$GOOGLE_SECRET" "-DPACITUM_CRASH_WEBHOOK=$CRASH_WEBHOOK"
           cmake --build build
       - name: Smoke test (window opens and stays up)
         env:

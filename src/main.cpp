@@ -24,6 +24,7 @@
 #include "PacitumScheme.h"
 #include "Lang.h"
 #include "ExtensionSafety.h"
+#include "CrashReporter.h"
 #include "Motion.h"
 #include "WebProfile.h"
 #include "AppSettings.h"
@@ -369,6 +370,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
+    CrashReporter::init(logDir());   // 2.0.5: keep the last run's log before this run starts its own
     openLog("startup.log");   // this process is the browser for its profile
     {   // web prefs from settings before any page is created
         const auto o = AppSettings::read();
@@ -393,7 +395,10 @@ int main(int argc, char *argv[]) {
     // rebuild the profile's preferences under the extension engine, and enabling an extension crashed.
     if (!guest) Pacitum::setMainProfileStorage(storagePath + QStringLiteral("/storage"), storagePath + QStringLiteral("/cache"));
     // 2.0.5: an extension that crashed this profile last time is moved aside before the profile loads it.
-    if (!guest && !extTest) ExtensionSafety::beginStartup(logDir() + QStringLiteral("/crash.log"));
+    if (!guest && !extTest) {
+        ExtensionSafety::beginStartup(logDir() + QStringLiteral("/crash.log"));
+        CrashReporter::setLastRunAbrupt(ExtensionSafety::lastRunEndedAbruptly());
+    }
     auto* profile = Pacitum::mainProfile();
     if (!guest && !Pacitum::mainProfileBuiltWithStorage()) {   // Qt 6.8: no builder
         profile->setPersistentStoragePath(storagePath + QStringLiteral("/storage"));
@@ -458,6 +463,8 @@ int main(int argc, char *argv[]) {
         // 2.0.5 extension crash safety: a minute of running, or a normal quit, clears the startup guard.
         QTimer::singleShot(60000, &app, []{ ExtensionSafety::markHealthy(); });
         QObject::connect(&app, &QCoreApplication::aboutToQuit, []{ ExtensionSafety::markHealthy(); });
+        if (!(smoke || stress || resizeTest || perf || handoffTest || permTest || extTest))   // never a dialog in CI tests
+            QTimer::singleShot(4000, &w, [&w]{ CrashReporter::maybeReport(&w); });   // 2.0.5 crash reports
         QTimer::singleShot(1500, &w, [&w]{
             const QString notice = ExtensionSafety::takeNotice();
             if (notice.isEmpty()) return;
