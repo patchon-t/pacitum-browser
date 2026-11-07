@@ -66,7 +66,11 @@ jobs:
             libxcb-shm0-dev libxcb-icccm4-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-shape0-dev libxcb-randr0-dev \
             libxcb-render-util0-dev libxcb-util-dev libxcb-xinerama0-dev libxcb-xkb-dev libxcb-cursor-dev libxrender-dev
           python3 -m pip install --quiet html5lib || true
-          df -h / | tail -1
+          # Jumbo-compiled Blink files need several GB each: 16 GB of RAM ran out (the runner shut down at 70%).
+          # Build on the large /mnt disk and add 16 GB of swap there.
+          sudo fallocate -l 16G /mnt/swapfile && sudo chmod 600 /mnt/swapfile && sudo mkswap /mnt/swapfile && sudo swapon /mnt/swapfile
+          sudo mkdir -p /mnt/w && sudo chown -R "$USER" /mnt/w
+          free -m; df -h / /mnt
       - name: Tools (Windows)
         if: matrix.name == 'windows' && steps.v.outputs.done != '1'
         shell: pwsh
@@ -80,6 +84,13 @@ jobs:
           & "$tools\bison.exe" --version | Select-Object -First 1
           python -m pip install --quiet html5lib
           git config --system core.longpaths true
+      - name: Page file (Windows)
+        if: matrix.name == 'windows' && steps.v.outputs.done != '1'
+        uses: al-cheb/configure-pagefile-action@v1.4
+        with:
+          minimum-size: 16GB
+          maximum-size: 24GB
+          disk-root: "C:"
       - uses: ilammy/msvc-dev-cmd@v1
         if: matrix.name == 'windows' && steps.v.outputs.done != '1'
       - name: Source
@@ -87,7 +98,7 @@ jobs:
         shell: bash
         run: |
           ver=${{ steps.v.outputs.ver }}; mm=${ver%.*}
-          src="${{ matrix.name == 'windows' && 'C:/w' || '/home/runner/w' }}"
+          src="${{ matrix.name == 'windows' && 'C:/w' || '/mnt/w/src' }}"
           mkdir -p "$src"
           curl -fsSL --retry 4 -o "$RUNNER_TEMP/we.tar.xz" "https://download.qt.io/official_releases/qt/$mm/$ver/submodules/qtwebengine-everywhere-src-$ver.tar.xz"
           tar --force-local -xJf "$RUNNER_TEMP/we.tar.xz" -C "$src" --strip-components=1   # --force-local: "D:\\..." is a path, not a host
@@ -97,7 +108,7 @@ jobs:
         if: steps.v.outputs.done != '1'
         shell: bash
         run: |
-          b="${{ matrix.name == 'windows' && 'C:/b' || '/home/runner/b' }}"; stage="${{ matrix.name == 'windows' && 'C:/stage' || '/home/runner/stage' }}"
+          b="${{ matrix.name == 'windows' && 'C:/b' || '/mnt/w/b' }}"; stage="${{ matrix.name == 'windows' && 'C:/stage' || '/mnt/w/stage' }}"
           echo "WE_BUILD=$b" >> "$GITHUB_ENV"; echo "WE_STAGE=$stage" >> "$GITHUB_ENV"
           cmake -S "$WE_SRC" -B "$b" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
             -DCMAKE_INSTALL_PREFIX="$stage" -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF \
@@ -109,6 +120,7 @@ jobs:
         shell: bash
         run: |
           cores=$(nproc 2>/dev/null || echo "$NUMBER_OF_PROCESSORS")
+          if [ "$RUNNER_OS" = Linux ]; then (while sleep 600; do echo "::group::memory"; free -m; df -h /mnt | tail -1; echo "::endgroup::"; done) & fi
           cmake --build "$WE_BUILD" --parallel "$cores"
           cmake --install "$WE_BUILD"
       - name: Publish
