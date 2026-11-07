@@ -84,6 +84,8 @@ void ThemeManager::setCustomTheme(const QString& name, const QString& strip, con
     c.set = true;
 }
 
+void ThemeManager::clearCustomTheme() { custom().set = false; }
+
 QStringList ThemeManager::themeIds() { QStringList l; for (const auto& t : kThemes) l << QString::fromLatin1(t.id); if (custom().set) l << QStringLiteral("custom"); return l; }
 bool ThemeManager::themeIsDark(const QString& id) { const auto* t = findTheme(id); return t && t->dark; }
 QString ThemeManager::themeName(const QString& id) { const auto* t = findTheme(id); return t ? QString::fromUtf8(t->name) : QString(); }

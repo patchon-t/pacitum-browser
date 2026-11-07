@@ -2,6 +2,7 @@
 #include "AppSettings.h"
 #include "ThemeManager.h"
 #include "ExtensionAccess.h"
+#include "ExtensionSafety.h"
 #include <QApplication>
 #include <QDir>
 #include <QFile>
@@ -73,8 +74,12 @@ QIcon manifestIcon(const QString& dir, const QJsonObject& m) {
     if (v.isUndefined()) v = m.value(QStringLiteral("browser_action")).toObject().value(QStringLiteral("default_icon"));
     if (v.isUndefined()) v = m.value(QStringLiteral("icons"));
     QIcon icon;
-    if (v.isString()) icon.addFile(dir + QLatin1Char('/') + v.toString());
-    else for (auto it = v.toObject().begin(); it != v.toObject().end(); ++it) {
+    if (v.isString()) { icon.addFile(dir + QLatin1Char('/') + v.toString()); return icon; }
+    // 2.0.5: iterate one named object. begin() and end() used to come from two temporary copies (v.toObject() twice),
+    // both destroyed before the loop body ran, so the loop read freed memory. It crashed Pacitum for extensions whose
+    // icon is a size map (Tampermonkey), every time the toolbar or the extensions page listed them.
+    const QJsonObject sizes = v.toObject();
+    for (auto it = sizes.begin(); it != sizes.end(); ++it) {
         const QString file = dir + QLatin1Char('/') + it.value().toString();
         if (QFileInfo::exists(file)) icon.addFile(file, QSize(it.key().toInt(), it.key().toInt()));
     }
@@ -105,6 +110,7 @@ void ChromeExtensions::attach(QWebEngineProfile* profile) {
     if (profile->isOffTheRecord()) return;   // Guest: nothing is installed or kept
     auto* mgr = profile->extensionManager();
     if (!mgr) return;
+    ExtensionSafety::rememberInstallPath(mgr->installPath());   // 2.0.5: where a crashing extension can be moved from
     connect(mgr, &QWebEngineExtensionManager::installFinished, this, [this](const QWebEngineExtensionInfo& e){
         const QByteArray key = m_keys.isEmpty() ? QByteArray() : m_keys.takeFirst();
         if (!e.error().isEmpty()) {
@@ -661,6 +667,7 @@ void ChromeExtensions::runSelfTest(QWidget* anchor, const std::function<void(con
         {QStringLiteral("unpacked test extension"), dir, {}},
         {QStringLiteral("store: Enhancer for YouTube"), {}, QStringLiteral("ponfpcnoihfmfllpaingbgckeeldkhle")},
         {QStringLiteral("store: uBlock Origin Lite"), {}, QStringLiteral("ddkjiahejlhfcafbddmgiahcphecmpfh")},
+        {QStringLiteral("store: Tampermonkey"), {}, QStringLiteral("dhdgffkkebhmkfjojejmpbldmpobfkfo")},   // 2.0.5: crashed a profile
     });
     auto mgr = m_profile->extensionManager();
     auto runNext = std::make_shared<std::function<void()>>();

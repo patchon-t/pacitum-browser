@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PacitumBrowser VERSION 2.0.4 LANGUAGES CXX)
+project(PacitumBrowser VERSION 2.0.5 LANGUAGES CXX)
 # 2.0.4: Pacitum is built for Windows and Linux only (the macOS port was removed).
 if(APPLE)
     message(FATAL_ERROR "Pacitum supports Windows and Linux. The macOS port was removed in 2.0.4.")
@@ -79,6 +79,7 @@ set(SOURCES
     src/SplitView.cpp
     src/ExtensionManager.cpp
     src/ExtensionAccess.cpp
+    src/ExtensionSafety.cpp
     src/Tools.cpp
     src/TabOverview.cpp
     src/SyncManager.cpp
@@ -124,6 +125,7 @@ set(HEADERS
     include/SplitView.h
     include/ExtensionManager.h
     include/ExtensionAccess.h
+    include/ExtensionSafety.h
     include/Tools.h
     include/TabOverview.h
     include/SyncManager.h
