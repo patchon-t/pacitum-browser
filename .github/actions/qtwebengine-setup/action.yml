@@ -34,9 +34,17 @@ runs:
       if: inputs.name == 'windows'
       shell: pwsh
       run: |
-        choco install -y --no-progress winflexbison3 gperf ninja
-        # choco's win_bison / win_flex on PATH are launcher shims: use the real programs, named bison / flex
-        $tools = "C:\ProgramData\chocolatey\lib\winflexbison3\tools"
+        choco install -y --no-progress gperf ninja
+        # bison / flex from the WinFlexBison release on GitHub (choco's winflexbison3 download started failing
+        # with HTTP 404), named bison / flex, with their data folder beside them.
+        $tools = "C:\fb"
+        New-Item -ItemType Directory -Force $tools | Out-Null
+        $zip = "$env:RUNNER_TEMP\winflexbison.zip"
+        for ($i = 1; $i -le 4; $i++) {
+          try { Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/lexxmark/winflexbison/releases/download/v2.5.25/win_flex_bison-2.5.25.zip" -OutFile $zip; break }
+          catch { if ($i -eq 4) { throw }; Start-Sleep -Seconds (5 * $i) }
+        }
+        Expand-Archive -Path $zip -DestinationPath $tools -Force
         Copy-Item "$tools\win_bison.exe" "$tools\bison.exe" -Force
         Copy-Item "$tools\win_flex.exe" "$tools\flex.exe" -Force
         Add-Content $env:GITHUB_PATH $tools
