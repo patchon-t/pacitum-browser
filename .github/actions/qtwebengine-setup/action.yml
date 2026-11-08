@@ -47,11 +47,14 @@ runs:
       if: inputs.name == 'windows'
       uses: al-cheb/configure-pagefile-action@v1.4
       with:
-        minimum-size: 16GB
-        maximum-size: 24GB
-        disk-root: "C:"
+        minimum-size: 8GB
+        maximum-size: 16GB
+        disk-root: "D:"   # not C:, where the build needs every GB (C: ran out at 62% with a 16-24 GB page file there)
     - uses: ilammy/msvc-dev-cmd@v1
       if: inputs.name == 'windows'
+    - name: Free space
+      shell: bash
+      run: df -h 2>/dev/null | head -20 || true
     - name: Source
       shell: bash
       run: |
