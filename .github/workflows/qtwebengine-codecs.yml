@@ -7,7 +7,7 @@ name: Qt WebEngine with codecs
 #
 # Chromium takes longer than one 6-hour job on Windows (84% after 5 h 50 min), so the build runs in two
 # parts: part 1 builds for up to 4 h 45 min and, if it isn't done, saves the build folder as an artifact;
-# part 2 restores it and finishes. A version that is already published is skipped.
+# parts 2 and 3 restore the newest saved folder, build on, and save again if still not done. A version that is already published is skipped.
 # Runs when this file changes, or by hand (Actions > Qt WebEngine with codecs > Run workflow).
 on:
   workflow_dispatch:
@@ -111,8 +111,8 @@ jobs:
     timeout-minutes: 360
     name: webengine part 2 (${{ matrix.name }})
     env:
-      BUILD_MINUTES: '310'
-    steps:
+      BUILD_MINUTES: '300'   # leaves time to save the build folder for the next part
+    steps: &resume
       - uses: actions/checkout@v7.0.1
       - uses: jurplel/install-qt-action@v4
         with: { version: '6.11.*', host: '${{ matrix.host }}', target: desktop, arch: '${{ matrix.arch }}', aqtsource: '${{ matrix.aqt }}', modules: 'qtwebchannel qtpositioning', cache: true }
@@ -146,7 +146,31 @@ jobs:
         if: steps.go.outputs.go == '1'
         shell: bash
         run: *build
+      - name: Save the build folder for the next part
+        if: steps.go.outputs.go == '1' && steps.build.outputs.finished != '1'
+        shell: bash
+        run: |
+          cd "$WE_BUILD/.."
+          if [ "$RUNNER_OS" = Windows ]; then 7z a -t7z -mx=1 -mmt=on "$RUNNER_TEMP/we-build.7z" "$(basename "$WE_BUILD")" >/dev/null
+          else tar -cf - "$(basename "$WE_BUILD")" | zstd -T0 -3 -q -o "$RUNNER_TEMP/we-build.7z"; fi
+          ls -la "$RUNNER_TEMP/we-build.7z"
+      - uses: actions/upload-artifact@v7.0.2
+        if: steps.go.outputs.go == '1' && steps.build.outputs.finished != '1'
+        with: { name: 'we-build-${{ matrix.name }}', path: '${{ runner.temp }}/we-build.7z', retention-days: 2, compression-level: 0, overwrite: true }
       - name: Install and publish
         if: steps.go.outputs.go == '1' && steps.build.outputs.finished == '1'
         shell: bash
         run: *publish
+
+  part3:   # Windows can need a third 6-hour job; it continues from what part 2 saved
+    needs: part2
+    if: always() && needs.part2.result != 'cancelled'
+    strategy:
+      fail-fast: false
+      matrix: *legs
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    name: webengine part 3 (${{ matrix.name }})
+    env:
+      BUILD_MINUTES: '300'
+    steps: *resume
