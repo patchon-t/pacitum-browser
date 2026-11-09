@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PacitumBrowser VERSION 2.0.6 LANGUAGES CXX)
+project(PacitumBrowser VERSION 2.0.7 LANGUAGES CXX)
 # 2.0.4: Pacitum is built for Windows and Linux only (the macOS port was removed).
 if(APPLE)
     message(FATAL_ERROR "Pacitum supports Windows and Linux. The macOS port was removed in 2.0.4.")
