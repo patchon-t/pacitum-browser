@@ -1,0 +1,176 @@
+name: Qt WebEngine with codecs
+# 2.0.6: YouTube live streams (AAC audio only), Twitch and most MP4 video need the H.264 / AAC decoders,
+# which Qt's ready-made WebEngine leaves out (issue #52). This builds Qt WebEngine with proprietary codecs
+# for the exact Qt version CI installs and publishes it on the release "qtwebengine-<version>-codecs"
+# (not marked latest, so neither the updater nor the Discord bot takes it for a Pacitum release).
+# windows.yml and linux.yml lay it over the installed Qt when it exists.
+#
+# Chromium takes longer than one 6-hour job on Windows (84% after 5 h 50 min), so the build runs in two
+# parts: part 1 builds for up to 4 h 45 min and, if it isn't done, saves the build folder as an artifact;
+# parts 2 and 3 restore the newest saved folder, build on, and save again if still not done. A version that is already published is skipped.
+# Runs when this file changes, or by hand (Actions > Qt WebEngine with codecs > Run workflow).
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/qtwebengine-codecs.yml', '.github/actions/qtwebengine-setup/**']
+permissions:
+  contents: write
+  actions: read   # find and download a build folder saved by an earlier run
+env:
+  GH_TOKEN: ${{ github.token }}
+  CMAKE_ARGS: >-
+    -G Ninja -DCMAKE_BUILD_TYPE=Release -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF
+    -DFEATURE_webengine_proprietary_codecs=ON -DFEATURE_qtpdf_build=OFF -DFEATURE_qtwebengine_quick_build=OFF
+    -DFEATURE_webengine_jumbo_build=ON
+jobs:
+  part1:
+    strategy:
+      fail-fast: false
+      matrix: &legs
+        include:
+          - { name: windows, os: windows-latest, host: windows, arch: win64_msvc2022_64, aqt: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b' }
+          - { name: linux, os: ubuntu-22.04, host: linux, arch: linux_gcc_64, aqt: 'aqtinstall' }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    name: webengine part 1 (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: jurplel/install-qt-action@v4
+        with: { version: '6.11.*', host: '${{ matrix.host }}', target: desktop, arch: '${{ matrix.arch }}', aqtsource: '${{ matrix.aqt }}', modules: 'qtwebchannel qtpositioning', cache: true }
+      - name: Version and whether it is already built
+        id: v
+        shell: bash
+        run: &version |
+          ver=$("$QT_ROOT_DIR/bin/qmake" -query QT_VERSION | tr -d '\r')
+          tag="qtwebengine-$ver-codecs"
+          if [ "${{ matrix.name }}" = windows ]; then asset="$tag-windows.7z"; else asset="$tag-linux.tar.xz"; fi
+          echo "ver=$ver" >> "$GITHUB_OUTPUT"; echo "tag=$tag" >> "$GITHUB_OUTPUT"; echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "$asset"; then
+            echo "done=1" >> "$GITHUB_OUTPUT"; echo "Already published: $asset"
+          fi
+          # A build folder saved by an earlier part 1 (any run, not expired): continue from it instead of starting over.
+          saved=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=we-build-${{ matrix.name }}&per_page=20" \
+                  -q '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .workflow_run.id // empty' 2>/dev/null || true)
+          if [ -n "$saved" ]; then echo "saved=$saved" >> "$GITHUB_OUTPUT"; echo "Saved build folder in run $saved"; fi
+      - uses: ./.github/actions/qtwebengine-setup
+        if: steps.v.outputs.done != '1' && steps.v.outputs.saved == ''
+        with: { name: '${{ matrix.name }}', version: '${{ steps.v.outputs.ver }}' }
+      - name: Configure
+        if: steps.v.outputs.done != '1' && steps.v.outputs.saved == ''
+        shell: bash
+        run: |
+          cmake -S "$WE_SRC" -B "$WE_BUILD" -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" -DCMAKE_INSTALL_PREFIX="$WE_STAGE" $CMAKE_ARGS
+          grep -i "proprietary" "$WE_BUILD/config.summary" || true
+      - name: Build (up to 4 h 45 min)
+        id: build
+        if: steps.v.outputs.done != '1' && steps.v.outputs.saved == ''
+        shell: bash
+        run: &build |
+          cores=$(nproc 2>/dev/null || echo "$NUMBER_OF_PROCESSORS")
+          if [ "$RUNNER_OS" = Linux ]; then (while sleep 600; do echo "::group::memory"; free -m; df -h /mnt | tail -1; echo "::endgroup::"; done) & fi
+          set +e
+          timeout -k 2m "${BUILD_MINUTES:-285}m" cmake --build "$WE_BUILD" --parallel "$cores"
+          rc=$?
+          set -e
+          if [ "$RUNNER_OS" = Windows ]; then taskkill //F //T //IM ninja.exe >/dev/null 2>&1 || true; fi
+          if [ $rc -eq 0 ]; then echo "finished=1" >> "$GITHUB_OUTPUT"
+          elif [ $rc -eq 124 ] || [ $rc -eq 137 ]; then echo "Time is up: the next part continues."
+          else exit $rc; fi
+      - name: Save the build folder for part 2
+        if: steps.v.outputs.done != '1' && steps.v.outputs.saved == '' && steps.build.outputs.finished != '1'
+        shell: bash
+        run: |
+          cd "$WE_BUILD/.."
+          if [ "$RUNNER_OS" = Windows ]; then 7z a -t7z -mx=1 -mmt=on "$RUNNER_TEMP/we-build.7z" "$(basename "$WE_BUILD")" >/dev/null
+          else tar -cf - "$(basename "$WE_BUILD")" | zstd -T0 -3 -q -o "$RUNNER_TEMP/we-build.7z"; fi
+          ls -la "$RUNNER_TEMP/we-build.7z"
+      - uses: actions/upload-artifact@v7.0.2
+        if: steps.v.outputs.done != '1' && steps.v.outputs.saved == '' && steps.build.outputs.finished != '1'
+        with: { name: 'we-build-${{ matrix.name }}', path: '${{ runner.temp }}/we-build.7z', retention-days: 2, compression-level: 0 }
+      - name: Install and publish
+        if: steps.v.outputs.done != '1' && steps.build.outputs.finished == '1'
+        shell: bash
+        run: &publish |
+          cmake --install "$WE_BUILD"
+          tag=${{ steps.v.outputs.tag }}; asset=${{ steps.v.outputs.asset }}
+          cd "$WE_STAGE"
+          if [ "${{ matrix.name }}" = windows ]; then 7z a -t7z -mx=7 "$RUNNER_TEMP/$asset" . >/dev/null; else tar -cJf "$RUNNER_TEMP/$asset" .; fi
+          ls -la "$RUNNER_TEMP/$asset"
+          gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$tag" -R "$GITHUB_REPOSITORY" --latest=false --title "Qt WebEngine ${{ steps.v.outputs.ver }} with H.264 / AAC (build input)" \
+              --notes "Qt WebEngine ${{ steps.v.outputs.ver }} built with proprietary codecs, used by Pacitum's CI. Not a Pacitum release."
+          gh release upload "$tag" "$RUNNER_TEMP/$asset" -R "$GITHUB_REPOSITORY" --clobber
+
+  part2:
+    needs: part1
+    if: always() && needs.part1.result != 'cancelled'
+    strategy:
+      fail-fast: false
+      matrix: *legs
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    name: webengine part 2 (${{ matrix.name }})
+    env:
+      BUILD_MINUTES: '300'   # leaves time to save the build folder for the next part
+    steps: &resume
+      - uses: actions/checkout@v7.0.1
+      - uses: jurplel/install-qt-action@v4
+        with: { version: '6.11.*', host: '${{ matrix.host }}', target: desktop, arch: '${{ matrix.arch }}', aqtsource: '${{ matrix.aqt }}', modules: 'qtwebchannel qtpositioning', cache: true }
+      - name: Version and whether it is already built
+        id: v
+        shell: bash
+        run: *version
+      - uses: actions/download-artifact@v4
+        id: dl
+        if: steps.v.outputs.done != '1' && steps.v.outputs.saved != ''
+        continue-on-error: true
+        with: { name: 'we-build-${{ matrix.name }}', path: '${{ runner.temp }}', run-id: '${{ steps.v.outputs.saved }}', github-token: '${{ github.token }}' }
+      - name: Anything to continue?
+        id: go
+        if: steps.v.outputs.done != '1' && steps.dl.outcome == 'success'
+        shell: bash
+        run: echo "go=1" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/qtwebengine-setup
+        if: steps.go.outputs.go == '1'
+        with: { name: '${{ matrix.name }}', version: '${{ steps.v.outputs.ver }}' }
+      - name: Restore the build folder
+        if: steps.go.outputs.go == '1'
+        shell: bash
+        run: |
+          mkdir -p "$WE_BUILD/.."; cd "$WE_BUILD/.."
+          if [ "$RUNNER_OS" = Windows ]; then 7z x -y "$RUNNER_TEMP/we-build.7z" >/dev/null
+          else zstd -d -q -c "$RUNNER_TEMP/we-build.7z" | tar -xf -; fi
+          rm "$RUNNER_TEMP/we-build.7z"
+      - name: Build (the rest)
+        id: build
+        if: steps.go.outputs.go == '1'
+        shell: bash
+        run: *build
+      - name: Save the build folder for the next part
+        if: steps.go.outputs.go == '1' && steps.build.outputs.finished != '1'
+        shell: bash
+        run: |
+          cd "$WE_BUILD/.."
+          if [ "$RUNNER_OS" = Windows ]; then 7z a -t7z -mx=1 -mmt=on "$RUNNER_TEMP/we-build.7z" "$(basename "$WE_BUILD")" >/dev/null
+          else tar -cf - "$(basename "$WE_BUILD")" | zstd -T0 -3 -q -o "$RUNNER_TEMP/we-build.7z"; fi
+          ls -la "$RUNNER_TEMP/we-build.7z"
+      - uses: actions/upload-artifact@v7.0.2
+        if: steps.go.outputs.go == '1' && steps.build.outputs.finished != '1'
+        with: { name: 'we-build-${{ matrix.name }}', path: '${{ runner.temp }}/we-build.7z', retention-days: 2, compression-level: 0, overwrite: true }
+      - name: Install and publish
+        if: steps.go.outputs.go == '1' && steps.build.outputs.finished == '1'
+        shell: bash
+        run: *publish
+
+  part3:   # Windows can need a third 6-hour job; it continues from what part 2 saved
+    needs: part2
+    if: always() && needs.part2.result != 'cancelled'
+    strategy:
+      fail-fast: false
+      matrix: *legs
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    name: webengine part 3 (${{ matrix.name }})
+    env:
+      BUILD_MINUTES: '300'
+    steps: *resume
