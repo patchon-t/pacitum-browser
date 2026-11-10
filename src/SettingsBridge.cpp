@@ -324,6 +324,9 @@ void SettingsBridge::set(const QString& key, const QVariant& value) {
     if (key == QLatin1String("picker")) { ProfileManager::instance()->setShowPickerOnStartup(value.toBool()); emit changed(); return; }
     if (key.startsWith(QLatin1String("sync."))) { SyncManager::instance()->setSyncs(key.mid(5), value.toBool()); emit changed(); return; }
     if (!plain.contains(key)) return;
+    // 2.0.8: turning off "ask for your computer password" needs that password (anyone at the keyboard could).
+    if (key == QLatin1String("passwords_pin") && !value.toBool() && settings().value(key).toBool(true)
+        && !OsAuth::verify(win(), QStringLiteral("Pacitum wants to stop asking for your password before showing saved passwords"))) { emit changed(); return; }
     AppSettings::set(key, QJsonValue::fromVariant(value));
     if (key == QLatin1String("startup")) AppSettings::set(QStringLiteral("restore_session"), value.toString() == QLatin1String("restore"));
     if (key == QLatin1String("reduce_motion")) AppSettings::set(QStringLiteral("animations"), !value.toBool());

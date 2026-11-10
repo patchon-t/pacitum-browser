@@ -65,6 +65,18 @@ static QElapsedTimer g_clock;
 // right away let every second launch truncate the running browser's log.
 static QByteArray g_pendingLog;
 static std::string g_crashPath;   // precomputed: no Qt allocations needed inside the crash handler
+#ifdef Q_OS_WIN
+static std::wstring g_crashPathW;   // 2.0.8: wide path, so user names outside the system code page work
+#endif
+// 2.0.8: fopen() takes a path in the ANSI code page on Windows; a Thai user name on English Windows (and the
+// like) meant startup.log and crash.log were never written.
+static FILE* openFile(const QString& path, const char* mode) {
+#ifdef Q_OS_WIN
+    return _wfopen(reinterpret_cast<const wchar_t*>(path.utf16()), QString::fromLatin1(mode).toStdWString().c_str());
+#else
+    return std::fopen(QFile::encodeName(path).constData(), mode);
+#endif
+}
 
 static QString logDir() {
     if (!g_logDir.isEmpty()) return g_logDir;
@@ -91,7 +103,7 @@ void pacitumLog(const QString& line) {
 static void openLog(const char* name) {
     if (g_log) return;
     const QString path = logDir() + QLatin1Char('/') + QLatin1String(name);
-    g_log = std::fopen(path.toLocal8Bit().constData(), "w");
+    g_log = openFile(path, "w");
     if (g_log && !g_pendingLog.isEmpty()) { std::fwrite(g_pendingLog.constData(), 1, size_t(g_pendingLog.size()), g_log); std::fflush(g_log); }
     g_pendingLog.clear();
 }
@@ -109,7 +121,11 @@ static void writeCrash(const char* what) {
     const time_t now = time(nullptr);
     if (const tm* lt = localtime(&now)) strftime(stamp, sizeof(stamp), "%Y-%m-%dT%H:%M:%S", lt);
     const long long ms = g_clock.isValid() ? (long long)g_clock.elapsed() : 0LL;
+#ifdef Q_OS_WIN
+    if (FILE* f = _wfopen(g_crashPathW.c_str(), L"a")) {
+#else
     if (FILE* f = std::fopen(g_crashPath.c_str(), "a")) {
+#endif
         std::fprintf(f, "%s Pacitum %s crashed after %lld ms: %s\n", stamp, PACITUM_VERSION, ms, what);
         std::fclose(f);
     }
@@ -134,7 +150,10 @@ static LONG WINAPI crashFilter(EXCEPTION_POINTERS* ep) {
 
 static void installLogging() {
     g_clock.start();
-    g_crashPath = (logDir() + QStringLiteral("/crash.log")).toLocal8Bit().toStdString();
+    g_crashPath = QFile::encodeName(logDir() + QStringLiteral("/crash.log")).toStdString();
+#ifdef Q_OS_WIN
+    g_crashPathW = (logDir() + QStringLiteral("/crash.log")).toStdWString();
+#endif
     qInstallMessageHandler(messageHandler);
     std::set_terminate([]{
         const char* what = "std::terminate";
@@ -395,6 +414,14 @@ int main(int argc, char *argv[]) {
 
     // Persistent profile storage (mirrors main.py:82)
     QString storagePath = QDir::currentPath() + QStringLiteral("/browser_data");  // persistent storage incl. cookies
+    // 2.0.8: "Clear cookies" also clears what sites keep in storage. Qt has no API for it while the profile is
+    // loaded, so it is done here, before Chromium opens the folders.
+    if (!guest && AppSettings::get(QStringLiteral("pending_clear_site_data")).toBool(false)) {
+        for (const char* d : {"Local Storage", "Session Storage", "IndexedDB", "Service Worker", "File System", "WebStorage", "databases", "blob_storage", "Shared Dictionary"})
+            QDir(storagePath + QStringLiteral("/storage/") + QLatin1String(d)).removeRecursively();
+        AppSettings::set(QStringLiteral("pending_clear_site_data"), false);
+        pacitumLog(QStringLiteral("cleared site data (requested last session)"));
+    }
     QDir().mkpath(storagePath + QStringLiteral("/storage"));
     QDir().mkpath(storagePath + QStringLiteral("/cache"));
     // 1.9.1: the profile is created with its paths (Qt 6.9+). Setting them afterwards made Qt 6.11

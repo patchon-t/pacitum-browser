@@ -103,7 +103,7 @@ void TabOverview::prepareCards() {
         QPixmap pm;
         if (!c.shot.isNull()) {
             pm = c.shot.scaled(cs, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-            pm = pm.copy((pm.width() - cs.width()) / 2, 0, cs.width(), cs.height());
+            pm = pm.copy(0, 0, cs.width(), cs.height());   // 2.0.8: from the left edge (the centre crop cut off the start of every page)
             pm.setDevicePixelRatio(devicePixelRatioF());
         }
         m_scaled << pm;
@@ -266,7 +266,8 @@ void TabOverview::paintEvent(QPaintEvent*) {
     p.drawText(QRectF(60, by, width() - 120, 30), Qt::AlignCenter, QFontMetrics(p.font()).elidedText(cur.title, Qt::ElideRight, width() - 160));
     const QUrl u(cur.url);
     p.setPen(muted); p.setFont(font(14, QFont::Normal));
-    const QString addr = u.scheme().startsWith(QLatin1String("http")) ? u.host().remove(QRegularExpression(QStringLiteral("^www\\."))) + u.path() : cur.url;
+    const QString addr = u.scheme().startsWith(QLatin1String("http"))
+        ? u.host().remove(QRegularExpression(QStringLiteral("^www\\."))) + (u.port() > 0 ? QStringLiteral(":%1").arg(u.port()) : QString()) + u.path() : cur.url;   // 2.0.8: keep the port
     p.drawText(QRectF(60, by + 32, width() - 120, 20), Qt::AlignCenter, QFontMetrics(p.font()).elidedText(addr, Qt::ElideMiddle, width() - 160));
     // dots
     const int maxDots = qMin(n, 30);

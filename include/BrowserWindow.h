@@ -148,6 +148,9 @@ private:
     void setupShortcuts();
     void setupAdBlocker();
     void setupDownloadHandler();
+    void handleDownloadRequest(QWebEngineDownloadRequest* dl, bool ownProfile);   // 2.0.8
+    void updatePrivateBadge();   // 2.0.8
+    QVector<SessionTab> windowsSessionTabs(bool includeSelf) const;   // 2.0.8
     void applyTheme();
     void applyToolbarTheme();
     void loadSettings();
@@ -288,7 +291,7 @@ private:
     QWidget* m_contentRow = nullptr;
     QHash<QObject*, QPixmap> m_thumbs;   // last snapshot per tab (3D tab overview), ~640 px wide
     QTimer m_thumbTimer;
-    bool m_thumbsWanted = false;   // the tab overview has been used: keep its cards fresh
+    bool m_thumbsWanted = true;   // 2.0.8: on from the start, so the first overview shows real cards, not blank ones   // the tab overview has been used: keep its cards fresh
     PacitumTabWidget* m_tabs = nullptr;
     PacitumTabWidget* m_splitTabs = nullptr;
     PacitumTabWidget* m_activeWidget = nullptr;

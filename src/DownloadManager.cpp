@@ -208,6 +208,7 @@ void DownloadManager::load() {
     });
 }
 void DownloadManager::save(const DownloadEntry& e) {
+    if (e.offTheRecord) return;   // 2.0.8: private-tab downloads stay out of the downloads history file
     withDb(m_dbPath, [&](QSqlQuery& q) {
         q.prepare(QStringLiteral("INSERT OR REPLACE INTO downloads VALUES (?,?,?,?,?,?,?,?,?,?,?)"));
         for (const QVariant& v : {QVariant(e.id), QVariant(e.url), QVariant(e.pageUrl), QVariant(e.dir), QVariant(e.fileName), QVariant(e.holdName),
@@ -252,10 +253,21 @@ void DownloadManager::addDownload(QWebEngineDownloadRequest* dl) {
     e->received = 0; e->total = dl->totalBytes(); e->samples.clear();
     e->state = DownloadEntry::InProgress;
     e->started = QDateTime::currentDateTime();
+    e->offTheRecord = dl->page() && dl->page()->profile() && dl->page()->profile()->isOffTheRecord() && dl->page()->profile() != Pacitum::mainProfile();
     // Potentially dangerous executable from the web: hold it under a temp name until Keep/Delete.
     const QString scheme = dl->url().scheme();
-    if (isDangerousName(e->fileName) && scheme != QStringLiteral("file") && scheme != QStringLiteral("data") && scheme != QStringLiteral("blob")) {
-        e->holdName = e->fileName + QStringLiteral(".pacitum-hold");
+    // 2.0.8: not again when the user already said "Save" to the program warning (it asked three times).
+    if (isDangerousName(e->fileName) && scheme != QStringLiteral("file") && scheme != QStringLiteral("data") && scheme != QStringLiteral("blob")
+        && !dl->property("pacitumConfirmed").toBool()) {
+        // 2.0.8: a hold name of its own. Two downloads of the same file used to share one held file.
+        QString hold = e->fileName + QStringLiteral(".pacitum-hold");
+        auto taken = [this, e](const QString& n) {
+            if (QFileInfo::exists(QDir(e->dir).filePath(n))) return true;
+            for (const auto& o : std::as_const(m_entries)) if (&o != e && o.holdName == n && o.dir == e->dir) return true;
+            return false;
+        };
+        for (int n = 2; taken(hold); ++n) hold = QStringLiteral("%1 (%2).pacitum-hold").arg(e->fileName).arg(n);
+        e->holdName = hold;
         dl->setDownloadFileName(e->holdName);
     }
     ++m_sessionDownloads;
@@ -282,6 +294,13 @@ void DownloadManager::attach(DownloadEntry& e, QWebEngineDownloadRequest* dl) {
     connect(dl, &DS::totalBytesChanged, this, prog);
     connect(dl, &DS::isPausedChanged, this, [this, id] { onState(id); });
     connect(dl, &DS::stateChanged, this, [this, id] { onState(id); });
+    // 2.0.8: a private tab's download ends with the tab (its profile is deleted): never leave it "in progress".
+    connect(dl, &QObject::destroyed, this, [this, id] {
+        auto* x = find(id); if (!x || !x->active()) return;
+        x->state = DownloadEntry::Failed; x->reason = QStringLiteral("Tab closed");
+        if (!x->holdName.isEmpty()) { QFile::remove(x->filePath()); x->holdName.clear(); }
+        save(*x); emit downloadFinished(id, false); emit entryChanged(id);
+    });
 }
 
 void DownloadManager::onState(qint64 id) {

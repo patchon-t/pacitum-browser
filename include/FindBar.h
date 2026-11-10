@@ -3,6 +3,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QLabel>
+#include <QKeyEvent>
 
 class QWebEngineView;
 
@@ -23,8 +24,11 @@ private slots:
     void findPrev();
     void closeBar();
 
+protected:
+    void keyPressEvent(QKeyEvent* e) override;
 private:
     void doFind(bool forward);
+    void refreshIcons();
 
     QWebEngineView* m_view = nullptr;
     QLineEdit* m_input = nullptr;

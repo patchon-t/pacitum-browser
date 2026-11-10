@@ -116,6 +116,7 @@
 
 BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent) {
     m_history = new HistoryManager(QStringLiteral("browser_history.db"));
+    QTimer::singleShot(30000, this, [this]{ if (m_history) m_history->cleanupOld(365); });   // 2.0.8: history older than a year (never trimmed before)
     m_bookmarks = new BookmarkManager(QStringLiteral("bookmarks.json"));
     m_downloads = DownloadManager::instance();
     m_theme = new ThemeManager(false);
@@ -135,7 +136,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent) {
     m_sessionTimer->setSingleShot(true);
     m_sessionTimer->setInterval(3000);   // coalesce bursts of navigations / tab changes into one write
     connect(m_sessionTimer, &QTimer::timeout, this, [this]{
-        const auto tabs = sessionTabs();
+        const auto tabs = windowsSessionTabs(true);   // 2.0.8: every open window, not just this one
         if (!tabs.isEmpty()) m_session->saveAsync(tabs);
     });
     setupAdBlocker();
@@ -372,21 +373,29 @@ void BrowserWindow::setupAdBlocker() {
 }
 
 void BrowserWindow::setupDownloadHandler() {
-    connect(Pacitum::mainProfile(), &QWebEngineProfile::downloadRequested, this, [this](QWebEngineDownloadRequest* dl){
-        // every window receives the signal; let the active one (or the first) handle it
+    connect(Pacitum::mainProfile(), &QWebEngineProfile::downloadRequested, this, [this](QWebEngineDownloadRequest* dl){ handleDownloadRequest(dl, false); });
+}
+
+void BrowserWindow::handleDownloadRequest(QWebEngineDownloadRequest* dl, bool ownProfile) {
+    {
+        // every window receives the main profile's signal; let the active one (or the first) handle it
         if (dl->state() != QWebEngineDownloadRequest::DownloadRequested) return;
         auto* aw = qobject_cast<BrowserWindow*>(QApplication::activeWindow());
-        if (aw && aw != this) return;
+        if (!ownProfile && aw && aw != this) return;
         // Multiple automatic downloads (§11): held / blocked per origin by the page's controller.
         for (auto* c : PermissionController::all())
             if (c->page() && c->page() == dl->page() && !c->filterDownload(dl)) { dl->cancel(); return; }
         onDownloadRequested(dl);
-    });
+    }
 }
 
 void BrowserWindow::setupUI() {
     setWindowTitle(QStringLiteral("Pacitum Browser"));
     setMinimumSize(720,520); resize(1440,900);   // spec §4.4: min width 720
+    if (auto* sc = screen()) {   // 2.0.8: never larger than the screen (the close button ended up off screen)
+        const QRect a = sc->availableGeometry();
+        if (a.width() >= 720 && a.height() >= 520) resize(qMin(width(), a.width()), qMin(height(), a.height()));
+    }
 
     auto* central = new QWidget(this); setCentralWidget(central);
     auto* mainLay = new QVBoxLayout(central); mainLay->setContentsMargins(0,0,0,0); mainLay->setSpacing(0);
@@ -984,6 +993,14 @@ void BrowserWindow::setupShortcuts() {
     new QShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+Space")), this, [this]{ showTabOverview(); });
     new QShortcut(QKeySequence(QStringLiteral("Alt+Left")), this, SLOT(goBack()));
     new QShortcut(QKeySequence(QStringLiteral("Alt+Right")), this, SLOT(goForward()));
+    // 2.0.8: shown in the menus but never connected
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+N")), this, [this]{ auto* w = new BrowserWindow(); w->setAttribute(Qt::WA_DeleteOnClose); w->show(); });
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+R")), this, SLOT(reloadPage()));
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+U")), this, [this]{
+        auto* t = activeTab(); if (!t) return;
+        const QUrl here(t->currentUrl());
+        if (here.scheme() == QLatin1String("http") || here.scheme() == QLatin1String("https")) newTab(QStringLiteral("view-source:") + here.toString());
+    });
     for (int i = 1; i <= 9; ++i)
         new QShortcut(QKeySequence(QStringLiteral("Ctrl+%1").arg(i)), this, [this, i]{
             if (i == 9) lastTab(); else if (i - 1 < m_tabs->count()) m_tabs->setCurrentIndex(i - 1); });
@@ -1049,7 +1066,10 @@ void BrowserWindow::newTab(const QString& url) {
     attachInternalChannel(tab, u);
     connect(tab, &BrowserTab::urlChanged, this, [this, tab](const QString& u){
         attachInternalChannel(tab, u);
-        if (!tab->isPrivate() && !tab->isLazy() && !u.startsWith(QStringLiteral("pacitum:"))) m_history->addVisit(u, tab->currentTitle());
+        // 2.0.8: no title here (it is still the previous page's); titleChanged / loadDone fill it in.
+        const bool typed = tab->property("pacitumTyped").toBool();
+        tab->setProperty("pacitumTyped", QVariant());
+        if (!tab->isPrivate() && !tab->isLazy() && !u.startsWith(QStringLiteral("pacitum:"))) m_history->addVisit(u, QString(), typed);
         if (tab == activeTab()) updateAddressBar(u);
         scheduleSessionSave();
     });
@@ -1065,7 +1085,10 @@ void BrowserWindow::newTab(const QString& url) {
         if (tab == activeTab()) m_addressBar->progressChanged(p);
         for (auto* tw : {m_tabs, m_splitTabs}) if (int i = tw->indexOf(tab); i >= 0) tw->setTabWaiting(i, tab->isLoading() && p <= 10);
     });
-    connect(tab, &BrowserTab::loadDone, this, [this, tab](bool ok){ if (tab == activeTab()) m_addressBar->progressFinished(ok); });
+    connect(tab, &BrowserTab::loadDone, this, [this, tab](bool ok){
+        if (tab == activeTab()) m_addressBar->progressFinished(ok);
+        if (ok && !tab->isPrivate() && !tab->isLazy()) m_history->updateTitle(tab->currentUrl(), tab->currentTitle());   // 2.0.8
+    });
     // 2.0.1 Languages › Offer to translate pages
     connect(tab, &BrowserTab::loadDone, this, [this, tab](bool ok){
         if (!ok || !tab->view() || !tab->currentUrl().startsWith(QLatin1String("http"))) return;
@@ -1122,6 +1145,12 @@ void BrowserWindow::newTab(const QString& url) {
     });
     connect(tab, &BrowserTab::crashed, this, [this, tab]{ const int i = m_tabs->indexOf(tab); if (i >= 0) m_tabs->setTabCrashed(i, true); });
     wirePermissions(tab);
+    if (tab->isPrivate() && tab->view()) {   // 2.0.8: a private tab has its own profile; it used to get no blocker and no downloads
+        QWebEngineProfile* prof = tab->view()->page()->profile();
+        if (m_adblock && prof != Pacitum::mainProfile()) prof->setUrlRequestInterceptor(m_adblock);
+        if (prof != Pacitum::mainProfile())
+            connect(prof, &QWebEngineProfile::downloadRequested, this, [this](QWebEngineDownloadRequest* dl){ handleDownloadRequest(dl, true); });
+    }
     if (tab->view()) {
         connect(tab->view()->page(), &QWebEnginePage::recentlyAudibleChanged, this, [this, tab]{ updateTabAudio(tab); });
         connect(tab->view()->page(), &QWebEnginePage::audioMutedChanged, this, [this, tab]{ updateTabAudio(tab); });
@@ -1142,7 +1171,7 @@ void BrowserWindow::newPrivateTab() {
     m_privateMode = true; newTab(); m_privateMode = false;
     int idx = m_tabs->currentIndex();
     m_tabs->setTabText(idx, QStringLiteral("Private — ") + m_tabs->tabText(idx));
-    m_privateBadge->show();
+    updatePrivateBadge();
 }
 
 void BrowserWindow::openLink(const QUrl& url, int target) {
@@ -1159,7 +1188,7 @@ void BrowserWindow::openLink(const QUrl& url, int target) {
         m_privateMode = true; newTab(u); m_privateMode = false;
         const int idx = m_tabs->currentIndex();
         m_tabs->setTabText(idx, QStringLiteral("Private — ") + m_tabs->tabText(idx));
-        m_privateBadge->show();
+        updatePrivateBadge();
         break;
     }
     case BrowserTab::SplitView:
@@ -1187,7 +1216,7 @@ void BrowserWindow::closeTab(int index) {
         if (!guard) return;
         const int idx = m_tabs->indexOf(guard);
         if (idx < 0) return;
-        if (auto* t = qobject_cast<BrowserTab*>(guard.data())) {
+        if (auto* t = qobject_cast<BrowserTab*>(guard.data()); t && !t->isPrivate()) {   // 2.0.8: private tabs leave no trace
             m_recentlyClosed.push_back({t->currentUrl(), t->currentTitle()});
             if (m_recentlyClosed.size() > 20) m_recentlyClosed.pop_front();
         }
@@ -1237,6 +1266,15 @@ void BrowserWindow::tabActivated(PacitumTabWidget* sender, int index) {
         setWindowTitle(QStringLiteral("Downloads — Pacitum Browser"));
     }
     updateNavState();
+    updatePrivateBadge();
+}
+
+// 2.0.8: the badge (and the menu's "Private browsing") shows only while a private tab is the one on screen.
+void BrowserWindow::updatePrivateBadge() {
+    if (!m_privateBadge) return;
+    auto* t = activeTab();
+    const bool on = t && t->isPrivate();
+    if (m_privateBadge->isVisibleTo(m_toolbar) != on) { m_privateBadge->setVisible(on); updateToolbarOverflow(); }
 }
 
 BrowserTab* BrowserWindow::activeTab() const {
@@ -1264,7 +1302,9 @@ void BrowserWindow::navigateToUrl(const QString& rawUrl) {
     }
     if (url.startsWith(QStringLiteral("pacitum://settings"))) { showSettings(QUrl(url).path().mid(1)); return; }
     if (url.startsWith(QStringLiteral("pacitum://downloads"))) { showDownloads(); return; }
-    if (auto* t = activeTab()) { t->loadUrl(url); m_history->addVisit(url, {}, true); }
+    // 2.0.8: the visit is recorded once the tab reaches the real address (urlChanged), marked as typed.
+    // It used to store the raw text ("localhost:8000", search words) and did so for private tabs too.
+    if (auto* t = activeTab()) { if (!t->isPrivate()) t->setProperty("pacitumTyped", true); t->loadUrl(url); }
     else newTab(url);
 }
 
@@ -1282,7 +1322,8 @@ void BrowserWindow::updateTabTitle(const QString& title) {
     for (auto* tw : {m_tabs, m_splitTabs}) {
         int idx = tw->indexOf(sender);
         if (idx >= 0) {   // full title: the floating tab fades the overflow instead of "…"
-            tw->setTabText(idx, title); tw->setTabToolTip(idx, title);
+            const QString shown = sender->isPrivate() ? QStringLiteral("Private — ") + title : title;   // 2.0.8: the label used to vanish on load
+            tw->setTabText(idx, shown); tw->setTabToolTip(idx, shown);
             if (sender == activeTab()) setWindowTitle(title + QStringLiteral(" — Pacitum Browser"));
             break;
         }
@@ -1478,15 +1519,18 @@ void BrowserWindow::attachInternalChannel(BrowserTab* tab, const QString& url) {
 
 void BrowserWindow::restartBrowser() {
     // The new process waits for this one to let go of the profile (--restarted).
-    static bool armed = false;
+    static QMetaObject::Connection armed;
     if (!armed) {
-        armed = true;
         const QString id = ProfileManager::instance()->currentId();
-        connect(qApp, &QCoreApplication::aboutToQuit, qApp, [id]{
+        armed = connect(qApp, &QCoreApplication::aboutToQuit, qApp, [id]{
             QProcess::startDetached(QCoreApplication::applicationFilePath(), QStringList{QStringLiteral("--restarted"), QStringLiteral("--profile-directory=") + id});
         });
     }
     for (auto* w : QApplication::topLevelWidgets()) if (qobject_cast<BrowserWindow*>(w)) w->close();
+    // 2.0.8: a window that didn't close (it asked to stay open) cancels the restart; it used to fire
+    // on some later, ordinary quit.
+    for (auto* w : QApplication::topLevelWidgets())
+        if (qobject_cast<BrowserWindow*>(w) && w->isVisible()) { disconnect(armed); armed = {}; break; }
 }
 
 void BrowserWindow::setupSettingsBridge() {
@@ -1554,7 +1598,7 @@ void BrowserWindow::setupSettingsBridge() {
 void BrowserWindow::clearBrowsingData(bool history, bool cookies, bool cache) {
     auto* p = Pacitum::mainProfile();
     if (history) { m_history->clear(); p->clearAllVisitedLinks(); m_recentlyClosed.clear(); }
-    if (cookies) p->cookieStore()->deleteAllCookies();
+    if (cookies) { p->cookieStore()->deleteAllCookies(); AppSettings::set(QStringLiteral("pending_clear_site_data"), true); }   // 2.0.8: storage too, at next start
     if (cache) p->clearHttpCache();
 }
 
@@ -1927,11 +1971,67 @@ void BrowserWindow::showPageInfo() {
         QMessageBox::information(this, QStringLiteral("Page Information"), sec + QStringLiteral("\n\n") + url);
     }
 }
+// 2.0.8: a real history window (search, open, remove). It used to be a message box with 20 titles.
 void BrowserWindow::showHistory() {
-    auto r = m_history->recent(50);
-    if (r.isEmpty()) { QMessageBox::information(this, QStringLiteral("History"), QStringLiteral("No browsing history yet.")); return; }
-    QStringList lines; for (int i=0;i<qMin(20,(int)r.size());++i) lines << (r[i].title.isEmpty()?r[i].url:r[i].title);
-    QMessageBox::information(this, QStringLiteral("History (%1 entries)").arg(r.size()), lines.join(QStringLiteral("\n")));
+    auto* dlg = new QDialog(this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setWindowTitle(QStringLiteral("History"));
+    dlg->resize(680, 560);
+    auto* v = new QVBoxLayout(dlg); v->setContentsMargins(20, 18, 20, 16); v->setSpacing(10);
+    auto* search = new QLineEdit(dlg); search->setPlaceholderText(QStringLiteral("Search history")); search->setClearButtonEnabled(true);
+    auto* list = new QListWidget(dlg); list->setSelectionMode(QAbstractItemView::ExtendedSelection); list->setAlternatingRowColors(false);
+    auto* empty = new QLabel(QStringLiteral("No browsing history yet."), dlg); empty->setObjectName(QStringLiteral("RowSub")); empty->setAlignment(Qt::AlignCenter);
+    auto* row = new QHBoxLayout(); row->setSpacing(8);
+    auto* openBtn = new QPushButton(QStringLiteral("Open"), dlg);
+    auto* removeBtn = new QPushButton(QStringLiteral("Remove"), dlg);
+    auto* clearBtn = new QPushButton(QStringLiteral("Clear all history…"), dlg);
+    auto* done = new QPushButton(QStringLiteral("Done"), dlg); done->setObjectName(QStringLiteral("PrimaryButton")); done->setDefault(true);
+    row->addWidget(openBtn); row->addWidget(removeBtn); row->addStretch(1); row->addWidget(clearBtn); row->addWidget(done);
+    v->addWidget(search); v->addWidget(list, 1); v->addWidget(empty, 1); v->addLayout(row);
+    QPointer<BrowserWindow> self(this);
+    auto fill = [self, list, search, empty, openBtn, removeBtn]{
+        if (!self) return;
+        list->clear();
+        const QString q = search->text().trimmed();
+        const auto rows = q.isEmpty() ? self->m_history->recent(500) : self->m_history->search(q, 500);
+        QDate last;
+        for (const auto& e : rows) {
+            const QDateTime at = QDateTime::fromSecsSinceEpoch(qint64(e.visitTime));
+            if (at.date() != last) {
+                last = at.date();
+                auto* head = new QListWidgetItem(QLocale().toString(last, QLocale::LongFormat), list);
+                head->setFlags(Qt::NoItemFlags); QFont f = head->font(); f.setBold(true); head->setFont(f);
+            }
+            auto* it = new QListWidgetItem(QStringLiteral("%1   %2").arg(QLocale().toString(at.time(), QLocale::ShortFormat), e.title.isEmpty() ? e.url : e.title), list);
+            it->setData(Qt::UserRole, e.url); it->setToolTip(e.url);
+        }
+        empty->setVisible(list->count() == 0); list->setVisible(list->count() > 0);
+        empty->setText(q.isEmpty() ? QStringLiteral("No browsing history yet.") : QStringLiteral("Nothing in your history matches \u201C%1\u201D.").arg(q));
+        openBtn->setEnabled(false); removeBtn->setEnabled(false);
+    };
+    auto openSelected = [self, list, dlg]{
+        if (!self) return;
+        for (auto* it : list->selectedItems()) if (const QString u = it->data(Qt::UserRole).toString(); !u.isEmpty()) self->newTab(u);
+        dlg->accept();
+    };
+    connect(search, &QLineEdit::textChanged, dlg, fill);
+    connect(list, &QListWidget::itemSelectionChanged, dlg, [list, openBtn, removeBtn]{ const bool any = !list->selectedItems().isEmpty(); openBtn->setEnabled(any); removeBtn->setEnabled(any); });
+    connect(list, &QListWidget::itemActivated, dlg, openSelected);
+    connect(openBtn, &QPushButton::clicked, dlg, openSelected);
+    connect(removeBtn, &QPushButton::clicked, dlg, [self, list, fill]{
+        if (!self) return;
+        for (auto* it : list->selectedItems()) if (const QString u = it->data(Qt::UserRole).toString(); !u.isEmpty()) self->m_history->deleteUrl(u);
+        fill();
+    });
+    connect(clearBtn, &QPushButton::clicked, dlg, [self, dlg, fill]{
+        if (!self || QMessageBox::question(dlg, QStringLiteral("Clear history"), QStringLiteral("Delete all browsing history? This can't be undone."),
+                                           QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
+        self->clearHistory(); fill();
+    });
+    connect(done, &QPushButton::clicked, dlg, &QDialog::accept);
+    fill();
+    dlg->open();
+    search->setFocus();
 }
 void BrowserWindow::clearHistory() { m_history->clear(); statusBar()->showMessage(QStringLiteral("History cleared"), 2000); }
 void BrowserWindow::showBookmarksDialog() {
@@ -2152,6 +2252,7 @@ void BrowserWindow::onDownloadRequested(QWebEngineDownloadRequest* dl){
                     .arg(dl->downloadFileName(), insecure ? QStringLiteral(" from a site that doesn't use a secure connection") : QString()),
                 QMessageBox::Save | QMessageBox::Cancel, QMessageBox::Cancel);
             if (r != QMessageBox::Save) { dl->cancel(); return; }
+            dl->setProperty("pacitumConfirmed", true);   // 2.0.8: the user decided; don't hold it and ask again
         }
     }
     m_downloads->addDownload(dl);
@@ -2464,16 +2565,24 @@ void BrowserWindow::closeEvent(QCloseEvent* e){
     if (m_firstRun) FirstRunBridge::markFirstRunDone();   // the welcome flow is shown once
     m_sessionTimer->stop();
     m_session->waitForPendingSave();
-    const auto tabs = sessionTabs();
+    // 2.0.8: with other windows still open, the session keeps theirs (this window's tabs are closed);
+    // the last window saves its own. Two windows used to overwrite each other's session.
+    const bool lastWindow = [this]{
+        for (auto* w : QApplication::topLevelWidgets()) if (auto* b = qobject_cast<BrowserWindow*>(w); b && b != this && b->isVisible()) return false;
+        return true; }();
+    const auto tabs = lastWindow ? sessionTabs() : windowsSessionTabs(false);
     if(!tabs.isEmpty()) m_session->save(tabs);
     auto s=readSettings();
-    if (s.value(QStringLiteral("clear_cookies_on_exit")).toBool(false)) Pacitum::mainProfile()->cookieStore()->deleteAllCookies();
-    if(s.value(QStringLiteral("clear_on_exit")).toBool(false)){
+    // 2.0.8: "clear when Pacitum closes" means the last window, not any window (others were still browsing).
+    if (lastWindow && s.value(QStringLiteral("clear_cookies_on_exit")).toBool(false)) Pacitum::mainProfile()->cookieStore()->deleteAllCookies();
+    if(lastWindow && s.value(QStringLiteral("clear_on_exit")).toBool(false)){
         m_history->clear();
         Pacitum::mainProfile()->clearHttpCache();
         Pacitum::mainProfile()->cookieStore()->deleteAllCookies();
         Pacitum::mainProfile()->clearAllVisitedLinks();
     }
+    if (lastWindow && (s.value(QStringLiteral("clear_on_exit")).toBool(false) || s.value(QStringLiteral("clear_cookies_on_exit")).toBool(false)))
+        AppSettings::set(QStringLiteral("pending_clear_site_data"), true);   // 2.0.8: local storage etc. go before the next start
     QMainWindow::closeEvent(e);
 }
 
@@ -2482,6 +2591,17 @@ QVector<SessionTab> BrowserWindow::sessionTabs() const {
     for(int i=0;i<m_tabs->count();++i) if(auto* t=qobject_cast<BrowserTab*>(m_tabs->widget(i)))
         if (!t->isPrivate() && !t->currentUrl().isEmpty() && !t->currentUrl().startsWith(QStringLiteral("pacitum://welcome"))) tabs.push_back({t->currentUrl(), t->currentTitle(), false});
     return tabs;
+}
+
+// Tabs of every visible Pacitum window (the active window last, so its last tab is the one restored on top).
+QVector<SessionTab> BrowserWindow::windowsSessionTabs(bool includeSelf) const {
+    QVector<SessionTab> out, active;
+    for (auto* w : QApplication::topLevelWidgets()) {
+        auto* b = qobject_cast<BrowserWindow*>(w);
+        if (!b || !b->isVisible() || (!includeSelf && b == this)) continue;
+        (b->isActiveWindow() ? active : out) += b->sessionTabs();
+    }
+    return out + active;
 }
 
 void BrowserWindow::scheduleSessionSave() {

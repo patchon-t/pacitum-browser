@@ -20,6 +20,7 @@ bool httpsOnly();
 void allowHttp(const QString& host);
 bool httpAllowed(const QString& host);
 bool wasUpgraded(const QString& host);
+bool spellCheckDictionaries();   // 2.0.8: Chromium .bdic files are present
 void setSafeBrowsing(const QString& mode);
 
 // Disk-backed main profile (Qt 6's defaultProfile() is off-the-record, so cookies would not persist).

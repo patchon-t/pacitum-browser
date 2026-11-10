@@ -16,7 +16,7 @@ class QFile;
 //
 // Feed: any URL that returns a GitHub "release" JSON object (tag_name, name, body, html_url,
 // assets[{name, size, browser_download_url}]). Default:
-//   https://api.github.com/repos/namo2024mntik-ops/pacitum-browser/releases?per_page=40 (a list: the highest
+//   https://api.github.com/repos/patchon-t/pacitum-browser/releases?per_page=40 (a list: the highest
 //   version of this build's line is used; the legacy Qt 6.8 build only takes 1.8.x)
 // Overrides (first wins): env PACITUM_UPDATE_FEED, setting "update_feed_url".
 // Flow: check -> compare versions -> prompt with release notes -> download the Setup .exe with

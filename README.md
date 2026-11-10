@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/namo2024mntik-ops/pacitum-browser/releases/latest"><b>Download</b></a> ·
+  <a href="https://github.com/patchon-t/pacitum-browser/releases/latest"><b>Download</b></a> ·
   <a href="#whats-new-in-200">What's new</a> ·
   <a href="#build-from-source">Build from source</a> ·
   <a href="BUILD.md">BUILD.md</a>
@@ -24,7 +24,7 @@ Pacitum is a calm, fast web browser written in C++17 on **Qt 6 WebEngine**. It r
 |---|---|
 | `PacitumBrowser-Setup-2.x.x.exe` | `PacitumBrowser-2.x.x-linux-x86_64.AppImage` |
 
-Get the file for your system from the [latest release](https://github.com/namo2024mntik-ops/pacitum-browser/releases/latest). Each file has a `.sha256` checksum next to it. Pacitum updates itself after that.
+Get the file for your system from the [latest release](https://github.com/patchon-t/pacitum-browser/releases/latest). Each file has a `.sha256` checksum next to it. Pacitum updates itself after that.
 
 ## What's new in 2.0.0
 

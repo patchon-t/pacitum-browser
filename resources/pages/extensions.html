@@ -226,7 +226,10 @@ function render() {
   const e = st.id ? D.extensions.find((x) => x.id === st.id) : null;
   if (st.id && !e) st.id = '';
   const focus = document.activeElement && document.activeElement.id === 'q';
+  // 2.0.8: a refresh (any change, from anywhere) rebuilt the page and wiped a site being typed.
+  const si = $('#siteIn'), siteText = si ? si.value : '', siteFocus = si && document.activeElement === si;
   $('#app').innerHTML = e ? detailView(e) : listView();
+  const si2 = $('#siteIn'); if (si2 && siteText) si2.value = siteText; if (si2 && siteFocus) si2.focus();
   document.title = e ? e.name : 'Extensions';
   if (focus) { const i = $('#q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
 }
@@ -258,7 +261,7 @@ document.addEventListener('click', async (ev) => {
       toast(await call('extAccess', { id: e.id, kind: e.kind, mode: v, sites: e.sites || [] })); break; }
     case 'siteAdd': { const e = ext(st.id); const i = $('#siteIn'); if (!e || !i) break;
       const h = siteOf(i.value); if (!h) { toast('Type a site such as youtube.com'); break; }
-      e.sites = (e.sites || []).filter((x) => x !== h).concat([h]); render();
+      i.value = ''; e.sites = (e.sites || []).filter((x) => x !== h).concat([h]); render();
       toast(await call('extAccess', { id: e.id, kind: e.kind, mode: 'sites', sites: e.sites })); break; }
     case 'siteDel': { const e = ext(st.id); if (!e) break; e.sites = (e.sites || []).filter((x) => x !== v); render();
       toast(await call('extAccess', { id: e.id, kind: e.kind, mode: 'sites', sites: e.sites })); break; }

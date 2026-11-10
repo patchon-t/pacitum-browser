@@ -364,7 +364,7 @@ function secPrivacy() {
   const cookieText = { all: 'Sites can use cookies to remember you, including ones from other sites embedded in the page.',
     private: 'Third-party cookies are blocked in private tabs only.', third: 'Third-party cookies are blocked everywhere. Some sign-in pop-ups may need an exception.' }[cm];
   const sb = sv('safe_browsing', 'standard');
-  const sbText = { enhanced: 'Blocks known dangerous, scam and tracking sites and warns before risky downloads.', standard: 'Blocks known dangerous sites and downloads.', off: 'Not recommended. Pacitum won’t warn you about dangerous sites.' }[sb];
+  const sbText = { enhanced: 'Asks before downloading any program, from any site.', standard: 'Asks before downloading a program from a site without a secure connection.', off: 'Not recommended. Pacitum won’t warn you before downloading programs.' }[sb];
   return `<h1>Privacy and security</h1>
     <div class="box" style="flex-direction:row;align-items:center;gap:16px">
       <span class="tx"><span class="t">Clear browsing data</span><span class="d">History, cookies, cached images and files</span></span>
@@ -872,7 +872,7 @@ async function onAction(a, v, el) {
     case 'cardSave': { const r = await call('cardSave', { id: v, number: val('c-num'), name: val('c-name'), m: +val('c-m'), y: +val('c-y'), nickname: val('c-nick') });
       if (typeof r === 'string' && r.includes(' ')) { toast(r); break; } closeSheet(); toast('Card saved'); break; }
     case 'cardDel': call('cardDelete', { id: v }); break;
-    case 'clearNow': await call('clearData', { history: val('cl-h'), cookies: val('cl-c'), cache: val('cl-k') }); closeSheet(); toast('Browsing data cleared'); break;
+    case 'clearNow': await call('clearData', { history: val('cl-h'), cookies: val('cl-c'), cache: val('cl-k') }); closeSheet(); toast(val('cl-c') ? 'Browsing data cleared. Other site data is removed when Pacitum restarts.' : 'Browsing data cleared'); break;
     case 'permDef': { const [key, d] = v.split('|'); await call('permDefault', { key, decision: +d }); SHEETS.perm(key); break; }
     case 'permSiteDel': { const [key, o] = v.split('|'); await call('permSite', { key, origin: o, decision: 0 }); SHEETS.perm(key); break; }
     case 'siteReset': await call('siteReset', { origin: v }); closeSheet(); toast('Permissions reset'); break;

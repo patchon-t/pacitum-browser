@@ -49,6 +49,14 @@ Optional, to open a GitHub issue for each bug report:
 2. Repository access: only `pacitum-browser`. Permissions: **Issues: Read and write**.
 3. Put the token in `GITHUB_TOKEN`. `GITHUB_ISSUES=all` also turns suggestions into issues.
 
+Optional, crash reports from Pacitum through the bot (so no Discord webhook is built into the app):
+1. Make a private channel such as `#crash-reports`, copy its ID into `CRASH_CHANNEL_ID`.
+2. The bot then listens on `PORT` (Railway sets it; otherwise 8080) for `POST /crash`. Give the service a public
+   address (Railway › **Settings › Networking › Generate Domain**).
+3. In GitHub › **Settings › Secrets and variables › Actions**, set `PACITUM_CRASH_WEBHOOK` to
+   `https://<that address>/crash` instead of the Discord webhook, and delete the old webhook in Discord.
+   Each sender address may send `CRASH_PER_HOUR` reports an hour (default 6).
+
 ## 4. Run it
 
 **Windows**: install Python 3.10 or newer from <https://www.python.org/downloads/> (tick *Add Python to PATH*), then double-click `start.bat`. The first start installs what it needs.

@@ -418,6 +418,13 @@ void ChromeExtensions::downloadFromStore(const QString& id, const QString& name)
         const QString zip = crxToZip(crx, &error);
         QFile::remove(crx);
         if (zip.isEmpty()) { emit message(error); return; }
+        // 2.0.8: the package must be the extension that was asked for (its key gives its ID).
+        if (m_lastKey.isEmpty() || idFromKey(m_lastKey) != id) {
+            QFile::remove(zip);
+            pacitumLog(QStringLiteral("extension %1: downloaded package has another ID (%2); not installed").arg(id, m_lastKey.isEmpty() ? QStringLiteral("none") : idFromKey(m_lastKey)));
+            emit message(tr("Couldn't add %1: the download wasn't that extension.").arg(name));
+            return;
+        }
         installSource(zip, m_lastKey);
     });
 #else

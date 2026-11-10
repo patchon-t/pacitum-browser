@@ -6,18 +6,24 @@
   and (with a GitHub token) opens a GitHub issue for it.
 - Suggestions: /suggest opens a form, posts the idea to the suggestion channel with 👍 / 👎 votes and a thread.
 - Staff (Manage Messages) set a status on reports and suggestions with the buttons under each post.
+- Crash reports (optional): Pacitum can send its crash reports to this bot (POST /crash) instead of to a
+  Discord webhook built into the app, so no webhook address ships inside Pacitum.
 
 Settings come from environment variables (or a .env file next to this script): see README.md.
 """
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
 import pathlib
 import re
+import time
+from collections import defaultdict, deque
 
 import aiohttp
+from aiohttp import web
 import discord
 from discord import app_commands
 from discord.ext import tasks
@@ -55,6 +61,9 @@ GITHUB_REPO = os.environ.get("GITHUB_REPO", "patchon-t/pacitum-browser").strip()
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
 GITHUB_ISSUES = os.environ.get("GITHUB_ISSUES", "bugs").strip().lower()   # bugs | all | none
 POLL_MINUTES = max(2, env_int("POLL_MINUTES") or 10)
+CRASH_CHANNEL_ID = env_int("CRASH_CHANNEL_ID")   # crash reports from Pacitum (POST /crash); unset = off
+CRASH_PORT = env_int("PORT") or env_int("CRASH_PORT") or 8080
+CRASH_PER_HOUR = env_int("CRASH_PER_HOUR") or 6   # reports per sender address per hour
 STATE_DIR = pathlib.Path(os.environ.get("STATE_DIR") or HERE)
 STATE_FILE = STATE_DIR / "state.json"
 
@@ -84,6 +93,26 @@ def write_state(state: dict) -> None:
     tmp.replace(STATE_FILE)
 
 
+# ---------------------------------------------------------------- helpers
+
+def no_mentions(text: str) -> str:
+    """Text from Discord going to GitHub: "@name" would notify that GitHub user, so it is broken up."""
+    return re.sub(r"@(?=[A-Za-z0-9-])", "@\u200b", text or "")
+
+
+VERSION_RE = re.compile(r"^[vV]?\d+(\.\d+){0,3}([-.][0-9A-Za-z.]+)?$")
+
+
+def clean_version(version: str | None) -> str | None:
+    """A version such as "2.0.5", "v2.0.6" or "2.1.0-beta.1"; anything else is refused (it goes into a URL)."""
+    if version is None:
+        return None
+    version = version.strip()
+    if not VERSION_RE.match(version) or len(version) > 40:
+        raise ValueError(version)
+    return version
+
+
 # ---------------------------------------------------------------- GitHub
 
 class GitHub:
@@ -103,6 +132,7 @@ class GitHub:
     async def release(self, version: str | None = None) -> dict | None:
         """The latest release, or the one for `version` ("2.0.5" or "v2.0.5")."""
         assert self.session
+        version = clean_version(version)
         if version:
             tag = version if version.lower().startswith("v") else f"v{version}"
             url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/tags/{tag}"
@@ -247,11 +277,11 @@ class BugForm(discord.ui.Modal, title="Report a bug in Pacitum"):
             return
         issue = None
         if GITHUB_ISSUES in ("bugs", "all"):
-            body = (f"**Reported on Discord by {interaction.user.display_name}** ({message.jump_url})\n\n"
-                    f"### What happened\n{self.what.value}\n\n"
-                    + (f"### Steps\n{self.steps.value}\n\n" if self.steps.value else "")
-                    + f"**Version:** {self.version.value or '—'}  \n**System:** {self.system.value or '—'}")
-            issue = await github.create_issue(self.summary.value, body, ["bug", "discord"])
+            body = no_mentions(f"**Reported on Discord by {interaction.user.display_name}** ({message.jump_url})\n\n"
+                               f"### What happened\n{self.what.value}\n\n"
+                               + (f"### Steps\n{self.steps.value}\n\n" if self.steps.value else "")
+                               + f"**Version:** {self.version.value or '—'}  \n**System:** {self.system.value or '—'}")
+            issue = await github.create_issue(no_mentions(self.summary.value), body, ["bug", "discord"])
             if issue:
                 embed.add_field(name="GitHub", value=f"[Issue]({issue})")
                 await message.edit(embed=embed)
@@ -276,14 +306,85 @@ class SuggestForm(discord.ui.Modal, title="Suggest an idea for Pacitum"):
         if not message:
             return
         if GITHUB_ISSUES == "all":
-            issue = await github.create_issue(self.summary.value,
-                                              f"**Suggested on Discord by {interaction.user.display_name}** ({message.jump_url})\n\n"
-                                              f"{self.details.value}\n\n" + (f"### Why\n{self.why.value}" if self.why.value else ""),
+            issue = await github.create_issue(no_mentions(self.summary.value),
+                                              no_mentions(f"**Suggested on Discord by {interaction.user.display_name}** ({message.jump_url})\n\n"
+                                                          f"{self.details.value}\n\n" + (f"### Why\n{self.why.value}" if self.why.value else "")),
                                               ["enhancement", "discord"])
             if issue:
                 embed.add_field(name="GitHub", value=f"[Issue]({issue})")
                 await message.edit(embed=embed)
         await interaction.followup.send(f"Thanks for the idea! It's posted at {message.jump_url}.", ephemeral=True)
+
+
+async def already_posted(channel: discord.abc.Messageable, release: dict, me: discord.abc.User | None) -> bool:
+    """True when the release-note channel already has this release from the bot (state can be lost on a redeploy)."""
+    title = release.get("name") or release.get("tag_name", "")
+    try:
+        async for m in channel.history(limit=40):
+            if me is not None and m.author.id == me.id and f"# 🚀 {title}" in m.content:
+                return True
+    except (discord.HTTPException, AttributeError):
+        pass
+    return False
+
+
+# ---------------------------------------------------------------- crash reports relay
+
+class RateLimit:
+    def __init__(self, per_hour: int) -> None:
+        self.per_hour = per_hour
+        self.hits: dict[str, deque] = defaultdict(deque)
+
+    def allow(self, key: str, now: float | None = None) -> bool:
+        now = time.monotonic() if now is None else now
+        q = self.hits[key]
+        while q and now - q[0] > 3600:
+            q.popleft()
+        if len(q) >= self.per_hour:
+            return False
+        q.append(now)
+        return True
+
+
+MAX_REPORT = 8 * 1024 * 1024
+
+
+def crash_app(send, limit: RateLimit) -> web.Application:
+    """POST /crash takes the same form Pacitum sends to a Discord webhook (payload_json + files[n]).
+    `send(content, files)` posts it. Set the app's crash address (PACITUM_CRASH_WEBHOOK) to this URL."""
+    async def crash(request: web.Request) -> web.Response:
+        sender = (request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote or "?")
+        if not limit.allow(sender):
+            return web.Response(status=429, text="too many reports")
+        if request.content_length and request.content_length > MAX_REPORT:
+            return web.Response(status=413, text="too large")
+        try:
+            reader = await request.multipart()
+        except (AssertionError, ValueError, KeyError):
+            return web.Response(status=400, text="expected multipart/form-data")
+        content, files, total = "", [], 0
+        while (part := await reader.next()) is not None:
+            data = await part.read(decode=False)
+            total += len(data)
+            if total > MAX_REPORT:
+                return web.Response(status=413, text="too large")
+            if part.name == "payload_json":
+                try:
+                    content = str(json.loads(data.decode("utf-8", "replace")).get("content", ""))
+                except ValueError:
+                    return web.Response(status=400, text="bad payload_json")
+            elif part.filename and len(files) < 4:
+                name = re.sub(r"[^A-Za-z0-9._-]", "_", part.filename)[:60] or "log.txt"
+                files.append((name, data))
+        if not content.strip():
+            return web.Response(status=400, text="empty report")
+        await send(content[:1900], files)
+        return web.Response(status=204)
+
+    app = web.Application(client_max_size=MAX_REPORT + 64 * 1024)
+    app.router.add_post("/crash", crash)
+    app.router.add_get("/", lambda r: web.Response(text="Pacitum bot"))
+    return app
 
 
 # ---------------------------------------------------------------- the bot
@@ -303,8 +404,23 @@ class PacitumBot(discord.Client):
         else:
             await self.tree.sync()
         self.check_releases.start()
+        self.web_runner = None
+        if CRASH_CHANNEL_ID:
+            async def send(content: str, files: list[tuple[str, bytes]]) -> None:
+                channel = self.get_channel(CRASH_CHANNEL_ID)
+                if channel is None:
+                    log.warning("crash channel %s not found", CRASH_CHANNEL_ID)
+                    return
+                await channel.send(content, files=[discord.File(io.BytesIO(d), filename=n) for n, d in files],
+                                   allowed_mentions=discord.AllowedMentions.none())
+            self.web_runner = web.AppRunner(crash_app(send, RateLimit(CRASH_PER_HOUR)))
+            await self.web_runner.setup()
+            await web.TCPSite(self.web_runner, "0.0.0.0", CRASH_PORT).start()
+            log.info("Crash reports: POST http://0.0.0.0:%s/crash", CRASH_PORT)
 
     async def close(self) -> None:
+        if getattr(self, "web_runner", None):
+            await self.web_runner.cleanup()
         await github.close()
         await super().close()
 
@@ -341,6 +457,13 @@ class PacitumBot(discord.Client):
 
     @tasks.loop(minutes=POLL_MINUTES)
     async def check_releases(self) -> None:
+        # One failed check (network, a missing channel permission) used to stop the loop for good.
+        try:
+            await self.check_releases_once()
+        except Exception:
+            log.exception("release check failed; trying again next time")
+
+    async def check_releases_once(self) -> None:
         if not RELEASE_CHANNEL_ID:
             return
         try:
@@ -352,16 +475,17 @@ class PacitumBot(discord.Client):
             return
         state = read_state()
         tag = release.get("tag_name")
-        if "last_release" not in state:   # first start: don't repost the current release
-            state["last_release"] = tag
-            write_state(state)
-            log.info("Watching releases from %s", tag)
-            return
-        if tag == state["last_release"]:
+        if tag == state.get("last_release"):
             return
         channel = self.get_channel(RELEASE_CHANNEL_ID)
         if channel is None:
             log.warning("release channel %s not found", RELEASE_CHANNEL_ID)
+            return
+        # State is lost on a redeploy without a volume: the channel itself says whether it was posted already
+        # (it used to skip a release published while the bot was down).
+        if await already_posted(channel, release, self.user):
+            state["last_release"] = tag
+            write_state(state)
             return
         await send_release(channel, release, ping=True)
         state["last_release"] = tag
@@ -392,6 +516,9 @@ async def release_command(interaction: discord.Interaction, version: str | None 
     await interaction.response.defer(thinking=True)
     try:
         release = await github.release(version)
+    except ValueError:
+        await interaction.followup.send("Use a version such as 2.0.5.")
+        return
     except Exception as e:
         await interaction.followup.send(f"Couldn't reach GitHub right now ({e.__class__.__name__}). Try again in a minute.")
         return
@@ -426,7 +553,14 @@ async def post_release_command(interaction: discord.Interaction, version: str | 
         await interaction.response.send_message("RELEASE_CHANNEL_ID isn't set.", ephemeral=True)
         return
     await interaction.response.defer(ephemeral=True, thinking=True)
-    release = await github.release(version)
+    try:
+        release = await github.release(version)
+    except ValueError:
+        await interaction.followup.send("Use a version such as 2.0.5.", ephemeral=True)
+        return
+    except Exception as e:   # it used to leave "thinking…" forever
+        await interaction.followup.send(f"Couldn't reach GitHub ({e.__class__.__name__}). Try again in a minute.", ephemeral=True)
+        return
     if not release:
         await interaction.followup.send("No such release.", ephemeral=True)
         return

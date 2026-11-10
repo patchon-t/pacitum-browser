@@ -31,7 +31,8 @@ void pacitumLog(const QString& line);   // main.cpp (startup.log)
 namespace {
 // The release list, not /latest: two lines are released side by side (1.9.x and legacy 1.8.x), and
 // "latest" is simply the newest one published. check() picks the highest version of our own line.
-const char* kDefaultFeed = "https://api.github.com/repos/namo2024mntik-ops/pacitum-browser/releases?per_page=40";
+// 2.0.8: the repository's current name (the old one only worked through GitHub's rename redirect).
+const char* kDefaultFeed = "https://api.github.com/repos/patchon-t/pacitum-browser/releases?per_page=40";
 #ifndef PACITUM_UPDATE_TRACK
 #define PACITUM_UPDATE_TRACK ""
 #endif
@@ -504,7 +505,18 @@ bool Updater::startInstall(const QStringList& overlayArgs) {
     QFile::remove(staged);
     if (!QFile::copy(m_file, staged)) return false;
     QFile::setPermissions(staged, QFile::permissions(current) | QFileDevice::ExeOwner | QFileDevice::ExeUser);
-    if (!QFile::remove(current) || !QFile::rename(staged, current)) { Updater::logLine(QStringLiteral("update: could not replace %1").arg(current)); return false; }
+    // 2.0.8: the old AppImage is kept until the new one is in place (it was deleted first, so a failed
+    // rename left nothing to start).
+    const QString old = current + QStringLiteral(".old");
+    QFile::remove(old);
+    if (!QFile::rename(current, old)) { QFile::remove(staged); Updater::logLine(QStringLiteral("update: could not move %1 aside").arg(current)); return false; }
+    if (!QFile::rename(staged, current)) {
+        QFile::rename(old, current);
+        QFile::remove(staged);
+        Updater::logLine(QStringLiteral("update: could not replace %1 (old version kept)").arg(current));
+        return false;
+    }
+    QFile::remove(old);
     args << QStringLiteral("--relaunch") << current << QStringLiteral("--app") << current;
     bool ok = QProcess::startDetached(current, QStringList{QStringLiteral("--update-overlay")} + args);
     Updater::logLine(QStringLiteral("update: replaced %1, overlay=%2").arg(current).arg(ok));

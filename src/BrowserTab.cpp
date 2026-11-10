@@ -132,6 +132,7 @@ protected:
 #include "Motion.h"
 #include <QEasingCurve>
 #include <QDesktopServices>
+#include <QDir>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -258,6 +259,14 @@ void BrowserTab::loadUrl(const QString& raw) {
     // and "localhost:3000" / "192.168.1.1:8080" were searched instead of opened.
     static const QRegularExpression scheme(QStringLiteral("^[a-zA-Z][a-zA-Z0-9+.-]*://"));
     static const QRegularExpression local(QStringLiteral("^(localhost|\\d{1,3}(\\.\\d{1,3}){3}|\\[[0-9a-fA-F:]+\\])(:\\d+)?([/?#].*)?$"));
+    // 2.0.8: "mailto:" / "tel:" links and file paths typed in the address bar (they became "https://mailto:…").
+    static const QRegularExpression handler(QStringLiteral("^(mailto|tel|sms|magnet|file):"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression path(QStringLiteral("^([a-zA-Z]:[\\\\/]|\\\\\\\\|/|~/)"));
+    if (path.match(url).hasMatch() && !url.contains(QLatin1String("://"))) {
+        QString p = url; if (p.startsWith(QLatin1String("~/"))) p = QDir::homePath() + p.mid(1);
+        ensureActive(); m_view->setUrl(QUrl::fromLocalFile(QDir::fromNativeSeparators(p))); return;
+    }
+    if (handler.match(url).hasMatch()) { ensureActive(); m_view->setUrl(QUrl(url)); return; }
     if (!scheme.match(url).hasMatch() && !url.startsWith(QStringLiteral("about:")) && !url.startsWith(QStringLiteral("pacitum:"))
         && !url.startsWith(QStringLiteral("data:")) && !url.startsWith(QStringLiteral("view-source:"))) {
         if (local.match(url).hasMatch()) url = QStringLiteral("http://") + url;   // local servers rarely have HTTPS
@@ -507,7 +516,7 @@ void BrowserTab::setZoomFactor(double f) {
 void BrowserTab::setMuted(bool m) { m_view->page()->setAudioMuted(m); }
 bool BrowserTab::isMuted() const { return m_view->page()->isAudioMuted(); }
 
-void BrowserTab::refreshTheme() { if (m_signInBar) m_signInBar->refresh(); }
+void BrowserTab::refreshTheme() { if (m_signInBar) m_signInBar->refresh(); if (m_httpBar) m_httpBar->refresh(); }
 void BrowserTab::showFindBar() { m_findBar->showFind(); }
 void BrowserTab::hideFindBar() { m_findBar->hideFind(); }
 
@@ -565,7 +574,32 @@ void BrowserTab::onTitleChanged(const QString& t) { m_title = t.isEmpty() ? QStr
 // shown/hidden on every load and shifted the page down by 3 px each time; it is no longer shown.
 void BrowserTab::onLoadStarted() { m_loading = true; m_loadValue = 0; emit loadingChanged(true); m_progress->setValue(0); }
 void BrowserTab::onLoadProgress(int p) { m_loadValue = p; m_progress->setValue(p); emit progressChanged(p); }
-void BrowserTab::onLoadFinished(bool ok) { checkGoogleSignIn(m_view->url()); m_loading = false; m_loadValue = 100; emit loadingChanged(false); emit loadDone(ok); m_progress->setValue(100); }
+// 2.0.8 "Always use secure connections": a site that has no HTTPS used to just fail to load, with no way
+// to reach it. Now a bar offers the insecure address (remembered for this site until Pacitum closes).
+void BrowserTab::checkHttpsFallback(bool ok) {
+    const QUrl u = m_view->url();
+    if (ok || u.scheme() != QLatin1String("https") || !Pacitum::wasUpgraded(u.host()) || Pacitum::httpAllowed(u.host())) {
+        if (m_httpBar && ok) m_httpBar->hideAnimated();
+        return;
+    }
+    if (!m_httpBar) {
+        m_httpBar = new InfoBar(this);
+        m_httpBar->setKind(InfoBar::Warning);
+        if (auto* lay = qobject_cast<QVBoxLayout*>(layout())) lay->insertWidget(lay->indexOf(m_view), m_httpBar);
+        connect(m_httpBar, &InfoBar::primaryClicked, this, [this]{
+            QUrl http = m_httpUrl; http.setScheme(QStringLiteral("http"));
+            Pacitum::allowHttp(http.host());
+            m_httpBar->hideAnimated();
+            loadUrl(http.toString());
+        });
+    }
+    m_httpUrl = u;
+    m_httpBar->setMessage(tr("%1 doesn't support a secure connection.").arg(u.host()));
+    m_httpBar->setPrimary(tr("Continue to the insecure site"), QStringLiteral("not-secure"));
+    m_httpBar->showAnimated();
+}
+
+void BrowserTab::onLoadFinished(bool ok) { checkHttpsFallback(ok); checkGoogleSignIn(m_view->url()); m_loading = false; m_loadValue = 100; emit loadingChanged(false); emit loadDone(ok); m_progress->setValue(100); }
 // Renderer gone: show the crashed state and reload once after a second -- but not in a loop (1.5.1
 // reloaded forever when a page crashed its renderer on load, e.g. after a discard), and not when the
 // renderer exited normally.

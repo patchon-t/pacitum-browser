@@ -15,7 +15,13 @@ bool BookmarkManager::load() {
     if (!f.exists()) { m_bookmarks.clear(); return true; }
     if (!f.open(QIODevice::ReadOnly)) return false;
     auto doc = QJsonDocument::fromJson(f.readAll());
-    if (!doc.isArray()) return false;
+    if (!doc.isArray()) {
+        // 2.0.8: keep a damaged file aside instead of overwriting it with the next bookmark added.
+        f.close();
+        QFile::rename(m_file, m_file + QStringLiteral(".damaged-") + QString::number(QDateTime::currentSecsSinceEpoch()));
+        m_bookmarks.clear();
+        return false;
+    }
     m_bookmarks.clear();
     for (auto v : doc.array()) {
         auto o = v.toObject();

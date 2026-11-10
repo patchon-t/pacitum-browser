@@ -246,7 +246,7 @@ void ExtensionManager::inject() {
             QWebEngineScript s;
             s.setName(kPrefix + e.id + QLatin1Char(':') + QString::number(n++));
             s.setSourceCode(src);
-            s.setWorldId(QWebEngineScript::ApplicationWorld);
+            s.setWorldId(QWebEngineScript::UserWorld);   // 2.0.8: its own world, away from Pacitum's password helper
             s.setRunsOnSubFrames(false);
             s.setInjectionPoint(g.runAt == QLatin1String("document_start") ? QWebEngineScript::DocumentCreation
                                 : g.runAt == QLatin1String("document_end") ? QWebEngineScript::DocumentReady

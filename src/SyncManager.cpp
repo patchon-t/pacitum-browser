@@ -2,6 +2,7 @@
 #include "AppSettings.h"
 #include "BookmarkManager.h"
 #include "HistoryManager.h"
+#include "Passwords.h"
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDesktopServices>
@@ -64,6 +65,13 @@ QJsonArray mergeList(const QJsonArray& base, const QJsonArray& local, const QJso
     QHash<QString, QJsonObject> b, r;
     for (const auto& v : base) b.insert(v.toObject().value(key).toString(), v.toObject());
     for (const auto& v : remote) r.insert(v.toObject().value(key).toString(), v.toObject());
+    // 2.0.8 safety: an empty other side (a reset Drive file, a different account) or a change that would remove
+    // most of this computer's items is not taken as "deleted there". Sync used to empty the bookmarks then.
+    if (followDeletes) {
+        int gone = 0;
+        for (const auto& v : local) { const QString k = v.toObject().value(key).toString(); if (!r.contains(k) && b.contains(k)) ++gone; }
+        if (remote.isEmpty() || (gone > 10 && gone * 2 > local.size())) followDeletes = false;
+    }
     QSet<QString> seen;
     QJsonArray out;
     for (const auto& v : local) {
@@ -121,7 +129,10 @@ void SyncManager::setSyncs(const QString& kind, bool on) { m_choices.insert(kind
 
 void SyncManager::loadAccount() {
     const QJsonObject o = readJsonFile(here(QStringLiteral("sync-account.json")));
-    m_refreshToken = o.value(QStringLiteral("refresh_token")).toString();
+    // 2.0.8: the token is kept encrypted (Vault, as saved passwords). A plain one from older versions is read once.
+    bool opened = false;
+    const QByteArray sealedTok = Vault::open(QByteArray::fromBase64(o.value(QStringLiteral("refresh_token_sealed")).toString().toLatin1()), &opened);
+    m_refreshToken = opened ? QString::fromUtf8(sealedTok) : o.value(QStringLiteral("refresh_token")).toString();
     m_account = {o.value(QStringLiteral("email")).toString(), o.value(QStringLiteral("name")).toString(), o.value(QStringLiteral("picture")).toString()};
     m_choices = o.value(QStringLiteral("choices")).toObject();
     const qint64 last = qint64(o.value(QStringLiteral("last_sync")).toDouble());
@@ -130,10 +141,14 @@ void SyncManager::loadAccount() {
 void SyncManager::saveAccount() const {
     const QString path = here(QStringLiteral("sync-account.json"));
     if (m_refreshToken.isEmpty()) { QFile::remove(path); return; }
-    writeJsonFile(path, QJsonObject{
-        {QStringLiteral("refresh_token"), m_refreshToken}, {QStringLiteral("email"), m_account.email},
+    QJsonObject o{
+        {QStringLiteral("email"), m_account.email},
         {QStringLiteral("name"), m_account.name}, {QStringLiteral("picture"), m_account.picture},
-        {QStringLiteral("choices"), m_choices}, {QStringLiteral("last_sync"), double(m_lastSync.isValid() ? m_lastSync.toMSecsSinceEpoch() : 0)}});
+        {QStringLiteral("choices"), m_choices}, {QStringLiteral("last_sync"), double(m_lastSync.isValid() ? m_lastSync.toMSecsSinceEpoch() : 0)}};
+    const QByteArray sealed = Vault::seal(m_refreshToken.toUtf8());
+    if (!sealed.isEmpty()) o.insert(QStringLiteral("refresh_token_sealed"), QString::fromLatin1(sealed.toBase64()));
+    else o.insert(QStringLiteral("refresh_token"), m_refreshToken);   // no vault on this system: as before
+    writeJsonFile(path, o);
     QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);   // the token is a credential
 }
 void SyncManager::setStatus(const QString& s) { m_status = s; emit changed(); }
@@ -196,6 +211,7 @@ void SyncManager::exchangeCode(const QString& code, const QString& redirect, con
     body.addQueryItem(QStringLiteral("grant_type"), QStringLiteral("authorization_code"));
     body.addQueryItem(QStringLiteral("code_verifier"), verifier);
     QNetworkRequest r(QUrl(QStringLiteral("https://oauth2.googleapis.com/token")));
+    r.setTransferTimeout(30000);
     r.setHeader(QNetworkRequest::ContentTypeHeader, QByteArray("application/x-www-form-urlencoded"));
     QNetworkReply* rep = m_net->post(r, body.query(QUrl::FullyEncoded).toUtf8());
     connect(rep, &QNetworkReply::finished, this, [this, rep] {
@@ -224,6 +240,7 @@ void SyncManager::withToken(std::function<void(bool ok)> next) {
     body.addQueryItem(QStringLiteral("refresh_token"), m_refreshToken);
     body.addQueryItem(QStringLiteral("grant_type"), QStringLiteral("refresh_token"));
     QNetworkRequest r(QUrl(QStringLiteral("https://oauth2.googleapis.com/token")));
+    r.setTransferTimeout(30000);
     r.setHeader(QNetworkRequest::ContentTypeHeader, QByteArray("application/x-www-form-urlencoded"));
     QNetworkReply* rep = m_net->post(r, body.query(QUrl::FullyEncoded).toUtf8());
     connect(rep, &QNetworkReply::finished, this, [this, rep, next] {
@@ -243,6 +260,7 @@ void SyncManager::withToken(std::function<void(bool ok)> next) {
 
 QNetworkReply* SyncManager::api(const QByteArray& verb, const QUrl& url, const QByteArray& body, const QByteArray& type) {
     QNetworkRequest r(url);
+    r.setTransferTimeout(30000);   // 2.0.8: a stalled request used to leave sync "busy" until restart
     r.setRawHeader("Authorization", "Bearer " + m_accessToken.toUtf8());
     if (!type.isEmpty()) r.setHeader(QNetworkRequest::ContentTypeHeader, type);
     return m_net->sendCustomRequest(r, verb, body);
@@ -423,7 +441,10 @@ void SyncManager::syncNow() {
             const QString fileId = QJsonDocument::fromJson(rep->readAll()).object().value(QStringLiteral("files")).toArray().first().toObject().value(QStringLiteral("id")).toString();
             auto proceed = [this, fileId](const QJsonObject& remote) {
                 const QJsonObject local = collectLocal();
-                const QJsonObject base = readJsonFile(here(QStringLiteral("sync-base.json")));
+                QJsonObject base = readJsonFile(here(QStringLiteral("sync-base.json")));
+                // 2.0.8: the last merge was with another Google account (or Drive has no file any more): start fresh.
+                const QString baseAccount = base.value(QStringLiteral("account")).toString();
+                if (remote.isEmpty() || (!baseAccount.isEmpty() && !m_account.email.isEmpty() && baseAccount != m_account.email)) base = {};
                 QJsonObject merged = merge(base, local, remote, remote.value(QStringLiteral("device")).toString());
                 const QStringList changedKinds = applyLocal(merged, local);
                 if (!changedKinds.isEmpty()) emit applied(changedKinds);
@@ -445,7 +466,9 @@ void SyncManager::syncNow() {
                 connect(up, &QNetworkReply::finished, this, [this, up, merged, changedKinds] {
                     up->deleteLater();
                     if (up->error() != QNetworkReply::NoError) { finish(false, tr("Couldn't save to Google Drive: %1").arg(up->errorString())); return; }
-                    writeJsonFile(here(QStringLiteral("sync-base.json")), merged);
+                    QJsonObject baseOut = merged;
+                    baseOut.insert(QStringLiteral("account"), m_account.email);
+                    writeJsonFile(here(QStringLiteral("sync-base.json")), baseOut);
                     finish(true, changedKinds.isEmpty() ? tr("Up to date.") : tr("Synced: %1 updated.").arg(changedKinds.join(QStringLiteral(", "))));
                 });
             };
