@@ -89,6 +89,60 @@ async def test_status_buttons():
     assert out["embed"].color.value == 0x2EB67D and "Fixed" in out["thread"]
 
 
+def test_no_mentions():
+    out = b.no_mentions("thanks @octocat and @team-x, mail a@b.c")
+    assert "@octocat" not in out and "@team-x" not in out and "@\u200boctocat" in out
+
+
+def test_clean_version():
+    assert b.clean_version("2.0.5") == "2.0.5" and b.clean_version(" v2.1.0-beta.1 ") == "v2.1.0-beta.1"
+    assert b.clean_version(None) is None
+    for bad in ("../../x", "2.0/../", "latest", "2.0.5?x=1", ""):
+        try:
+            b.clean_version(bad)
+        except ValueError:
+            continue
+        raise AssertionError(bad)
+
+
+def test_rate_limit():
+    r = b.RateLimit(2)
+    assert r.allow("a", 0) and r.allow("a", 1) and not r.allow("a", 2) and r.allow("b", 2) and r.allow("a", 3700)
+
+
+async def test_crash_relay():
+    from aiohttp import FormData
+    from aiohttp.test_utils import TestClient, TestServer
+    got = []
+
+    async def send(content, files):
+        got.append((content, files))
+
+    async with TestClient(TestServer(b.crash_app(send, b.RateLimit(2)))) as client:
+        form = FormData()
+        form.add_field("payload_json", '{"content": "**Crash report** @everyone"}', content_type="application/json")
+        form.add_field("files[0]", b"log line", filename="crash.log", content_type="text/plain")
+        r = await client.post("/crash", data=form)
+        assert r.status == 204, r.status
+        assert got[0][0].startswith("**Crash report**") and got[0][1] == [("crash.log", b"log line")]
+        assert (await client.post("/crash", data=b"x")).status == 400
+        assert (await client.post("/crash", data=b"x")).status == 429   # 2 per hour in this test
+
+
+async def test_already_posted():
+    me = NS(id=1)
+
+    class Channel:
+        def history(self, limit):
+            async def gen():
+                yield NS(author=NS(id=2), content="# 🚀 Pacitum Browser 2.0.5")
+                yield NS(author=me, content="# 🚀 Pacitum Browser 2.0.5\nnotes")
+            return gen()
+
+    assert await b.already_posted(Channel(), RELEASE, me)
+    assert not await b.already_posted(Channel(), {"name": "Pacitum Browser 2.0.6"}, me)
+
+
 def test_state():
     b.write_state({"last_release": "v2.0.5"})
     assert b.read_state() == {"last_release": "v2.0.5"}
