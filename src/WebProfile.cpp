@@ -19,6 +19,8 @@
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
 #include <QUrl>
+#include <QDir>
+#include <QCoreApplication>
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
 #include <QWebEngineClientHints>
 #endif
@@ -122,6 +124,19 @@ bool httpAllowed(const QString& host) { QMutexLocker l(&s_httpMx); return s_http
 bool wasUpgraded(const QString& host) { QMutexLocker l(&s_httpMx); return s_upgraded.contains(host.toLower()); }
 void setSafeBrowsing(const QString&) {}
 
+bool spellCheckDictionaries() {
+    static const bool have = [] {
+        const QString env = qEnvironmentVariable("QTWEBENGINE_DICTIONARIES_PATH");
+        if (!env.isEmpty() && QDir(env).exists()) return true;
+        if (QDir(QCoreApplication::applicationDirPath() + QStringLiteral("/qtwebengine_dictionaries")).exists()) return true;
+#ifndef Q_OS_WIN
+        if (QDir(QStringLiteral("/usr/share/qt6/qtwebengine_dictionaries")).exists()) return true;
+#endif
+        return false;
+    }();
+    return have;
+}
+
 void applyProfilePrefs(QWebEngineProfile* profile, bool privateProfile) {
     if (!profile) return;
     const QJsonObject o = AppSettings::read();
@@ -145,7 +160,7 @@ void applyProfilePrefs(QWebEngineProfile* profile, bool privateProfile) {
         dicts << d;
     }
     profile->setSpellCheckLanguages(dicts);
-    profile->setSpellCheckEnabled(spell);
+    profile->setSpellCheckEnabled(spell && spellCheckDictionaries());   // 2.0.8: not without dictionaries (it only searched the disk and logged errors)
     // Cookies: block third-party everywhere, in private tabs only, or allow all.
     const QString mode = o.value(QStringLiteral("cookie_mode")).toString(QStringLiteral("third"));
     const bool blockThird = mode == QLatin1String("third") || (mode == QLatin1String("private") && privateProfile);

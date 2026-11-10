@@ -49,6 +49,13 @@ void beginStartup(const QString& crashLog) {
         QFileInfo newest;
         for (const QFileInfo& d : QDir(installPath).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot))
             if (!newest.exists() || added(d) > added(newest)) newest = d;
+        // 2.0.8: only an extension added since the last healthy run is suspected. Any crash used to move the
+        // newest one away, even when it had been running fine for weeks.
+        const qint64 healthyAt = qint64(g.value(QStringLiteral("healthyAt")).toDouble(0));
+        if (newest.exists() && healthyAt > 0 && added(newest).toMSecsSinceEpoch() < healthyAt) {
+            pacitumLog(QStringLiteral("startup guard: newest extension %1 predates the last healthy run; left on").arg(newest.fileName()));
+            newest = QFileInfo();
+        }
         if (newest.exists()) {
             const QString name = extensionName(newest.absoluteFilePath());
             const QString qdir = QDir::current().absoluteFilePath(QStringLiteral("extensions-quarantine"));
@@ -81,6 +88,8 @@ void markHealthy() {
     if (!g.value(QStringLiteral("running")).toBool(false)) return;
     g.insert(QStringLiteral("running"), false);
     g.insert(QStringLiteral("strikes"), 0);
+    // The run that just proved healthy started with every extension that existed then.
+    g.insert(QStringLiteral("healthyAt"), g.value(QStringLiteral("started")).toDouble(double(QDateTime::currentMSecsSinceEpoch())));
     writeGuard(g);
 }
 

@@ -609,7 +609,7 @@ void UpdateFlow::runSelfTest(QWidget* window) {
     info.version = QStringLiteral("99.0.0"); info.tag = QStringLiteral("v99.0.0"); info.name = QStringLiteral("Pacitum test update");
     info.notes = QStringLiteral("- self test");
     info.installerName = QStringLiteral("PacitumBrowser-Setup-99.0.0.exe");
-    info.installerUrl = QUrl(QStringLiteral("https://github.com/namo2024mntik-ops/pacitum-browser/releases/download/v99.0.0/PacitumBrowser-Setup-99.0.0.exe"));
+    info.installerUrl = QUrl(QStringLiteral("https://github.com/patchon-t/pacitum-browser/releases/download/v99.0.0/PacitumBrowser-Setup-99.0.0.exe"));
     info.installerSize = 1;
     offer(info, window, true);
     QPointer<UpdateCard> card = m_card;

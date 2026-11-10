@@ -110,6 +110,9 @@ private:
     void showSignInBar(const QUrl& target);
     void checkGoogleSignIn(const QUrl& url);
     class InfoBar* m_signInBar = nullptr;
+    class InfoBar* m_httpBar = nullptr;   // 2.0.8 HTTPS-only fallback
+    QUrl m_httpUrl;
+    void checkHttpsFallback(bool ok);
     QUrl m_signInUrl;
     QString m_pendingUrl;
 protected:

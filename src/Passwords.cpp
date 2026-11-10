@@ -33,6 +33,12 @@
 #include <QPointer>
 #include <QScreen>
 #include <QWindow>
+#include <QInputDialog>
+#include <QProcess>
+#ifndef Q_OS_WIN
+#include <pwd.h>
+#include <unistd.h>
+#endif
 
 #ifdef Q_OS_WIN
 #ifndef NOMINMAX
@@ -195,6 +201,36 @@ static int helloVerify(HWND hwnd, const QString& reason) {
 #endif
 #endif
 
+#ifndef Q_OS_WIN
+// 2.0.8 Linux: the computer (login) password, checked by the system's own helper unix_chkpwd (it exists to
+// let a program verify its own user's password). Returns 1 verified, 0 refused/cancelled, -1 not available.
+static int linuxVerify(QWidget* parent, const QString& reason) {
+    QString helper;
+    for (const char* p : {"/usr/sbin/unix_chkpwd", "/sbin/unix_chkpwd", "/usr/bin/unix_chkpwd"})
+        if (QFileInfo(QLatin1String(p)).isExecutable()) { helper = QLatin1String(p); break; }
+    if (helper.isEmpty()) return -1;
+    QString user = qEnvironmentVariable("USER");
+    if (const passwd* pw = getpwuid(getuid())) user = QString::fromLocal8Bit(pw->pw_name);
+    if (user.isEmpty()) return -1;
+    QString prompt = reason + QStringLiteral("\n\n") + QObject::tr("Enter the password you use to sign in to this computer.");
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        bool ok = false;
+        QString pass = QInputDialog::getText(parent, QStringLiteral("Pacitum"), prompt, QLineEdit::Password, QString(), &ok);
+        if (!ok) return 0;
+        QProcess p;
+        p.start(helper, {user, QStringLiteral("nonull")});
+        if (!p.waitForStarted(3000)) return -1;
+        QByteArray bytes = pass.toUtf8(); bytes.append('\0');
+        p.write(bytes); p.closeWriteChannel();
+        bytes.fill('\0'); pass.fill(QLatin1Char('\0'));
+        p.waitForFinished(10000);
+        if (p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0) return 1;
+        prompt = QObject::tr("That password isn't right. Try again.") + QStringLiteral("\n\n") + reason;
+    }
+    return 0;
+}
+#endif
+
 bool verify(QWidget* parent, const QString& reason) {
     if (recentlyVerified()) return true;
     bool ok = true;
@@ -204,7 +240,10 @@ bool verify(QWidget* parent, const QString& reason) {
     const int hello = helloVerify(hwnd, reason);
     ok = hello == 1 || (hello < 0 && credUiVerify(hwnd, reason));
 #else
-    Q_UNUSED(parent); Q_UNUSED(reason);
+    QWidget* w = parent ? parent->window() : QApplication::activeWindow();
+    const int r = linuxVerify(w, reason);
+    ok = r == 1 || r < 0;   // no helper on this system: as before (nothing to check against)
+    if (r < 0) qWarning("passwords: unix_chkpwd not found; can't ask for the computer password");
 #endif
     if (ok) s_lastOk = QDateTime::currentMSecsSinceEpoch();
     return ok;
@@ -214,12 +253,21 @@ bool verify(QWidget* parent, const QString& reason) {
 // ===================================================================== helpers
 static QString newId() { return QUuid::createUuid().toString(QUuid::Id128).left(16); }
 
+// 2.0.8: a file that exists but can't be opened (unreadable, or the key doesn't fit) is moved aside before
+// anything is saved. The store used to load empty and the next save replaced every saved password.
 static QByteArray readSealed(const QString& file) {
     QFile f(file);
-    if (!f.open(QIODevice::ReadOnly)) return {};
+    if (!f.exists() || f.size() == 0) return {};
     bool ok = false;
-    const QByteArray plain = Vault::open(f.readAll(), &ok);
-    return ok ? plain : QByteArray();
+    QByteArray plain;
+    if (f.open(QIODevice::ReadOnly)) { plain = Vault::open(f.readAll(), &ok); f.close(); }
+    if (!ok || !QJsonDocument::fromJson(plain).isObject()) {
+        const QString aside = file + QStringLiteral(".unreadable-") + QString::number(QDateTime::currentSecsSinceEpoch());
+        QFile::rename(file, aside);
+        qWarning("passwords: %s could not be opened; kept as %s", qPrintable(file), qPrintable(aside));
+        return {};
+    }
+    return plain;
 }
 static void writeSealed(const QString& file, const QByteArray& plain) {
     const QByteArray sealed = Vault::seal(plain);

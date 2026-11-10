@@ -23,10 +23,17 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QVariantAnimation>
+#include <QPointer>
+#include <QSaveFile>
+#include <optional>
 
 // ---------------------------------------------------------------------------- QR code
 QImage QrDialog::render(const QString& text, int modulePx, int quiet) {
-    const auto qr = qrcodegen::QrCode::encodeText(text.toUtf8().constData(), qrcodegen::QrCode::Ecc::MEDIUM);
+    // 2.0.8: an address too long for a QR code made qrcodegen throw, and the exception closed Pacitum.
+    std::optional<qrcodegen::QrCode> made;
+    try { made.emplace(qrcodegen::QrCode::encodeText(text.toUtf8().constData(), qrcodegen::QrCode::Ecc::MEDIUM)); }
+    catch (...) { return {}; }
+    const auto& qr = *made;
     const int n = qr.getSize();
     QImage img((n + 2 * quiet) * modulePx, (n + 2 * quiet) * modulePx, QImage::Format_RGB32);
     img.fill(Qt::white);
@@ -47,10 +54,18 @@ QrDialog::QrDialog(const QString& url, QWidget* parent) : QDialog(parent) {
     l->addWidget(title);
     m_img = render(url, 8, 4);
     auto* pic = new QLabel(this);
+    if (m_img.isNull()) {   // 2.0.8
+        title->setText(QStringLiteral("This address is too long for a QR code"));
+        pic->setText(QStringLiteral("Share a shorter link to this page instead."));
+        pic->setObjectName(QStringLiteral("RowSub"));
+    }
     const int side = 248;
-    QPixmap pm = QPixmap::fromImage(m_img.scaled(side * devicePixelRatioF(), side * devicePixelRatioF(), Qt::KeepAspectRatio, Qt::FastTransformation));
-    pm.setDevicePixelRatio(devicePixelRatioF());
-    pic->setPixmap(pm); pic->setAlignment(Qt::AlignCenter); pic->setAccessibleName(QStringLiteral("QR code for %1").arg(url));
+    if (!m_img.isNull()) {
+        QPixmap pm = QPixmap::fromImage(m_img.scaled(side * devicePixelRatioF(), side * devicePixelRatioF(), Qt::KeepAspectRatio, Qt::FastTransformation));
+        pm.setDevicePixelRatio(devicePixelRatioF());
+        pic->setPixmap(pm);
+    }
+    pic->setAlignment(Qt::AlignCenter); pic->setAccessibleName(QStringLiteral("QR code for %1").arg(url));
     l->addWidget(pic, 0, Qt::AlignHCenter);
     auto* addr = new QLabel(fontMetrics().elidedText(url, Qt::ElideMiddle, 300), this);
     addr->setObjectName(QStringLiteral("RowSub")); addr->setAlignment(Qt::AlignHCenter); addr->setToolTip(url);
@@ -60,6 +75,7 @@ QrDialog::QrDialog(const QString& url, QWidget* parent) : QDialog(parent) {
     auto* save = new QPushButton(QStringLiteral("Save…"), this);
     auto* done = new QPushButton(QStringLiteral("Done"), this); done->setObjectName(QStringLiteral("PrimaryButton")); done->setDefault(true);
     row->addWidget(copy); row->addWidget(save); row->addStretch(1); row->addWidget(done);
+    copy->setEnabled(!m_img.isNull()); save->setEnabled(!m_img.isNull());
     l->addLayout(row);
     connect(copy, &QPushButton::clicked, this, [this, copy]{ QApplication::clipboard()->setImage(m_img); copy->setText(QStringLiteral("Copied")); });
     connect(save, &QPushButton::clicked, this, [this]{
@@ -169,6 +185,9 @@ void ScreenshotOverlay::keyPressEvent(QKeyEvent* e) {
 
 // ---------------------------------------------------------------------------- Notes
 static QString notesPath() { return QDir::current().absoluteFilePath(QStringLiteral("notes.txt")); }
+// 2.0.8: every window has its own Notes panel on the same file; after one saves, the others read it again
+// (a panel with stale text used to overwrite what another window had just written).
+static QList<QPointer<NotesPanel>>& notesPanels() { static QList<QPointer<NotesPanel>> l; return l; }
 
 NotesPanel::NotesPanel(QWidget* parent) : QWidget(parent) {
     setObjectName(QStringLiteral("NotesPanel"));
@@ -193,6 +212,8 @@ NotesPanel::NotesPanel(QWidget* parent) : QWidget(parent) {
     connect(&m_save, &QTimer::timeout, this, &NotesPanel::flush);
     connect(m_edit, &QPlainTextEdit::textChanged, this, [this]{ m_status->setText(QStringLiteral("Editing…")); m_save.start(); });
     connect(close, &QToolButton::clicked, this, &NotesPanel::closeRequested);
+    notesPanels().removeAll(nullptr);
+    notesPanels() << this;
 }
 void NotesPanel::reload() {
     QFile f(notesPath());
@@ -205,9 +226,11 @@ void NotesPanel::reload() {
 void NotesPanel::focusEditor() { m_edit->setFocus(); m_edit->moveCursor(QTextCursor::End); }
 void NotesPanel::flush() {
     m_save.stop();
-    QFile f(notesPath());
-    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) { f.write(m_edit->toPlainText().toUtf8()); m_status->setText(QStringLiteral("Saved")); }
-    else m_status->setText(QStringLiteral("Couldn't save notes"));
+    QSaveFile f(notesPath());   // 2.0.8: atomic, never a half-written notes file
+    if (f.open(QIODevice::WriteOnly) && f.write(m_edit->toPlainText().toUtf8()) >= 0 && f.commit()) {
+        m_status->setText(QStringLiteral("Saved"));
+        for (const auto& other : notesPanels()) if (other && other != this && !other->m_save.isActive()) other->reload();
+    } else m_status->setText(QStringLiteral("Couldn't save notes"));
 }
 
 // ---------------------------------------------------------------------------- Picture-in-picture

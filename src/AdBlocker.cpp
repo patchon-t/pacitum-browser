@@ -18,13 +18,21 @@ const QSet<QString> AdBlocker::s_hosts = {
     QStringLiteral("yieldmo.com"), QStringLiteral("teads.tv"), QStringLiteral("zedo.com"), QStringLiteral("ads-twitter.com")
 };
 
+// 2.0.8: only paths that are ads by name. "/banner", "/tracking", "/pixel", "/ad-" and "sponsored" also matched
+// ordinary images, parcel tracking pages and APIs, and broke them.
 const QStringList AdBlocker::s_patterns = {
-    QStringLiteral("/ads/"), QStringLiteral("/ad/"), QStringLiteral("/ad-"),
-    QStringLiteral("/banner"), QStringLiteral("/tracking"), QStringLiteral("/pixel"),
-    QStringLiteral("pagead"), QStringLiteral("doubleclick"), QStringLiteral("advertisement"),
-    QStringLiteral("google_ad"), QStringLiteral("sponsored"), QStringLiteral("popunder"),
+    QStringLiteral("/ads/"), QStringLiteral("pagead"), QStringLiteral("doubleclick"),
+    QStringLiteral("google_ad"), QStringLiteral("popunder"),
     QStringLiteral("facebook.com/tr?"), QStringLiteral("facebook.com/tr/")
 };
+
+// The site's own domain (last two labels; enough to tell a page's own files from someone else's).
+static QString siteOf(QString host) {
+    host = host.toLower();
+    const int last = host.lastIndexOf(QLatin1Char('.'));
+    const int prev = last > 0 ? host.lastIndexOf(QLatin1Char('.'), last - 1) : -1;
+    return prev >= 0 ? host.mid(prev + 1) : host;
+}
 
 // Listed domains block their subdomains too (www.google-analytics.com, securepubads.g.doubleclick.net):
 // walk up the labels, one hash lookup each.
@@ -47,6 +55,8 @@ void AdBlocker::interceptRequest(QWebEngineUrlRequestInfo &info) {
     // URL patterns only for what a page loads by itself: a page you open (address bar, link) is never
     // blocked for words like "sponsored" in its address.
     if (info.resourceType() == QWebEngineUrlRequestInfo::ResourceTypeMainFrame) return;
+    // A site's own files are never blocked by path (only listed ad networks are blocked outright).
+    if (siteOf(host) == siteOf(info.firstPartyUrl().host())) return;
     const QString url = info.requestUrl().toString().toLower();
     for (auto &p : s_patterns) if (url.contains(p)) { info.block(true); AdBlocker::noteBlocked(); return; }
 }

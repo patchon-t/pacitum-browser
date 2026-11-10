@@ -36,6 +36,7 @@ struct DownloadEntry {
     QPointer<QWebEngineDownloadRequest> req;
     QVector<QPair<qint64, qint64>> samples;  // (msecs since epoch, bytes) for 3 s moving average
     qint64 lastEmit = 0;
+    bool offTheRecord = false;   // 2.0.8: from a private tab: shown this session, never written to disk
 
     QString filePath() const;
     QString domain() const;

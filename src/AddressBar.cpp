@@ -511,7 +511,7 @@ void AddressBar::rebuildPopup() {
 void AddressBar::fetchSearchSuggestions(const QString& query) {
     if (m_suggestReply) m_suggestReply->abort();
     // Only words go to the search engine: not addresses, not long pastes.
-    if (!m_online || query.size() > 200 || query.contains(QStringLiteral("://")) || query.startsWith(QStringLiteral("pacitum:"))
+    if (!m_online || query.size() > 200 || looksLikeUrl(query) || query.contains(QStringLiteral("://")) || query.startsWith(QStringLiteral("pacitum:"))   // 2.0.8: no addresses
         || query.startsWith(QStringLiteral("file:")) || query.startsWith(QStringLiteral("about:"))) return;
     QNetworkRequest r(suggestUrl(m_engine, query));
     r.setRawHeader("User-Agent", QByteArray("Mozilla/5.0 PacitumBrowser/") + QCoreApplication::applicationVersion().toLatin1());

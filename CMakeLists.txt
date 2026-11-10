@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PacitumBrowser VERSION 2.0.7 LANGUAGES CXX)
+project(PacitumBrowser VERSION 2.0.8 LANGUAGES CXX)
 # 2.0.4: Pacitum is built for Windows and Linux only (the macOS port was removed).
 if(APPLE)
     message(FATAL_ERROR "Pacitum supports Windows and Linux. The macOS port was removed in 2.0.4.")
@@ -158,7 +158,8 @@ target_compile_definitions(PacitumBrowser PRIVATE PACITUM_VERSION="${PACITUM_FUL
 # Leave empty to let users paste their own in Settings › Sync › Advanced.
 set(PACITUM_GOOGLE_CLIENT_ID "" CACHE STRING "Google OAuth client ID (Desktop app) for sync")
 set(PACITUM_GOOGLE_CLIENT_SECRET "" CACHE STRING "Google OAuth client secret for sync")
-# 2.0.5 crash reports: a Discord webhook URL (repository secret PACITUM_CRASH_WEBHOOK in CI). Empty = never sent.
+# 2.0.5 crash reports: a Discord webhook URL, or (2.0.8) the Pacitum bot's /crash address (repository secret
+# PACITUM_CRASH_WEBHOOK in CI; same form either way). Empty = never sent.
 set(PACITUM_CRASH_WEBHOOK "" CACHE STRING "Discord webhook URL that receives crash reports")
 if(PACITUM_CRASH_WEBHOOK)
     target_compile_definitions(PacitumBrowser PRIVATE PACITUM_CRASH_WEBHOOK="${PACITUM_CRASH_WEBHOOK}")
