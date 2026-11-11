@@ -16,6 +16,7 @@
 #include "TabWidget.h"
 #include "AddressBar.h"
 #include "BookmarksBar.h"
+#include "FaviconCache.h"
 #include "BookmarkManager.h"
 #include "HistoryManager.h"
 #include "AppSettings.h"
@@ -1126,7 +1127,11 @@ void BrowserWindow::newTab(const QString& url) {
         if (tab != activeTab() || !isActiveWindow()) return;
         (new SaveAddressBubble(a, m_addressBar))->showAt(m_addressBar);
     });
-    connect(tab, &BrowserTab::iconChanged, this, [this, tab]{ updateTabIcon(tab); });
+    connect(tab, &BrowserTab::iconChanged, this, [this, tab]{
+        updateTabIcon(tab);
+        // 2.0.8: remember the site's icon for the bookmarks bar (never from a private tab)
+        if (!tab->isPrivate() && tab->view() && !tab->view()->icon().isNull()) FaviconCache::instance()->store(tab->currentUrl(), tab->view()->icon());
+    });
     connect(tab, &BrowserTab::urlChanged, this, [this, tab]{ updateTabIcon(tab); });
     connect(tab, &BrowserTab::fullScreenRequested, this, [this, tab](QWebEngineFullScreenRequest req){
         if (req.toggleOn()) {
