@@ -2,7 +2,13 @@
 #define AppName "Pacitum Browser"
 ; CI passes /DAppVer=<version from build/pacitum-version.txt> (1.9.x or legacy 1.8.x)
 #ifndef AppVer
-#define AppVer "2.0.9"
+#define AppVer "2.0.9-A"
+#endif
+; 2.0.9-A: Windows file versions are numbers only ("2.0.9-A" / "2.1.0-beta.1" -> 2.0.9 / 2.1.0)
+#if Pos("-", AppVer) > 0
+  #define AppNumVer Copy(AppVer, 1, Pos("-", AppVer) - 1)
+#else
+  #define AppNumVer AppVer
 #endif
 #define AppExe "PacitumBrowser.exe"
 [Setup]
@@ -52,7 +58,7 @@ CloseApplications=yes
 CloseApplicationsFilter=*.exe,*.dll
 RestartApplications=yes
 AppMutex=PacitumBrowserRunning
-VersionInfoVersion={#AppVer}
+VersionInfoVersion={#AppNumVer}
 VersionInfoProductName={#AppName}
 VersionInfoCompany=Next PRJ
 VersionInfoDescription={#AppName} Setup

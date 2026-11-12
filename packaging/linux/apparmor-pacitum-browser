@@ -1,0 +1,12 @@
+# Pacitum Browser (2.0.9-A): lets the browser and its Chromium processes create user namespaces, which
+# Chromium's sandbox needs. Ubuntu 24.04 and systems built on it (Linux Mint 22, Pop!_OS, Zorin...) only allow
+# that to programs with a profile like this one; without it the browser closed at once ("No usable sandbox").
+# Installed to /etc/apparmor.d/pacitum-browser only where AppArmor 4 is present (abi 4.0).
+abi <abi/4.0>,
+include <tunables/global>
+
+profile pacitum-browser /opt/pacitum-browser/{bin/PacitumBrowser,libexec/QtWebEngineProcess} flags=(unconfined) {
+  userns,
+
+  include if exists <local/pacitum-browser>
+}

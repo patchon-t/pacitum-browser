@@ -48,6 +48,7 @@ public:
 
     static QUrl feedUrl();
     static int compareVersions(const QString& a, const QString& b);   // <0, 0, >0
+    static bool isPreReleaseVersion(const QString& v);   // "2.1.0-beta.1" yes; "2.0.9" and the rebuild "2.0.9-A" no
     static QString currentVersion();
     // 2.0.6 update channel (setting "update_channel"): "stable" or "beta" (GitHub pre-releases too).
     // Leaving Beta never downgrades: Stable then waits for a release newer than the installed beta.

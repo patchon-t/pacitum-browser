@@ -284,7 +284,7 @@ QVariantMap SettingsBridge::state() const {
     o["isDefault"] = FirstRunBridge::isDefaultBrowserStatic();
     auto* up = Updater::instance();
     o["update"] = QVariantMap{{"status", up->lastStatus()}, {"busy", up->busy()}, {"channel", Updater::channel()},
-                              {"pre", up->preReleases()}, {"isBeta", Updater::currentVersion().contains(QLatin1Char('-'))},
+                              {"pre", up->preReleases()}, {"isBeta", Updater::isPreReleaseVersion(Updater::currentVersion())},
                               {"last", AppSettings::get(QStringLiteral("update_last_check")).toDouble() * 1000.0}};
     auto* sm = SyncManager::instance();
     o["sync"] = QVariantMap{{"signedIn", sm->signedIn()}, {"email", sm->account().email}, {"hasClient", sm->hasClient()}, {"busy", sm->busy()},
