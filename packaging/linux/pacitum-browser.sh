@@ -31,6 +31,21 @@ echo "exit $rc after ${took}s" >> "$LOG"
 # 0 = normal quit or handed over to a running window; 6 = profile already open (Pacitum said so itself).
 if [ "$rc" -eq 0 ] || [ "$rc" -eq 6 ] || [ "$took" -ge 20 ]; then exit "$rc"; fi
 
+notify() {
+    if command -v zenity >/dev/null 2>&1; then zenity --error --no-wrap --title="Pacitum Browser" --text="$1" 2>/dev/null
+    elif command -v kdialog >/dev/null 2>&1; then kdialog --title "Pacitum Browser" --error "$1" 2>/dev/null
+    elif command -v notify-send >/dev/null 2>&1; then notify-send "Pacitum Browser" "$1" 2>/dev/null
+    fi
+    echo "$1" >&2
+}
+# A system library is missing or doesn't fit: a safe mode can't help, say which one.
+missing=$(grep -o -e "error while loading shared libraries: [^:]*" -e "symbol lookup error: .*" "$LOG" 2>/dev/null | head -n 1)
+if [ -n "$missing" ]; then
+    echo "not retrying: $missing" >> "$LOG"
+    notify "Pacitum Browser can't start: a system library is missing ($missing). Reinstall the package with your package manager (it installs what Pacitum needs) or install the latest Pacitum. Details: $LOG"
+    exit "$rc"
+fi
+
 # Chromium's sandbox can't start: "No usable sandbox" (no user namespaces), or "credentials.cc ... Permission denied"
 # (Ubuntu 24.04-style AppArmor restriction when the profile isn't loaded).
 sandbox_broken() { grep -q -e "No usable sandbox" -e "credentials.cc" -e "zygote_host_impl_linux" -e "setuid_sandbox_host" "$LOG" 2>/dev/null; }
@@ -47,11 +62,6 @@ else
     fi
 fi
 if [ "$rc" -ne 0 ] && [ "$rc" -ne 6 ]; then
-    msg="Pacitum Browser couldn't start. Details are in $LOG"
-    if command -v zenity >/dev/null 2>&1; then zenity --error --no-wrap --title="Pacitum Browser" --text="$msg" 2>/dev/null
-    elif command -v kdialog >/dev/null 2>&1; then kdialog --title "Pacitum Browser" --error "$msg" 2>/dev/null
-    elif command -v notify-send >/dev/null 2>&1; then notify-send "Pacitum Browser" "$msg" 2>/dev/null
-    fi
-    echo "$msg" >&2
+    notify "Pacitum Browser couldn't start. Details are in $LOG"
 fi
 exit "$rc"

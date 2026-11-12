@@ -172,3 +172,5 @@ jobs:
           echo "--- startup.log"; tail -n 30 "$dir/startup.log" || true
           grep -q "SMOKE OK" "$dir/startup.log"
           if grep -q "^retrying" "$dir/launch.log"; then echo "::warning::${{ matrix.image }}: the browser only started in safe mode"; fi
+          # secure connections (updates, sync, site icons) need the system's OpenSSL
+          if grep -q "Failed to load libssl" "$dir/startup.log"; then echo "::error::${{ matrix.image }}: no OpenSSL, HTTPS from Pacitum itself fails"; exit 1; fi
