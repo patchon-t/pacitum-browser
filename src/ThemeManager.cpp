@@ -236,7 +236,7 @@ QMainWindow, QDialog { background: @page; }
 BookmarksBar { background: @toolbar; border: none; }
 BookmarksBar QScrollArea, BookmarksBar QScrollArea > QWidget > QWidget { background: @toolbar; border: none; }
 BookmarksBar QPushButton { background: transparent; border: none; border-radius: 8px; padding: 0 10px;
-          height: 26px; min-height: 26px; max-width: 160px; font-size: 12px; color: @text; text-align: left; }
+          height: 26px; min-height: 26px; max-width: 160px; font-size: 12.5px; font-weight: 400; color: @text; text-align: left; }
 BookmarksBar QPushButton:hover { background: @surface; }
 BookmarksBar QPushButton:pressed { background: @pressed; }
 QMenu { background: @toolbar; border: 1px solid @borderStrong; border-radius: 16px; padding: 6px; }

@@ -107,6 +107,9 @@ public:
     }
     int styleHint(StyleHint h, const QStyleOption* opt, const QWidget* w, QStyleHintReturn* r) const override {
         if (h == SH_Widget_Animation_Duration && qobject_cast<const PacitumTabBar*>(w)) return Pacitum::motionMs(160);   // reorder slide
+        // 2.0.8: select on press, everywhere. The Windows style selects on release, so a tab dragged and let go over its
+        // neighbour selected the neighbour (the tab you were dragging lost focus).
+        if (h == SH_TabBar_SelectMouseType && qobject_cast<const PacitumTabBar*>(w)) return QEvent::MouseButtonPress;
         return QProxyStyle::styleHint(h, opt, w, r);
     }
 };
@@ -147,7 +150,9 @@ void PacitumTabBar::enableFloatingTabs() {
     m_slideAnim->setStartValue(0.0); m_slideAnim->setEndValue(1.0); m_slideAnim->setEasingCurve(QEasingCurve::OutCubic);
     connect(m_slideAnim, &QVariantAnimation::valueChanged, this, [this](const QVariant& v){ m_slideT = v.toReal(); update(); });
     connect(m_slideAnim, &QVariantAnimation::finished, this, [this]{ m_slideT = 1.0; update(); });
-    connect(this, &QTabBar::currentChanged, this, [this](int){ startSelectionSlide(); });
+    // 2.0.8: the close button follows the active tab at once (a tab that just lost focus kept its button, and its
+    // title stayed cut short, until the mouse passed over it).
+    connect(this, &QTabBar::currentChanged, this, [this](int){ startSelectionSlide(); updateCloseButtons(); update(); });
     connect(this, &QTabBar::tabMoved, this, [this]{ markStructChange(); });
     m_spin = new QVariantAnimation(this);
     // animations-spec §6: one shared 0→1 loop (1600 ms) for all loading tabs; angle = v·720 (800 ms/turn),
@@ -375,7 +380,12 @@ void PacitumTabBar::mouseReleaseEvent(QMouseEvent* e) {
     const bool wasDragging = m_dragging;
     m_dragging = false;
     QTabBar::mouseReleaseEvent(e);
-    if (wasDragging) markStructChange();
+    if (wasDragging) {
+        markStructChange();
+        // 2.0.8: once Qt's drop slide has finished, put the close buttons back on their tabs and repaint the strip.
+        // After a drag a button could stay where the moving tab had been, and titles were drawn around it.
+        QTimer::singleShot(Pacitum::motionMs(160) + 80, this, [this]{ if (!m_dragging) { relayout(); updateCloseButtons(); update(); } });
+    }
 }
 void PacitumTabBar::leaveEvent(QEvent* e) {
     if (m_floating) {
@@ -512,7 +522,9 @@ void PacitumTabBar::paintFloatingTab(QPainter* p, const QStyleOptionTab& opt) co
     }
 
     const bool compact = !pinned && bodyW < 80;
-    const bool closeVisible = idx >= 0 && tabButton(idx, QTabBar::RightSide) && tabButton(idx, QTabBar::RightSide)->isVisible();
+    // 2.0.8: only a button that is really on this tab narrows the title (a stale one after a drag cut it short)
+    const QWidget* cbtn = idx >= 0 ? tabButton(idx, QTabBar::RightSide) : nullptr;
+    const bool closeVisible = cbtn && cbtn->isVisible() && (opt.position == QStyleOptionTab::Moving || r.contains(cbtn->geometry().center()));
     int iconX = pinned || (compact && !closeVisible) ? int(body.center().x() - 8) : r.x() + 12;
     const QRectF iconR(iconX, r.y() + kTop + kIconY, 16, 16);
     if (fl.loading) {

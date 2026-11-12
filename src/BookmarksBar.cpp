@@ -3,6 +3,8 @@
 #include "ThemeManager.h"
 #include "Motion.h"
 #include "Widgets.h"
+#include "FaviconCache.h"
+#include <QTimer>
 #include <QSet>
 #include <QPropertyAnimation>
 #include <QFontMetrics>
@@ -108,6 +110,10 @@ BookmarksBar::BookmarksBar(BookmarkManager* mgr, QWidget* parent) : QWidget(pare
         m.exec(m_other->mapToGlobal(QPoint(0, m_other->height() + 4)));
     });
     layout->addWidget(m_other);
+    // 2.0.8: a site icon arrived (a visit or the one-time fetch): redraw the bar once, shortly after.
+    auto* iconRefresh = new QTimer(this); iconRefresh->setSingleShot(true); iconRefresh->setInterval(400);
+    connect(iconRefresh, &QTimer::timeout, this, [this]{ refresh(); });
+    connect(FaviconCache::instance(), &FaviconCache::changed, this, [iconRefresh]{ iconRefresh->start(); });
     refresh();
 }
 
@@ -116,7 +122,8 @@ void BookmarksBar::addFolderMenu(QMenu* m, const QString& folder) {
     const auto list = m_mgr->bookmarksIn(folder);
     for (const auto& bm : list) {
         const QString u = bm.url;
-        auto* a = m->addAction(m_theme ? m_theme->secondaryIcon(QStringLiteral("globe"), 14) : QIcon(),
+        const QIcon site = FaviconCache::instance()->icon(u);   // 2.0.8: the site's own icon
+        auto* a = m->addAction(!site.isNull() ? site : m_theme ? m_theme->secondaryIcon(QStringLiteral("globe"), 14) : QIcon(),
                                QFontMetrics(m->font()).elidedText(bm.title.isEmpty() ? bm.url : bm.title, Qt::ElideRight, 320).replace(QLatin1Char('&'), QStringLiteral("&&")));
         a->setToolTip(u);
         connect(a, &QAction::triggered, this, [this, u]{ emit urlActivated(u); });
@@ -175,7 +182,10 @@ void BookmarksBar::refresh() {
         auto* btn = new BookmarkChip(url, m_inner);
         btn->setText(QFontMetrics(btn->font()).elidedText(label, Qt::ElideRight, 130));
         btn->setFixedHeight(26); btn->setIconSize(QSize(14,14));
-        if (m_theme) btn->setIcon(m_theme->secondaryIcon(QStringLiteral("globe"), 14));
+        // 2.0.8: the site's own icon (it was always a globe); the globe only until the icon is known
+        const QIcon site = FaviconCache::instance()->icon(url);
+        if (!site.isNull()) btn->setIcon(site);
+        else if (m_theme) btn->setIcon(m_theme->secondaryIcon(QStringLiteral("globe"), 14));
         btn->setToolTip(bm.url); btn->setFlat(true);
         connect(btn, &QPushButton::clicked, this, [this, url]{ emit urlActivated(url); });
         btn->onMiddle = [this, url]{ emit urlActivatedInNewTab(url); };
