@@ -174,3 +174,4 @@ jobs:
           if grep -q "^retrying" "$dir/launch.log"; then echo "::warning::${{ matrix.image }}: the browser only started in safe mode"; fi
           # secure connections (updates, sync, site icons) need the system's OpenSSL
           if grep -q "Failed to load libssl" "$dir/startup.log"; then echo "::error::${{ matrix.image }}: no OpenSSL, HTTPS from Pacitum itself fails"; exit 1; fi
+          if grep -q "issuer certificate" "$dir/startup.log"; then echo "::error::${{ matrix.image }}: no system CA certificates, HTTPS from Pacitum itself fails"; exit 1; fi

@@ -61,13 +61,13 @@ common=(-s dir -n pacitum-browser --url "https://github.com/patchon-t/pacitum-br
         --description "Pacitum Browser: a calm, fast web browser (Qt WebEngine / Chromium)." --after-install "$PWD/after-install.sh" --after-remove "$PWD/after-remove.sh" -C "$root")
 fpm "${common[@]}" -v "$debver" -t deb -a amd64 -p "PacitumBrowser-$ver-linux-x86_64.deb" \
     -d "libc6 (>= 2.35)" -d "libstdc++6 (>= 12)" -d libx11-6 -d libx11-xcb1 -d libxcb1 -d libgbm1 -d libwayland-client0 -d libfreetype6 -d libexpat1 -d zlib1g \
-    -d libcom-err2 -d libgmp10 -d "libssl3t64 | libssl3" \
+    -d libcom-err2 -d libgmp10 -d "libssl3t64 | libssl3" -d ca-certificates \
     -d libnss3 -d libxkbcommon-x11-0 -d libxcb-cursor0 -d libxcb-icccm4 -d libxcb-image0 -d libxcb-keysyms1 \
     -d libxcb-render-util0 -d libxcb-xinerama0 -d "libasound2t64 | libasound2 (>= 1.1)" -d libgl1 -d libegl1 -d libopengl0 -d libglx0 -d libxcomposite1 -d libxdamage1 \
     -d libxrandr2 -d libxtst6 -d libfontconfig1 -d libdbus-1-3 -d libgpg-error0 .
 fpm "${common[@]}" -v "$rpmver" -t rpm -a x86_64 -p "PacitumBrowser-$ver-linux-x86_64.rpm" --no-rpm-autoreqprov \
     -d "glibc >= 2.35" -d "libstdc++ >= 12" -d libX11 -d libX11-xcb -d libxcb -d mesa-libgbm -d libwayland-client -d freetype -d expat -d zlib \
-    -d libcom_err -d gmp -d openssl-libs \
+    -d libcom_err -d gmp -d openssl-libs -d ca-certificates \
     -d nss -d libxkbcommon-x11 -d xcb-util-cursor -d xcb-util-wm -d xcb-util-image -d xcb-util-keysyms -d xcb-util-renderutil \
     -d alsa-lib -d mesa-libGL -d mesa-libEGL -d libglvnd-opengl -d libglvnd-glx -d libglvnd-egl -d libXcomposite -d libXdamage -d libXrandr -d libXtst -d fontconfig -d dbus-libs -d libgpg-error .
 for f in PacitumBrowser-"$ver"-linux-x86_64.deb PacitumBrowser-"$ver"-linux-x86_64.rpm; do sha256sum "$f" > "$f.sha256"; ls -la "$f"; done
