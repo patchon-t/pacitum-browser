@@ -52,6 +52,7 @@ QString preRelease(QString v) {
     const int at = v.indexOf(QRegularExpression(QStringLiteral("[^0-9.]")));
     return at < 0 ? QString() : v.mid(at).remove(QRegularExpression(QStringLiteral("^[\\-_. +]+")));
 }
+bool isRevisionSuffix(const QString& s) { return s.size() == 1 && s.at(0).isLetter(); }
 QVector<int> versionParts(QString v) {
     v = v.trimmed();
     if (v.startsWith(QLatin1Char('v'), Qt::CaseInsensitive)) v.remove(0, 1);
@@ -109,8 +110,12 @@ int Updater::compareVersions(const QString& a, const QString& b) {
         if (p != q) return p < q ? -1 : 1;
     }
     // 2.0.6: pre-releases ("2.1.0-beta.2") come before the release of the same number, and in order among themselves.
+    // 2.0.9-A: a single letter is a fixed rebuild of a release ("2.0.9-A", then "-B"): after the release, not before.
     const QString sa = preRelease(a), sb = preRelease(b);
-    if (sa.isEmpty() || sb.isEmpty()) return sa.isEmpty() == sb.isEmpty() ? 0 : (sa.isEmpty() ? 1 : -1);
+    auto rank = [](const QString& s) { return s.isEmpty() ? 0 : isRevisionSuffix(s) ? 1 : -1; };
+    if (rank(sa) != rank(sb)) return rank(sa) < rank(sb) ? -1 : 1;
+    if (sa.isEmpty()) return 0;
+    if (rank(sa) == 1) { const int c = sa.compare(sb, Qt::CaseInsensitive); return c == 0 ? 0 : (c < 0 ? -1 : 1); }
     const QStringList pa = sa.split(QRegularExpression(QStringLiteral("[.\\-_ ]+")), Qt::SkipEmptyParts);
     const QStringList pb = sb.split(QRegularExpression(QStringLiteral("[.\\-_ ]+")), Qt::SkipEmptyParts);
     for (int i = 0; i < qMax(pa.size(), pb.size()); ++i) {
@@ -124,6 +129,11 @@ int Updater::compareVersions(const QString& a, const QString& b) {
         if (c) return c < 0 ? -1 : 1;
     }
     return 0;
+}
+
+bool Updater::isPreReleaseVersion(const QString& v) {
+    const QString s = preRelease(v);
+    return !s.isEmpty() && !isRevisionSuffix(s);
 }
 
 QString Updater::channel() {

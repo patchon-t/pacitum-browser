@@ -30,7 +30,13 @@ else()
 endif()
 # 2.0.6: a beta build (GitHub pre-release) names its stage, e.g. -DPACITUM_PRERELEASE=beta.1 -> "2.1.0-beta.1".
 set(PACITUM_PRERELEASE "" CACHE STRING "Pre-release stage for a beta build (empty for a release)")
+# 2.0.9-A: a fixed rebuild of a release gets a letter ("2.0.9-A"); the updater sorts it after "2.0.9".
+# Clear it when the version number goes up.
+set(PACITUM_REVISION "A")
 set(PACITUM_FULL_VERSION ${PACITUM_APP_VERSION})
+if(PACITUM_REVISION AND NOT PACITUM_UPDATE_TRACK)
+    set(PACITUM_FULL_VERSION "${PACITUM_APP_VERSION}-${PACITUM_REVISION}")
+endif()
 if(PACITUM_PRERELEASE)
     set(PACITUM_FULL_VERSION "${PACITUM_APP_VERSION}-${PACITUM_PRERELEASE}")
 endif()

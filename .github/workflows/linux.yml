@@ -109,8 +109,8 @@ jobs:
           echo "--- deb"; dpkg-deb -I PacitumBrowser-$ver-linux-x86_64.deb | head -30
           echo "--- rpm requires"; rpm -qp --requires PacitumBrowser-$ver-linux-x86_64.rpm
       - name: Install the .deb and check that it starts
-        env:
-          QTWEBENGINE_DISABLE_SANDBOX: '1'
+        # 2.0.9-A: with Chromium's sandbox on, through /usr/bin/pacitum-browser (the launcher), as a user would start it.
+        # (This step used to turn the sandbox off, so a sandbox failure could never show up here.)
         run: |
           ver=$(cat build/pacitum-version.txt)
           rm -rf "$HOME/.local/share/Pacitum"
@@ -120,6 +120,8 @@ jobs:
           log="$HOME/.local/share/Pacitum/Pacitum Browser/startup.log"
           tail -n 40 "$log" || true
           grep -q "SMOKE OK" "$log"
+          echo "--- launch.log"; cat "$HOME/.local/share/Pacitum/Pacitum Browser/launch.log" | grep -E "^===|^exit|^retrying" || true
+          if grep -q "^retrying" "$HOME/.local/share/Pacitum/Pacitum Browser/launch.log"; then echo "::warning::the browser only started in safe mode"; fi
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: PacitumBrowser-Linux-${{ matrix.line }}
@@ -135,3 +137,41 @@ jobs:
           [ "${{ github.ref_name }}" = "v$(cat build/pacitum-version.txt)" ] || { echo "tag is for the other line; skipping"; exit 0; }
           bash .github/ensure-release.sh "${{ github.ref_name }}" "${{ github.repository }}" || { echo "no release and no release-notes/${{ github.ref_name }}.md; skipping"; exit 0; }
           gh release upload "${{ github.ref_name }}" PacitumBrowser-*.AppImage* PacitumBrowser-*.deb* PacitumBrowser-*.rpm* --clobber --repo "${{ github.repository }}"
+
+  # 2.0.9-A: install the packages on clean systems, as a user would, and start the browser (sandbox on, not root).
+  # The .deb didn't open on a Debian desktop; ubuntu-22.04 (above) already had everything it needed.
+  install-test:
+    needs: linux
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['debian:12', 'debian:13', 'ubuntu:24.04', 'fedora:42']
+    container: ${{ matrix.image }}
+    name: install on ${{ matrix.image }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: PacitumBrowser-Linux-main }
+      - name: Install the package
+        run: |
+          if command -v apt-get >/dev/null; then
+            apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ./PacitumBrowser-*.deb xvfb
+          else
+            dnf install -y -q ./PacitumBrowser-*.rpm xorg-x11-server-Xvfb util-linux shadow-utils
+          fi
+          test -x /usr/bin/pacitum-browser && test -f /usr/share/applications/pacitum-browser.desktop
+      - name: Start it as a normal user
+        run: |
+          useradd -m tester
+          Xvfb :99 -screen 0 1440x900x24 >/dev/null 2>&1 &
+          sleep 2
+          runuser -u tester -- env DISPLAY=:99 HOME=/home/tester timeout 120 /usr/bin/pacitum-browser --smoke-test || echo "exit code $?"
+          dir="/home/tester/.local/share/Pacitum/Pacitum Browser"
+          echo "--- launch.log"; cat "$dir/launch.log" || true
+          echo "--- startup.log"; tail -n 30 "$dir/startup.log" || true
+          grep -q "SMOKE OK" "$dir/startup.log"
+          if grep -q "^retrying" "$dir/launch.log"; then echo "::warning::${{ matrix.image }}: the browser only started in safe mode"; fi
+          # secure connections (updates, sync, site icons) need the system's OpenSSL
+          if grep -q "Failed to load libssl" "$dir/startup.log"; then echo "::error::${{ matrix.image }}: no OpenSSL, HTTPS from Pacitum itself fails"; exit 1; fi
+          if grep -q "issuer certificate" "$dir/startup.log"; then echo "::error::${{ matrix.image }}: no system CA certificates, HTTPS from Pacitum itself fails"; exit 1; fi
