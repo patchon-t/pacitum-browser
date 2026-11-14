@@ -103,7 +103,8 @@ jobs:
           test -f "$gi/libqt-plugin-wayland-egl.so"
           mkdir -p AppDir/usr/plugins/wayland-graphics-integration-client AppDir/usr/lib
           cp -a "$gi/libqt-plugin-wayland-egl.so" AppDir/usr/plugins/wayland-graphics-integration-client/
-          cp -a "$QT_ROOT_DIR"/lib/libQt6WaylandEglClientHwIntegration.so.6* AppDir/usr/lib/
+          # Qt 6.8 has a separate libQt6WaylandEglClientHwIntegration; Qt 6.11 folded it into libQt6WaylandClient
+          for l in "$QT_ROOT_DIR"/lib/libQt6WaylandEglClientHwIntegration.so.6*; do [ -e "$l" ] && cp -a "$l" AppDir/usr/lib/; done
           export OUTPUT="PacitumBrowser-$ver-linux-x86_64.AppImage"
           ./linuxdeploy-x86_64.AppImage --appdir AppDir -e AppDir/usr/bin/PacitumBrowser \
             --deploy-deps-only AppDir/usr/plugins/wayland-graphics-integration-client \
