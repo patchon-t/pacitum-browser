@@ -95,9 +95,22 @@ jobs:
           ls "$QT_ROOT_DIR/plugins/platforms/"
           echo "extra platform plugins: ${plugins:-none}"
           [ -n "$plugins" ] && export EXTRA_PLATFORM_PLUGINS="$plugins"
+          # 2.0.9-A: OpenGL for Wayland windows (KDE Plasma, GNOME on Wayland). linuxdeploy-plugin-qt bundles the Wayland
+          # platform plugin but not its EGL buffer integration, so on Wayland Qt logged
+          # 'Failed to load client buffer integration: "wayland-egl"' and the web view / Qt Quick parts got no OpenGL.
+          gi="$QT_ROOT_DIR/plugins/wayland-graphics-integration-client"
+          ls "$gi"
+          test -f "$gi/libqt-plugin-wayland-egl.so"
+          mkdir -p AppDir/usr/plugins/wayland-graphics-integration-client AppDir/usr/lib
+          cp -a "$gi/libqt-plugin-wayland-egl.so" AppDir/usr/plugins/wayland-graphics-integration-client/
+          cp -a "$QT_ROOT_DIR"/lib/libQt6WaylandEglClientHwIntegration.so.6* AppDir/usr/lib/
           export OUTPUT="PacitumBrowser-$ver-linux-x86_64.AppImage"
           ./linuxdeploy-x86_64.AppImage --appdir AppDir -e AppDir/usr/bin/PacitumBrowser \
+            --deploy-deps-only AppDir/usr/plugins/wayland-graphics-integration-client \
             -d resources/linux/pacitum-browser.desktop -i resources/linux/pacitum-browser.png --plugin qt --output appimage
+          test -f AppDir/usr/plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so
+          ldd AppDir/usr/plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so | grep -E "not found|Qt6Wayland|wayland-egl" || true
+          ! ldd AppDir/usr/plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so | grep -q "not found"
           sha256sum "$OUTPUT" > "$OUTPUT.sha256"
           ls -la "$OUTPUT"
       - name: Packages (.deb + .rpm)
@@ -175,3 +188,28 @@ jobs:
           # secure connections (updates, sync, site icons) need the system's OpenSSL
           if grep -q "Failed to load libssl" "$dir/startup.log"; then echo "::error::${{ matrix.image }}: no OpenSSL, HTTPS from Pacitum itself fails"; exit 1; fi
           if grep -q "issuer certificate" "$dir/startup.log"; then echo "::error::${{ matrix.image }}: no system CA certificates, HTTPS from Pacitum itself fails"; exit 1; fi
+      - name: Start it in a Wayland session (as on KDE Plasma)
+        # 2.0.9-A: Plasma (and GNOME) run apps on Wayland. Weston with Mesa's software OpenGL stands in for the desktop;
+        # the browser must get OpenGL there (the package once lacked Qt's wayland-egl plugin and drew nothing).
+        if: matrix.image == 'ubuntu:24.04' || matrix.image == 'fedora:42'
+        run: |
+          if command -v apt-get >/dev/null; then
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends weston libegl-mesa0 libgl1-mesa-dri
+          else
+            dnf install -y -q weston mesa-dri-drivers mesa-libEGL
+          fi
+          export XDG_RUNTIME_DIR=/tmp/xdg-tester; mkdir -p $XDG_RUNTIME_DIR; chmod 700 $XDG_RUNTIME_DIR; chown tester $XDG_RUNTIME_DIR
+          runuser -u tester -- env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR LIBGL_ALWAYS_SOFTWARE=1 \
+            weston --backend=headless --renderer=gl --socket=wayland-ci --width=1440 --height=900 > /tmp/weston.log 2>&1 &
+          for i in $(seq 1 20); do [ -S $XDG_RUNTIME_DIR/wayland-ci ] && break; sleep 0.5; done
+          cat /tmp/weston.log
+          dir="/home/tester/.local/share/Pacitum/Pacitum Browser"; rm -rf "/home/tester/.local/share/Pacitum"
+          runuser -u tester -- env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR WAYLAND_DISPLAY=wayland-ci XDG_SESSION_TYPE=wayland \
+            XDG_CURRENT_DESKTOP=KDE KDE_FULL_SESSION=true LIBGL_ALWAYS_SOFTWARE=1 HOME=/home/tester \
+            timeout 120 /usr/bin/pacitum-browser --smoke-test || echo "exit code $?"
+          echo "--- launch.log"; grep -v "wildcard call disconnects" "$dir/launch.log" || true
+          grep -q "SMOKE OK" "$dir/startup.log"
+          if grep -q "^retrying" "$dir/launch.log"; then echo "::error::${{ matrix.image }} Wayland: only started in safe mode"; exit 1; fi
+          if grep -qE 'client buffer integration|no rhi|Failed to create QRhi|QRhiGles2: Failed' "$dir/launch.log"; then
+            echo "::error::${{ matrix.image }} Wayland: no OpenGL for the window (Qt wayland-egl)"; exit 1
+          fi
