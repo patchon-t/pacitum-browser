@@ -46,6 +46,10 @@ for T in Light Dark; do
   key ctrl+t; shot 02-newtab-$t 4
   key alt+f; shot 03-menu-$t 1.5; key Escape; sleep 1
   key ctrl+shift+Tab; shot 04-website-$t 2
+  # 2.0.10 quick switcher: empty, then searching
+  key ctrl+k; shot 08-quick-switcher-$t 1.5
+  focus; xdotool type --delay 80 "wiki"; shot 09-quick-switcher-search-$t 1.5
+  key Escape; sleep 1
   key ctrl+comma; shot 05-settings-$t 3
   # Settings nav sits on the left; focus it and jump to its last row (About Pacitum)
   focus; xdotool mousemove 140 330 click 1; sleep 0.5; xdotool key End; shot 06-about-$t 2
@@ -53,6 +57,10 @@ for T in Light Dark; do
   xdotool mousemove 700 500; for i in $(seq 1 15); do xdotool click 5; sleep 0.05; done; shot 07-about-bottom-$t 1.5
   quit
 done
+# 2.0.10 dark websites ("Always"), on the light theme so the page is the only dark thing
+theme Light
+jq '.web_dark="always"' "$SET" > "$SET.tmp" && mv "$SET.tmp" "$SET"
+if launch "https://en.wikipedia.org/wiki/Web_browser"; then shot 10-dark-website 3; quit; fi
 kill $XVFB 2>/dev/null
 ls -la "$OUT"
 for f in "$OUT"/*.jpg; do

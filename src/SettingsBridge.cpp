@@ -304,7 +304,7 @@ void SettingsBridge::set(const QString& key, const QVariant& value) {
         "gpu_acceleration", "run_in_background", "cookie_mode", "safe_browsing", "https_only", "adblock_enabled", "do_not_track",
         "clear_on_exit", "clear_cookies_on_exit", "tab_size", "startup", "startup_pages", "homepage", "auto_check_updates", "update_feed_url",
         "passwords_offer", "passwords_autosignin", "passwords_pin", "passwords_suggest", "autofill_addresses", "autofill_payments",
-        "theme_ntp", "search_shortcuts", "languages", "custom_theme", "ext_dev_mode", "switcher_style"};
+        "theme_ntp", "search_shortcuts", "languages", "custom_theme", "ext_dev_mode", "switcher_style", "web_dark"};
     if (key == QLatin1String("update_channel")) {   // 2.0.6: Stable / Beta, then look again at once
         Updater::setChannel(value.toString());
         if (m_h.checkUpdates) m_h.checkUpdates();

@@ -402,6 +402,7 @@ function secAppearance() {
     <div class="card">
       <div class="row"><span class="tx"><span class="t">Accent colour</span><span class="d">Used for the active tab, the cursor and your profile</span></span>
         <div style="display:flex;gap:8px">${ACCENTS.map((w) => `<button class="swatch" aria-label="${w[0]}" aria-pressed="${w[1] === '#D9141F' ? def : acc === w[1]}" style="background:${w[1]};--ring:${w[1]}" data-a="accent" data-v="${w[1]}"></button>`).join('')}</div></div>
+      ${row('Dark websites', 'Shows sites that only come in light colours in dark colours', seg('web_dark', 'off', [['off', 'Off'], ['theme', 'With dark theme'], ['always', 'Always']], 'sm'))}
       ${row('Tab size', 'Compact fits more tabs', seg('tab_size', 'comfy', [['compact', 'Compact'], ['comfy', 'Comfortable']], 'sm'))}
       ${row('Tab overview style', 'Ctrl + Shift + Space shows your tabs as 3D cards', seg('switcher_style', 'carousel', [['carousel', 'Carousel'], ['stack', 'Stack'], ['grid', 'Grid']], 'sm'))}
       ${row('Font size', '', select('default_font_size', 16, [[9, 'Very small'], [12, 'Small'], [16, 'Medium (recommended)'], [20, 'Large'], [24, 'Very large']], 'Font size'))}

@@ -14,6 +14,7 @@
 #include <QCoreApplication>
 #include <QtGlobal>
 #include "BrowserWindow.h"
+#include "PageTest.h"
 #include "UpdateOverlay.h"
 #include "UpdateUi.h"
 #include "ChromeExtensions.h"
@@ -282,7 +283,7 @@ int main(int argc, char *argv[]) {
     bool restarted = false;
     bool stress = false;
     bool resizeTest = false;
-    bool perf = false, handoffTest = false;
+    bool perf = false, handoffTest = false, pageTest = false;
     bool profileTest = false, guest = false, forcePicker = false, permTest = false, extTest = false;
     QString profileArg;
     for (int i = 1; i < argc; ++i) {
@@ -290,6 +291,7 @@ int main(int argc, char *argv[]) {
         if (qstrcmp(argv[i], "--stress-test") == 0) stress = true;
         if (qstrcmp(argv[i], "--resize-test") == 0) resizeTest = true;
         if (qstrcmp(argv[i], "--perf-test") == 0) perf = true;
+        if (qstrcmp(argv[i], "--page-test") == 0) pageTest = true;   // 2.0.10
         if (qstrcmp(argv[i], "--handoff-test") == 0) handoffTest = true;
         if (qstrcmp(argv[i], "--profile-test") == 0) profileTest = true;
         if (qstrcmp(argv[i], "--permissions-test") == 0) permTest = true;
@@ -358,7 +360,7 @@ int main(int argc, char *argv[]) {
             const QUrl u = QUrl::fromUserInput(a, launchDir, QUrl::AssumeLocalFile);
             if (u.isValid()) urlArgs << u.toString();
         }
-        const bool testRun = smoke || stress || resizeTest || perf || handoffTest || permTest || extTest;
+        const bool testRun = smoke || stress || resizeTest || perf || handoffTest || permTest || extTest || pageTest;
         // Single instance: a plain second launch (taskbar, a link clicked in another app while
         // Pacitum is open) goes to the running browser before anything else -- the profile picker
         // used to come up first, and the link was lost. Explicit --profile/--guest/--profile-picker
@@ -496,7 +498,7 @@ int main(int argc, char *argv[]) {
         // 2.0.5 extension crash safety: a minute of running, or a normal quit, clears the startup guard.
         QTimer::singleShot(60000, &app, []{ ExtensionSafety::markHealthy(); });
         QObject::connect(&app, &QCoreApplication::aboutToQuit, []{ ExtensionSafety::markHealthy(); });
-        if (!(smoke || stress || resizeTest || perf || handoffTest || permTest || extTest))   // never a dialog in CI tests
+        if (!(smoke || stress || resizeTest || perf || handoffTest || permTest || extTest || pageTest))   // never a dialog in CI tests
             QTimer::singleShot(4000, &w, [&w]{ CrashReporter::maybeReport(&w); });   // 2.0.5 crash reports
         QTimer::singleShot(1500, &w, [&w]{
             const QString notice = ExtensionSafety::takeNotice();
@@ -508,7 +510,7 @@ int main(int argc, char *argv[]) {
         // Time-to-window: first moment the native window is actually exposed (on screen).
         auto* exposeProbe = new QTimer(&app);
         exposeProbe->setInterval(15);
-        QObject::connect(exposeProbe, &QTimer::timeout, &app, [&w, exposeProbe, smoke, stress, resizeTest, perf, handoffTest, permTest, extTest]{
+        QObject::connect(exposeProbe, &QTimer::timeout, &app, [&w, exposeProbe, smoke, stress, resizeTest, perf, handoffTest, permTest, extTest, pageTest]{
             if (!w.windowHandle() || !w.windowHandle()->isExposed()) return;
             exposeProbe->stop(); exposeProbe->deleteLater();
             pacitumLog(QStringLiteral("window exposed (time-to-window)"));
@@ -525,6 +527,7 @@ int main(int argc, char *argv[]) {
                 ChromeExtensions::instance()->runSelfTest(&w, [&w](const QString& u){ w.openUrlInNewTab(u); });
             });
             else if (perf) QTimer::singleShot(1500, &w, [&w]{ pacitumLog(QStringLiteral("perf test starting")); w.runPerfTest(); });
+            else if (pageTest) QTimer::singleShot(1500, &w, [&w]{ PageTest::run(&w); });
             else if (resizeTest) QTimer::singleShot(2500, &w, [&w]{ pacitumLog(QStringLiteral("resize test starting")); w.runResizeTest(); });
             else if (stress) QTimer::singleShot(1500, &w, [&w]{ pacitumLog(QStringLiteral("stress test starting")); w.runStressTest(); });
             else if (smoke) {
@@ -532,15 +535,27 @@ int main(int argc, char *argv[]) {
                 // Meanwhile the update pop-up is opened the way a user does it (1.8.10 crashed there).
                 QTimer::singleShot(1500, &w, [&w]{ UpdateFlow::instance()->runSelfTest(&w); });
                 QTimer::singleShot(5000, &w, [&w]{
-                    const bool ok = w.isVisible() && w.windowHandle() && w.windowHandle()->isExposed() && w.width() > 200 && w.height() > 200;
-                    pacitumLog(QStringLiteral("SMOKE %1 visible=%2 exposed=%3 size=%4x%5").arg(ok ? QStringLiteral("OK") : QStringLiteral("FAIL"))
-                               .arg(w.isVisible()).arg(w.windowHandle() && w.windowHandle()->isExposed()).arg(w.width()).arg(w.height()));
+                    const bool shown = w.isVisible() && w.windowHandle() && w.windowHandle()->isExposed() && w.width() > 200 && w.height() > 200;
+                    // 2.0.10: and it drew. The page area of a window without OpenGL (Wayland without the wayland-egl
+                    // plugin) stayed empty while the old check passed. The window and the page are saved for the CI log.
+                    const QPixmap win = w.grab();
+                    BrowserTab* t = w.currentTab();
+                    const QPixmap page = t ? t->captureView() : QPixmap();
+                    const int winColors = PageTest::colorCount(win), pageColors = PageTest::colorCount(page);
+                    win.save(logDir() + QStringLiteral("/smoke-window.png"));
+                    if (!page.isNull()) page.save(logDir() + QStringLiteral("/smoke-page.png"));
+                    const bool drew = winColors >= 8 && (page.isNull() || pageColors >= 4);   // no visible page (e.g. a settings tab): the window check alone
+                    const bool ok = shown && drew;
+                    pacitumLog(QStringLiteral("SMOKE %1 visible=%2 exposed=%3 size=%4x%5 window-colors=%6 page-colors=%7 page=%8")
+                               .arg(ok ? QStringLiteral("OK") : QStringLiteral("FAIL"))
+                               .arg(w.isVisible()).arg(w.windowHandle() && w.windowHandle()->isExposed()).arg(w.width()).arg(w.height())
+                               .arg(winColors).arg(pageColors).arg(t ? t->currentUrl() : QStringLiteral("(no web page)")));
                     QCoreApplication::exit(ok ? 0 : 3);
                 });
             }
         });
         exposeProbe->start();
-        if (smoke || stress || resizeTest || perf || handoffTest || permTest || extTest) QTimer::singleShot(extTest ? 240000 : stress || resizeTest || perf || handoffTest || permTest ? 120000 : 40000, &app, []{ pacitumLog(QStringLiteral("TIMEOUT: window never exposed / test hung")); QCoreApplication::exit(4); });
+        if (smoke || stress || resizeTest || perf || handoffTest || permTest || extTest || pageTest) QTimer::singleShot(extTest ? 240000 : stress || resizeTest || perf || handoffTest || permTest ? 120000 : pageTest ? 420000 : 40000, &app, []{ pacitumLog(QStringLiteral("TIMEOUT: window never exposed / test hung")); QCoreApplication::exit(4); });
         const int rc = app.exec();
         pacitumLog(QStringLiteral("exit %1").arg(rc));
         return rc;

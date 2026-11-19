@@ -252,6 +252,10 @@ void applyWebSettings(QWebEngineSettings* s) {
     // 1.7.5: Chromium always hands window.open to Pacitum (PacitumPage::createWindow), which applies the
     // per-site pop-up decision and records blocked pop-ups; "popups_allowed" is now the default.
     s->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, true);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    // 2.0.10 Settings › Appearance › Dark websites: Chromium's own dark rendering for pages that only come in light
+    s->setAttribute(QWebEngineSettings::ForceDarkMode, webPrefs().forceDark);
+#endif
 }
 
 }

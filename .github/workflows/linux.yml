@@ -65,6 +65,15 @@ jobs:
           log="$HOME/.local/share/Pacitum/Pacitum Browser/startup.log"
           tail -n 40 "$log" || true
           grep -q "SMOKE OK" "$log"
+      - name: Page test (built-in, test page and real sites load and draw)
+        # 2.0.10: each page must load, get a title and draw; YouTube / GitHub / Google search are soft
+        env:
+          QTWEBENGINE_DISABLE_SANDBOX: '1'
+        run: |
+          timeout 470 xvfb-run -a -s "-screen 0 1440x900x24" ./build/PacitumBrowser --page-test || echo "exit code $?"
+          log="$HOME/.local/share/Pacitum/Pacitum Browser/startup.log"
+          grep "PAGE" "$log" || tail -n 40 "$log"
+          grep -q "PAGE TEST PASSED" "$log"
       - name: Showcase screenshots
         continue-on-error: true
         run: |

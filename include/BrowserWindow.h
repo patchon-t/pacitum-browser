@@ -107,6 +107,7 @@ private slots:
     void showPageQr();
     void togglePictureInPicture();
     void showTabOverview();
+    void showQuickSwitcher();   // 2.0.10 Ctrl+K
     void captureActiveThumb(bool force = false);
     void showNotice(const QString& text);
     void setupSync();
@@ -152,6 +153,7 @@ private:
     void updatePrivateBadge();   // 2.0.8
     QVector<SessionTab> windowsSessionTabs(bool includeSelf) const;   // 2.0.8
     void applyTheme();
+    void updateWebDark();   // 2.0.10 dark websites, from "web_dark" and the theme
     void applyToolbarTheme();
     void loadSettings();
     void saveSettings();
@@ -187,6 +189,7 @@ public:
     void runPerfTest();
     void runStressTest();              // --stress-test (CI): tabs, switching, fullscreen, loads
     void runResizeTest();              // --resize-test (CI): window/client/web view geometry after resizes
+    BrowserTab* currentTab() const { return activeTab(); }   // 2.0.10: tests (page test, smoke pixels)
 private:
     void setChromeHidden(bool hidden);
     bool m_pageFullscreen = false;     // a page (e.g. YouTube) owns fullscreen

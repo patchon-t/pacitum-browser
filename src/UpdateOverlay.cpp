@@ -310,7 +310,7 @@ void Sheet::setNotes(const QStringList& lines, const QString& heading) {
 void Sheet::setButtons(const QString& primary, const QString& secondary, const QString& tertiary) {
     const QString t[] = {primary, secondary, tertiary};
     QPushButton* b[] = {m_primary, m_secondary, m_tertiary};
-    for (int i = 0; i < 3; ++i) { b[i]->setText(t[i]); b[i]->setVisible(!t[i].isEmpty()); b[i]->disconnect(); }
+    for (int i = 0; i < 3; ++i) { b[i]->setText(t[i]); b[i]->setVisible(!t[i].isEmpty()); QObject::disconnect(b[i], &QPushButton::clicked, nullptr, nullptr); }   // 2.0.10: only clicks (a bare disconnect() also cut destroyed() and Qt warned every time)
     if (!primary.isEmpty()) m_primary->setDefault(true);
 }
 

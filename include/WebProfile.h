@@ -48,6 +48,6 @@ public:
     void interceptRequest(QWebEngineUrlRequestInfo& info) override;
 };
 
-struct WebPrefs { bool javascript = true; bool popups = false; };
+struct WebPrefs { bool javascript = true; bool popups = false; bool forceDark = false; };   // forceDark: 2.0.10 dark websites
 WebPrefs& webPrefs();
 }

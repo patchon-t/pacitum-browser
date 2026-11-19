@@ -15,6 +15,7 @@ class FaviconCache : public QObject {
 public:
     static FaviconCache* instance();
     QIcon icon(const QString& url);                    // null when not known (yet); starts a fetch
+    QIcon cached(const QString& url);                  // 2.0.10: memory / disk only, never fetches (quick switcher, history)
     void store(const QString& url, const QIcon& icon);  // from a tab that finished loading its icon
 signals:
     void changed(const QString& host);
