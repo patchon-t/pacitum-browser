@@ -117,10 +117,15 @@ jobs:
           export OUTPUT="PacitumBrowser-$ver-linux-x86_64.AppImage"
           ./linuxdeploy-x86_64.AppImage --appdir AppDir -e AppDir/usr/bin/PacitumBrowser \
             --deploy-deps-only AppDir/usr/plugins/wayland-graphics-integration-client \
+            --exclude-library 'libbrotli*' \
             -d resources/linux/pacitum-browser.desktop -i resources/linux/pacitum-browser.png --plugin qt --output appimage
           test -f AppDir/usr/plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so
           ldd AppDir/usr/plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so | grep -E "not found|Qt6Wayland|wayland-egl" || true
           ! ldd AppDir/usr/plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so | grep -q "not found"
+          # 2.0.10: brotli comes from the system. The system's freetype loads the system libbrotlidec, which then
+          # picked up our older bundled libbrotlicommon: on Fedora 42 Chromium's page process died at once
+          # ("undefined symbol: BrotliSharedDictionaryDestroyInstance") and no page ever drew.
+          if ls AppDir/usr/lib | grep -q '^libbrotli'; then echo "::error::brotli is bundled"; exit 1; fi
           sha256sum "$OUTPUT" > "$OUTPUT.sha256"
           ls -la "$OUTPUT"
       - name: Packages (.deb + .rpm)
