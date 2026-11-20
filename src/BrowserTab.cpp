@@ -499,7 +499,14 @@ void BrowserTab::hideEvent(QHideEvent* e) {
     if (!e->spontaneous() && s_freezeEnabled && m_freezeTimer) m_freezeTimer->start(m_windowMinimized ? kFreezeMinimizedMs : kFreezeAfterMs);   // tab switched away (not window minimize)
 }
 
-void BrowserTab::applyWebSettings() { Pacitum::applyWebSettings(m_view->settings()); }
+void BrowserTab::applyWebSettings() {
+    Pacitum::applyWebSettings(m_view->settings());
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    // Pacitum's own pages (new tab, settings…) have their own dark design; Chromium's darkening would recolour them
+    if (Pacitum::webPrefs().forceDark && m_view->url().scheme() == QLatin1String("pacitum"))
+        m_view->settings()->setAttribute(QWebEngineSettings::ForceDarkMode, false);
+#endif
+}
 
 void BrowserTab::goBack() { if (m_view->history()->canGoBack()) { ensureActive(); m_view->back(); } }
 void BrowserTab::goForward() { if (m_view->history()->canGoForward()) { ensureActive(); m_view->forward(); } }
@@ -568,7 +575,11 @@ void BrowserTab::checkGoogleSignIn(const QUrl& u) {
         [this, u](const QVariant& v){ if (v.toBool() && m_view->url() == u) showSignInBar(u); });
 }
 
-void BrowserTab::onUrlChanged(const QUrl& u) { m_url = u.toString(); emit urlChanged(m_url); checkGoogleSignIn(u); }
+void BrowserTab::onUrlChanged(const QUrl& u) {
+    m_url = u.toString();
+    if (Pacitum::webPrefs().forceDark) applyWebSettings();   // 2.0.10: in and out of pacitum:// pages
+    emit urlChanged(m_url); checkGoogleSignIn(u);
+}
 void BrowserTab::onTitleChanged(const QString& t) { m_title = t.isEmpty() ? QStringLiteral("New Tab") : t; emit titleChanged(m_title); }
 // Progress is shown in the omnibox (animations-spec §7). The old in-page 3 px QProgressBar was
 // shown/hidden on every load and shifted the page down by 3 px each time; it is no longer shown.

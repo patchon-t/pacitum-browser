@@ -2,7 +2,7 @@
 #define AppName "Pacitum Browser"
 ; CI passes /DAppVer=<version from build/pacitum-version.txt> (1.9.x or legacy 1.8.x)
 #ifndef AppVer
-#define AppVer "2.0.9-A"
+#define AppVer "2.0.10"
 #endif
 ; 2.0.9-A: Windows file versions are numbers only ("2.0.9-A" / "2.1.0-beta.1" -> 2.0.9 / 2.1.0)
 #if Pos("-", AppVer) > 0

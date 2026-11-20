@@ -74,6 +74,7 @@
 #include "SitePermissions.h"
 #include <QMessageBox>
 #include <QApplication>
+#include <algorithm>
 #include <QClipboard>
 #include <QFile>
 #include <QJsonDocument>
@@ -107,6 +108,7 @@
 #include "ChromeExtensions.h"
 #include "Tools.h"
 #include "TabOverview.h"
+#include "QuickSwitcher.h"
 #include "SyncManager.h"
 #include <QHBoxLayout>
 #include <QFileDialog>
@@ -884,6 +886,173 @@ void BrowserWindow::captureActiveThumb(bool force) {
     m_thumbs.insert(t, pm);
 }
 
+// 2.0.10 Quick switcher (Ctrl+K): open tabs, actions, bookmarks and history in one box, or a web search.
+void BrowserWindow::showQuickSwitcher() {
+    if (auto* open = findChild<QuickSwitcher*>(QString(), Qt::FindDirectChildrenOnly)) { open->dismiss(); return; }   // Ctrl+K again closes it
+    if (findChild<TabOverview*>(QString(), Qt::FindDirectChildrenOnly)) return;
+    const PacitumPalette pal = m_theme->palette();
+    QPointer<BrowserWindow> self(this);
+    struct Act { QString title, keys, hint, icon; std::function<void()> run; };
+    const QList<Act> acts = {
+        {QStringLiteral("New tab"), QStringLiteral("open blank page"), QStringLiteral("Ctrl+T"), QStringLiteral("tab-new"), [this]{ newTab(); }},
+        {QStringLiteral("New private tab"), QStringLiteral("incognito secret window"), QStringLiteral("Ctrl+Shift+N"), QStringLiteral("private"), [this]{ newPrivateTab(); }},
+        {QStringLiteral("New window"), QString(), QStringLiteral("Ctrl+N"), QStringLiteral("window"), [this]{ auto* w = new BrowserWindow(); w->setAttribute(Qt::WA_DeleteOnClose); w->show(); }},
+        {QStringLiteral("Reopen closed tab"), QStringLiteral("undo restore"), QStringLiteral("Ctrl+Shift+T"), QStringLiteral("tab-restore"), [this]{ reopenClosedTab(); }},
+        {QStringLiteral("Settings"), QStringLiteral("preferences options"), QStringLiteral("Ctrl+,"), QStringLiteral("settings"), [this]{ showSettings(); }},
+        {QStringLiteral("History"), QStringLiteral("visited"), QStringLiteral("Ctrl+H"), QStringLiteral("history"), [this]{ showHistory(); }},
+        {QStringLiteral("Downloads"), QStringLiteral("files"), QStringLiteral("Ctrl+J"), QStringLiteral("download"), [this]{ showDownloads(); }},
+        {QStringLiteral("Bookmark this tab"), QStringLiteral("star save favourite favorite"), QStringLiteral("Ctrl+D"), QStringLiteral("bookmark-add"), [this]{ toggleBookmark(); }},
+        {QStringLiteral("Bookmark manager"), QStringLiteral("bookmarks organise organize"), QStringLiteral("Ctrl+Shift+O"), QStringLiteral("bookmark-manager"), [this]{ showBookmarksDialog(); }},
+        {QStringLiteral("Show or hide the bookmarks bar"), QStringLiteral("toolbar"), QStringLiteral("Ctrl+Shift+B"), QStringLiteral("bookmarks"), [this]{ toggleBookmarksBar(); }},
+        {QStringLiteral("Find in page"), QStringLiteral("search text"), QStringLiteral("Ctrl+F"), QStringLiteral("find"), [this]{ showFind(); }},
+        {QStringLiteral("Split view"), QStringLiteral("side by side two pages"), QStringLiteral("Ctrl+Alt+S"), QStringLiteral("split-view"), [this]{ toggleSplitView(m_splitActive ? -1 : m_tabs->currentIndex()); }},
+        {QStringLiteral("Tab overview"), QStringLiteral("3d cards carousel all tabs"), QStringLiteral("Ctrl+Shift+Space"), QStringLiteral("grid"), [this]{ showTabOverview(); }},
+        {QStringLiteral("Vertical tabs"), QStringLiteral("side tabs sidebar"), QStringLiteral("Ctrl+Shift+E"), QStringLiteral("vertical-tabs"), [this]{ toggleVerticalTabs(); }},
+        {QStringLiteral("Screenshot"), QStringLiteral("capture picture image"), QStringLiteral("Ctrl+Shift+S"), QStringLiteral("screenshot"), [this]{ takeScreenshot(); }},
+        {QStringLiteral("Reader mode"), QStringLiteral("read article clean"), QStringLiteral("Ctrl+Shift+R"), QStringLiteral("reader-mode"), [this]{ toggleReaderMode(); }},
+        {QStringLiteral("Notes"), QStringLiteral("notepad write"), QStringLiteral("Ctrl+Shift+Y"), QStringLiteral("notes"), [this]{ toggleNotes(); }},
+        {QStringLiteral("Picture-in-picture"), QStringLiteral("video pip float"), QStringLiteral("Alt+P"), QStringLiteral("picture-in-picture"), [this]{ togglePictureInPicture(); }},
+        {QStringLiteral("QR code for this page"), QStringLiteral("share phone"), QString(), QStringLiteral("qr-code"), [this]{ showPageQr(); }},
+        {QStringLiteral("Copy link"), QStringLiteral("address url clipboard"), QString(), QStringLiteral("link"), [this]{ copyCurrentUrl(); }},
+        {QStringLiteral("Print"), QString(), QStringLiteral("Ctrl+P"), QStringLiteral("print"), [this]{ printPage(); }},
+        {QStringLiteral("Save page as"), QStringLiteral("download html"), QStringLiteral("Ctrl+S"), QStringLiteral("disk"), [this]{ savePageAs(); }},
+        {QStringLiteral("Zoom in"), QStringLiteral("bigger larger"), QStringLiteral("Ctrl+="), QStringLiteral("zoom-in"), [this]{ zoomIn(); }},
+        {QStringLiteral("Zoom out"), QStringLiteral("smaller"), QStringLiteral("Ctrl+-"), QStringLiteral("zoom-out"), [this]{ zoomOut(); }},
+        {QStringLiteral("Reset zoom"), QStringLiteral("actual size 100"), QStringLiteral("Ctrl+0"), QStringLiteral("zoom-reset"), [this]{ zoomReset(); }},
+        {QStringLiteral("Full screen"), QStringLiteral("fullscreen"), QStringLiteral("F11"), QStringLiteral("fullscreen"), [this]{ toggleFullscreen(); }},
+        {QStringLiteral("Switch light or dark theme"), QStringLiteral("dark mode night appearance"), QString(), QStringLiteral("theme"), [this]{ toggleDarkMode(); }},
+        {QStringLiteral("Dark websites"), QStringLiteral("dark mode pages night force"), QString(), QStringLiteral("moon"), [this]{ showSettings(QStringLiteral("appearance")); }},
+        {QStringLiteral("Clear browsing data"), QStringLiteral("delete cookies cache history privacy"), QString(), QStringLiteral("trash"), [this]{ showSettings(QStringLiteral("privacy")); }},
+        {QStringLiteral("Passwords"), QStringLiteral("logins keys"), QString(), QStringLiteral("password-manager"), [this]{ showSettings(QStringLiteral("passwords")); }},
+        {QStringLiteral("Themes"), QStringLiteral("colours colors look"), QString(), QStringLiteral("palette"), [this]{ showSettings(QStringLiteral("themes")); }},
+        {QStringLiteral("Extensions"), QStringLiteral("add-ons addons plugins"), QString(), QStringLiteral("extensions"), [this]{ newTab(QStringLiteral("pacitum://extensions")); }},
+        {QStringLiteral("Developer tools"), QStringLiteral("devtools inspect console"), QStringLiteral("F12"), QStringLiteral("devtools"), [this]{ showDevTools(); }},
+        {QStringLiteral("Check for updates"), QStringLiteral("update version upgrade"), QString(), QStringLiteral("update"), [this]{ showSettings(QStringLiteral("updates")); }},
+        {QStringLiteral("About Pacitum"), QStringLiteral("version"), QString(), QStringLiteral("info"), [this]{ showSettings(QStringLiteral("about")); }},
+    };
+    auto provider = [self, pal, acts](const QString& query) {
+        QList<QuickSwitcher::Item> out;
+        if (!self) return out;
+        BrowserWindow* w = self;
+        const QStringList words = QuickSwitcher::words(query);
+        const QString q = query.trimmed();
+        QSet<QString> seen;   // addresses already listed (open tabs first)
+        struct Scored { int score; QuickSwitcher::Item item; };
+        auto take = [&out](QList<Scored>& list, int max) {
+            std::stable_sort(list.begin(), list.end(), [](const Scored& a, const Scored& b){ return a.score > b.score; });
+            for (int i = 0; i < list.size() && i < max; ++i) out << list[i].item;
+        };
+        // typed address: "Go to …" first
+        if (!q.isEmpty() && !q.contains(QLatin1Char(' '))) {
+            const bool looksLikeUrl = q.contains(QLatin1String("://")) || q.startsWith(QLatin1String("localhost"))
+                || (q.contains(QLatin1Char('.')) && !q.endsWith(QLatin1Char('.')) && !q.startsWith(QLatin1Char('.')));
+            if (looksLikeUrl) {
+                QuickSwitcher::Item it; it.kind = QuickSwitcher::Item::Go;
+                it.title = Lang::tr(QStringLiteral("Go to %1")).arg(q);
+                it.icon = ThemeManager::icon(QStringLiteral("globe"), pal.textSecondary, 18);
+                it.run = [self, q]{ if (self) self->navigateToUrl(q); };
+                out << it;
+            }
+        }
+        // open tabs (both panes of a split)
+        QList<Scored> tabs;
+        for (PacitumTabWidget* tw : {w->m_tabs, w->m_splitActive ? w->m_splitTabs : nullptr}) {
+            if (!tw) continue;
+            for (int i = 0; i < tw->count(); ++i) {
+                QWidget* page = tw->widget(i);
+                auto* bt = qobject_cast<BrowserTab*>(page);
+                const QString url = bt ? bt->currentUrl() : QString();
+                const QString title = tw->tabText(i).trimmed().isEmpty() ? url : tw->tabText(i);
+                const int sc = QuickSwitcher::score(words, title, url);
+                if (sc < 0) continue;
+                QuickSwitcher::Item it; it.kind = QuickSwitcher::Item::Tab;
+                it.title = title; it.sub = url; it.icon = tw->tabIcon(i);
+                if (it.icon.isNull()) it.icon = ThemeManager::icon(QStringLiteral("globe"), pal.textSecondary, 18);
+                const bool current = tw == w->m_activeWidget && i == tw->currentIndex();
+                it.hint = current ? Lang::tr(QStringLiteral("Current tab")) : bt && bt->isDiscarded() ? Lang::tr(QStringLiteral("Asleep")) : Lang::tr(QStringLiteral("Switch to tab"));
+                QPointer<QWidget> pg(page); QPointer<PacitumTabWidget> ptw(tw);
+                it.run = [pg, ptw]{ if (pg && ptw) { const int at = ptw->indexOf(pg); if (at >= 0) { ptw->setCurrentIndex(at); pg->setFocus(); } } };
+                tabs << Scored{sc + (current ? -1 : 0), it};
+                if (!url.isEmpty()) seen.insert(url);
+            }
+        }
+        take(tabs, words.isEmpty() ? 8 : 6);
+        // actions
+        QList<Scored> actions;
+        static const QStringList suggested = {QStringLiteral("New tab"), QStringLiteral("New private tab"), QStringLiteral("Reopen closed tab"),
+                                              QStringLiteral("History"), QStringLiteral("Downloads"), QStringLiteral("Settings")};
+        for (const Act& a : acts) {
+            const QString title = Lang::tr(a.title);
+            int sc;
+            if (words.isEmpty()) { const int at = suggested.indexOf(a.title); if (at < 0) continue; sc = 100 - at; }
+            else {
+                sc = QuickSwitcher::score(words, title, QString(), a.keys + QLatin1Char(' ') + a.title);   // English words work in every language
+                if (sc < 0) continue;
+            }
+            QuickSwitcher::Item it; it.kind = QuickSwitcher::Item::Action;
+            it.title = title; it.hint = a.hint;
+            it.icon = ThemeManager::icon(a.icon, pal.text, 18);
+            auto run = a.run;
+            it.run = [self, run]{ if (self) run(); };
+            actions << Scored{sc, it};
+        }
+        take(actions, words.isEmpty() ? 6 : 5);
+        if (words.isEmpty()) return out;
+        // bookmarks
+        QList<Scored> marks;
+        for (const Bookmark& b : w->m_bookmarks->allBookmarks()) {
+            if (seen.contains(b.url)) continue;
+            const int sc = QuickSwitcher::score(words, b.title, b.url, b.folder);
+            if (sc < 0) continue;
+            QuickSwitcher::Item it; it.kind = QuickSwitcher::Item::Bookmark;
+            it.title = b.title.isEmpty() ? b.url : b.title; it.sub = b.url;
+            it.icon = FaviconCache::instance()->cached(b.url);
+            if (it.icon.isNull()) it.icon = ThemeManager::icon(QStringLiteral("star"), pal.textSecondary, 18);
+            const QString url = b.url;
+            it.run = [self, url]{ if (self) self->navigateToUrl(url); };
+            marks << Scored{sc, it};
+            seen.insert(b.url);
+        }
+        take(marks, 5);
+        // history (private windows don't look through it)
+        if (!w->m_privateMode) {
+            QList<Scored> hist;
+            for (const HistoryEntry& h : w->m_history->search(words.first(), 60)) {
+                if (seen.contains(h.url)) continue;
+                const int sc = QuickSwitcher::score(words, h.title, h.url);
+                if (sc < 0) continue;
+                QuickSwitcher::Item it; it.kind = QuickSwitcher::Item::History;
+                it.title = h.title.isEmpty() ? h.url : h.title; it.sub = h.url;
+                it.icon = FaviconCache::instance()->cached(h.url);
+                if (it.icon.isNull()) it.icon = ThemeManager::icon(QStringLiteral("history"), pal.textSecondary, 18);
+                const QString url = h.url;
+                it.run = [self, url]{ if (self) self->navigateToUrl(url); };
+                hist << Scored{sc + qMin(20, h.visitCount * 2), it};
+                seen.insert(h.url);
+            }
+            take(hist, 5);
+        }
+        // web search, last
+        QuickSwitcher::Item web; web.kind = QuickSwitcher::Item::Web;
+        web.title = Lang::tr(QStringLiteral("Search the web for “%1”")).arg(q);
+        web.sub = w->m_searchEngine;
+        web.icon = ThemeManager::icon(QStringLiteral("search"), pal.textSecondary, 18);
+        web.run = [self, q]{
+            if (!self) return;
+            // with a space, navigateToUrl knows search shortcuts ("yt cats") and searches the rest; one word
+            // ("example.com") is always searched here, not opened (that is the "Go to" row)
+            BrowserTab* t = self->activeTab();
+            self->navigateToUrl(q.contains(QLatin1Char(' ')) || !t ? q : t->searchUrl(q));
+        };
+        out << web;
+        return out;
+    };
+    auto* qs = new QuickSwitcher(provider, this);
+    qs->setObjectName(QStringLiteral("PacitumWindowOverlay"));   // resizeEvent keeps it at the window size
+    connect(qs, &QuickSwitcher::closed, this, [this]{ if (auto* t = activeTab()) t->setFocus(); });
+    qs->open();
+}
+
 void BrowserWindow::showTabOverview() {
     if (findChild<TabOverview*>(QString(), Qt::FindDirectChildrenOnly)) return;   // already open
     if (m_tabs->count() < 2) { showNotice(QStringLiteral("Open more tabs to use the overview")); return; }
@@ -992,6 +1161,7 @@ void BrowserWindow::setupShortcuts() {
     new QShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+Y")), this, [this]{ toggleNotes(); });
     new QShortcut(QKeySequence(QStringLiteral("Alt+P")), this, [this]{ togglePictureInPicture(); });
     new QShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+Space")), this, [this]{ showTabOverview(); });
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+K")), this, [this]{ showQuickSwitcher(); });   // 2.0.10
     new QShortcut(QKeySequence(QStringLiteral("Alt+Left")), this, SLOT(goBack()));
     new QShortcut(QKeySequence(QStringLiteral("Alt+Right")), this, SLOT(goForward()));
     // 2.0.8: shown in the menus but never connected
@@ -1653,6 +1823,8 @@ void BrowserWindow::onSettingChanged(const QString& key) {
         applyTheme();
     } else if (key == QStringLiteral("show_home_button")) {
         m_homeBtn->setVisible(s.value(key).toBool(false));
+    } else if (key == QStringLiteral("web_dark")) {
+        updateWebDark();
     } else if (key == QStringLiteral("tab_size")) {
         PacitumTabBar::setCompact(s.value(key).toString() == QLatin1String("compact"));
         for (auto* tw : {m_tabs, m_splitTabs}) if (tw && tw->stripBar()) { tw->stripBar()->updateGeometry(); tw->stripBar()->update(); if (tw->tabBar()) tw->tabBar()->adjustSize(); }
@@ -1785,6 +1957,7 @@ void BrowserWindow::showMenu() {
     add(&m, QStringLiteral("Save page as"), QStringLiteral("Ctrl+S"), [this]{ savePageAs(); });
     {   // More tools ›
         auto* mt = sub(QStringLiteral("More tools"));
+        add(mt, QStringLiteral("Quick switcher"), QStringLiteral("Ctrl+K"), [this]{ QTimer::singleShot(0, this, &BrowserWindow::showQuickSwitcher); });
         add(mt, QStringLiteral("Tab overview"), QStringLiteral("Ctrl+Shift+Space"), [this]{ showTabOverview(); });
         add(mt, QStringLiteral("Split view"), QStringLiteral("Ctrl+Alt+S"), [this]{ toggleSplitView(m_splitActive ? -1 : m_tabs->currentIndex()); });
         add(mt, QStringLiteral("Screenshot"), QStringLiteral("Ctrl+Shift+S"), [this]{ takeScreenshot(); });
@@ -2364,6 +2537,20 @@ void BrowserWindow::swapSplitSides() {
 
 void BrowserWindow::toggleDarkMode(){ m_darkMode=!m_darkMode; m_themeSetting = m_darkMode ? QStringLiteral("Dark") : QStringLiteral("Light"); applyTheme(); saveSettings(); }
 
+// 2.0.10 Settings › Appearance › Dark websites: "off", "theme" (when Pacitum is dark) or "always".
+// One switch for the whole app (every window and tab), like the other web settings.
+void BrowserWindow::updateWebDark() {
+    const QString mode = readSettings().value(QStringLiteral("web_dark")).toString(QStringLiteral("off"));
+    const bool on = mode == QLatin1String("always") || (mode == QLatin1String("theme") && m_darkMode);
+    if (on == Pacitum::webPrefs().forceDark) return;
+    Pacitum::webPrefs().forceDark = on;
+    Pacitum::applyWebSettings(Pacitum::mainProfile()->settings());
+    for (QWidget* top : QApplication::topLevelWidgets())
+        if (auto* w = qobject_cast<BrowserWindow*>(top))
+            for (auto* tw : {w->m_tabs, w->m_splitTabs})
+                if (tw) for (int i = 0; i < tw->count(); ++i) if (auto* t = qobject_cast<BrowserTab*>(tw->widget(i))) t->applyWebSettings();
+}
+
 void BrowserWindow::applyTheme(){
     // 2.0.1: "theme" is System, Light, Dark or one of the design's themes (Midnight, Forest, Sakura,
     // Sand, Graphite, Contrast). System follows the OS between Pacitum Light and Pacitum Dark.
@@ -2427,6 +2614,7 @@ void BrowserWindow::applyTheme(){
                     && !t->currentUrl().startsWith(QStringLiteral("pacitum://settings")) && !t->currentUrl().startsWith(QStringLiteral("pacitum://extensions"))) t->reload();
     if (m_settingsBridge) m_settingsBridge->notifyChanged();   // Settings re-reads its colours live
     if (m_firstRun) emit m_firstRun->themeChanged(m_firstRun->palette());
+    updateWebDark();
 }
 
 void BrowserWindow::applyToolbarTheme(){

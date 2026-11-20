@@ -28,7 +28,7 @@ QString FaviconCache::fileFor(const QString& host) const {
     return QDir::current().absoluteFilePath(QStringLiteral("favicons/") + host + QStringLiteral(".png"));
 }
 
-QIcon FaviconCache::icon(const QString& url) {
+QIcon FaviconCache::cached(const QString& url) {
     const QString host = hostOf(url);
     if (host.isEmpty()) return {};
     if (auto it = m_icons.constFind(host); it != m_icons.constEnd()) return *it;
@@ -37,8 +37,13 @@ QIcon FaviconCache::icon(const QString& url) {
         const QPixmap pm(file);
         if (!pm.isNull()) { const QIcon ic(pm); m_icons.insert(host, ic); return ic; }
     }
-    fetch(host);
     return {};
+}
+
+QIcon FaviconCache::icon(const QString& url) {
+    const QIcon ic = cached(url);
+    if (ic.isNull()) { const QString host = hostOf(url); if (!host.isEmpty()) fetch(host); }
+    return ic;
 }
 
 void FaviconCache::store(const QString& url, const QIcon& icon) {

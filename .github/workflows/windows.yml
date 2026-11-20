@@ -249,6 +249,26 @@ jobs:
       - uses: actions/upload-artifact@v7.0.2
         if: failure()   # logs/screens only when a test fails (keeps Actions storage small)
         with: { name: "stress-test-${{ matrix.line }}", path: stress/, if-no-files-found: ignore, retention-days: 1 }
+      - name: Page test (built-in, test page and real sites load and draw)
+        # 2.0.10: every page must load, get a title and draw (more than a few colours in the page area).
+        # YouTube / GitHub / Google search are soft: a CI machine may get a consent or bot page.
+        shell: pwsh
+        run: |
+          $log = "$env:LOCALAPPDATA\Pacitum\Pacitum Browser"
+          Remove-Item "$log\crash.log" -ErrorAction SilentlyContinue
+          $p = Start-Process dist\PacitumBrowser.exe -ArgumentList '--page-test' -PassThru
+          if (-not $p.WaitForExit(450000)) { Write-Host "page test hung; killing"; $p.Kill(); $p.WaitForExit() }
+          New-Item -ItemType Directory -Force pagetest | Out-Null
+          Copy-Item "$log\startup.log" pagetest\startup.log -ErrorAction SilentlyContinue
+          Copy-Item "$log\crash.log" pagetest\crash.log -ErrorAction SilentlyContinue
+          Get-Content pagetest\startup.log -ErrorAction SilentlyContinue | Select-String 'PAGE'
+          Get-Content pagetest\crash.log -ErrorAction SilentlyContinue
+          Write-Host "exit code: $($p.ExitCode)"
+          $ok = Select-String -Path pagetest\startup.log -Pattern 'PAGE TEST PASSED' -Quiet
+          if ($p.ExitCode -ne 0 -or -not $ok -or (Test-Path pagetest\crash.log)) { Write-Error "PAGE TEST FAILED"; exit 1 }
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with: { name: "page-test-${{ matrix.line }}", path: pagetest/, if-no-files-found: ignore, retention-days: 1 }
       - name: Single-instance handoff test (second launch passes its URL to the running window)
         shell: pwsh
         run: |

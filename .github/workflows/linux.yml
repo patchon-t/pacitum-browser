@@ -65,6 +65,15 @@ jobs:
           log="$HOME/.local/share/Pacitum/Pacitum Browser/startup.log"
           tail -n 40 "$log" || true
           grep -q "SMOKE OK" "$log"
+      - name: Page test (built-in, test page and real sites load and draw)
+        # 2.0.10: each page must load, get a title and draw; YouTube / GitHub / Google search are soft
+        env:
+          QTWEBENGINE_DISABLE_SANDBOX: '1'
+        run: |
+          timeout 470 xvfb-run -a -s "-screen 0 1440x900x24" ./build/PacitumBrowser --page-test || echo "exit code $?"
+          log="$HOME/.local/share/Pacitum/Pacitum Browser/startup.log"
+          grep "PAGE" "$log" || tail -n 40 "$log"
+          grep -q "PAGE TEST PASSED" "$log"
       - name: Showcase screenshots
         continue-on-error: true
         run: |
@@ -106,12 +115,21 @@ jobs:
           # Qt 6.8 has a separate libQt6WaylandEglClientHwIntegration; Qt 6.11 folded it into libQt6WaylandClient
           for l in "$QT_ROOT_DIR"/lib/libQt6WaylandEglClientHwIntegration.so.6*; do [ -e "$l" ] && cp -a "$l" AppDir/usr/lib/; done
           export OUTPUT="PacitumBrowser-$ver-linux-x86_64.AppImage"
+          # 1) deploy (the Qt plugin brings Qt's libraries and their dependencies)
           ./linuxdeploy-x86_64.AppImage --appdir AppDir -e AppDir/usr/bin/PacitumBrowser \
             --deploy-deps-only AppDir/usr/plugins/wayland-graphics-integration-client \
-            -d resources/linux/pacitum-browser.desktop -i resources/linux/pacitum-browser.png --plugin qt --output appimage
+            -d resources/linux/pacitum-browser.desktop -i resources/linux/pacitum-browser.png --plugin qt
           test -f AppDir/usr/plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so
           ldd AppDir/usr/plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so | grep -E "not found|Qt6Wayland|wayland-egl" || true
           ! ldd AppDir/usr/plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so | grep -q "not found"
+          # 2) 2.0.10: brotli comes from the system. The system's freetype loads the system libbrotlidec, which then
+          # picked up our older bundled libbrotlicommon: on Fedora 42 Chromium's page process died at once
+          # ("undefined symbol: BrotliSharedDictionaryDestroyInstance") and no page ever drew. The Qt plugin bundles
+          # it whatever --exclude-library says, so it is removed here and kept out of the AppImage step.
+          rm -fv AppDir/usr/lib/libbrotli*
+          # 3) the AppImage, from that AppDir
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --exclude-library 'libbrotli*' --output appimage
+          if ls AppDir/usr/lib | grep -q '^libbrotli'; then echo "::error::brotli is bundled"; exit 1; fi
           sha256sum "$OUTPUT" > "$OUTPUT.sha256"
           ls -la "$OUTPUT"
       - name: Packages (.deb + .rpm)

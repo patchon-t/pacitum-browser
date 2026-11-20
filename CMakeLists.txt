@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PacitumBrowser VERSION 2.0.9 LANGUAGES CXX)
+project(PacitumBrowser VERSION 2.0.10 LANGUAGES CXX)
 # 2.0.4: Pacitum is built for Windows and Linux only (the macOS port was removed).
 if(APPLE)
     message(FATAL_ERROR "Pacitum supports Windows and Linux. The macOS port was removed in 2.0.4.")
@@ -32,7 +32,7 @@ endif()
 set(PACITUM_PRERELEASE "" CACHE STRING "Pre-release stage for a beta build (empty for a release)")
 # 2.0.9-A: a fixed rebuild of a release gets a letter ("2.0.9-A"); the updater sorts it after "2.0.9".
 # Clear it when the version number goes up.
-set(PACITUM_REVISION "A")
+set(PACITUM_REVISION "")
 set(PACITUM_FULL_VERSION ${PACITUM_APP_VERSION})
 if(PACITUM_REVISION AND NOT PACITUM_UPDATE_TRACK)
     set(PACITUM_FULL_VERSION "${PACITUM_APP_VERSION}-${PACITUM_REVISION}")
@@ -96,6 +96,8 @@ set(SOURCES
     src/CrashReporter.cpp
     src/Tools.cpp
     src/TabOverview.cpp
+    src/QuickSwitcher.cpp
+    src/PageTest.cpp
     src/SyncManager.cpp
     third_party/qrcodegen/qrcodegen.cpp
 )
@@ -144,6 +146,8 @@ set(HEADERS
     include/CrashReporter.h
     include/Tools.h
     include/TabOverview.h
+    include/QuickSwitcher.h
+    include/PageTest.h
     include/SyncManager.h
 )
 
