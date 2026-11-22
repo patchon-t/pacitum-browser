@@ -12,6 +12,19 @@ LOG="$DIR/launch.log"
 mkdir -p "$DIR" 2>/dev/null
 { echo "=== $(date '+%Y-%m-%d %H:%M:%S') pacitum-browser $*"; echo "session=${XDG_SESSION_TYPE:-?} display=${DISPLAY:-} wayland=${WAYLAND_DISPLAY:-}"; } > "$LOG" 2>/dev/null
 
+# 2.0.11: Chromium TLS certificate verification needs a complete, matching NSS suite.
+# When the host system has libnss3 and its dlopened libsoftokn3 backend, prefer the system's NSS
+# so an older bundled libnss cannot clash with the host's crypto modules and crash with SIGTRAP.
+for p in /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib; do
+    if [ -f "$p/libnss3.so" ] && [ -f "$p/libsoftokn3.so" ]; then
+        nss_preload="$p/libnss3.so"
+        [ -f "$p/libnssutil3.so" ] && nss_preload="$nss_preload:$p/libnssutil3.so"
+        [ -f "$p/libnspr4.so" ] && nss_preload="$nss_preload:$p/libnspr4.so"
+        export LD_PRELOAD="${LD_PRELOAD:+$LD_PRELOAD:}$nss_preload"
+        break
+    fi
+done
+
 safe_graphics() {
     export PACITUM_DISABLE_GPU=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none LIBGL_ALWAYS_SOFTWARE=1
     [ -n "$DISPLAY" ] && export QT_QPA_PLATFORM=xcb
