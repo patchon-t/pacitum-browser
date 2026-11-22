@@ -126,10 +126,12 @@ jobs:
           # picked up our older bundled libbrotlicommon: on Fedora 42 Chromium's page process died at once
           # ("undefined symbol: BrotliSharedDictionaryDestroyInstance") and no page ever drew. The Qt plugin bundles
           # it whatever --exclude-library says, so it is removed here and kept out of the AppImage step.
-          rm -fv AppDir/usr/lib/libbrotli*
+          # 2.0.11: nss and nspr also come from the system. Bundling partial NSS (libnss3 without dlopened libsoftokn3/libfreebl3)
+          # causes NSS_NoDB_Init to fail (-5977) during certificate verification, crashing Chromium with SIGTRAP.
+          rm -fv AppDir/usr/lib/libbrotli* AppDir/usr/lib/libnss* AppDir/usr/lib/libnspr* AppDir/usr/lib/libplc* AppDir/usr/lib/libplds* AppDir/usr/lib/libsmime* AppDir/usr/lib/libssl3*
           # 3) the AppImage, from that AppDir
-          ./linuxdeploy-x86_64.AppImage --appdir AppDir --exclude-library 'libbrotli*' --output appimage
-          if ls AppDir/usr/lib | grep -q '^libbrotli'; then echo "::error::brotli is bundled"; exit 1; fi
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --exclude-library 'libbrotli*' --exclude-library 'libnss*' --exclude-library 'libnspr*' --output appimage
+          if ls AppDir/usr/lib | grep -qE '^libbrotli|^libnss|^libnspr'; then echo "::error::brotli or nss is bundled"; exit 1; fi
           sha256sum "$OUTPUT" > "$OUTPUT.sha256"
           ls -la "$OUTPUT"
       - name: Packages (.deb + .rpm)
