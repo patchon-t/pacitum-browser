@@ -1,6 +1,7 @@
 #include "QuickSwitcher.h"
 #include "ThemeManager.h"
 #include "Lang.h"
+#include <QGraphicsOpacityEffect>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMouseEvent>
@@ -24,12 +25,20 @@ QuickSwitcher::QuickSwitcher(Provider provider, QWidget* parent) : QWidget(paren
     m_field->setPlaceholderText(Lang::tr(QStringLiteral("Search tabs, bookmarks, history and actions")));
     m_field->setAccessibleName(Lang::tr(QStringLiteral("Quick switcher")));
     m_field->installEventFilter(this);
+    m_fieldOpacity = new QGraphicsOpacityEffect(m_field);
+    m_fieldOpacity->setOpacity(0.0);
+    m_field->setGraphicsEffect(m_fieldOpacity);
     const PacitumPalette& p = ThemeManager::current();
     m_field->setStyleSheet(QStringLiteral("QLineEdit{background:transparent;border:0;color:%1;font-size:16px;selection-background-color:%2;selection-color:%3}")
                                .arg(p.text, p.primary, p.onPrimary));
     connect(m_field, &QLineEdit::textChanged, this, [this]{ refresh(); });
     m_anim.setEasingCurve(QEasingCurve::OutCubic);
-    connect(&m_anim, &QVariantAnimation::valueChanged, this, [this](const QVariant& v){ m_show = v.toReal(); update(); });
+    connect(&m_anim, &QVariantAnimation::valueChanged, this, [this](const QVariant& v){
+        m_show = v.toReal();
+        if (m_fieldOpacity) m_fieldOpacity->setOpacity(m_show);
+        updateFieldGeometry();
+        update();
+    });
     connect(&m_anim, &QVariantAnimation::finished, this, [this]{
         if (!m_closing) return;
         auto then = std::move(m_then);
@@ -42,10 +51,20 @@ QuickSwitcher::QuickSwitcher(Provider provider, QWidget* parent) : QWidget(paren
 void QuickSwitcher::open() {
     if (parentWidget()) setGeometry(parentWidget()->rect());
     refresh();
+    m_field->setEnabled(true);
     show(); raise();
     m_field->setFocus();
     const int ms = Pacitum::motionMs(140);
-    if (ms <= 0) { m_show = 1.0; update(); return; }
+    if (ms <= 0) {
+        m_show = 1.0;
+        if (m_fieldOpacity) m_fieldOpacity->setOpacity(1.0);
+        updateFieldGeometry();
+        update();
+        return;
+    }
+    m_show = 0.0;
+    if (m_fieldOpacity) m_fieldOpacity->setOpacity(0.0);
+    updateFieldGeometry();
     m_anim.setDuration(ms); m_anim.setStartValue(0.0); m_anim.setEndValue(1.0); m_anim.start();
 }
 
@@ -131,9 +150,14 @@ QRect QuickSwitcher::listRect() const {
     return QRect(c.left() + kPad, c.top() + kField + 1 + kPad, c.width() - kPad * 2, c.height() - kField - 1 - kFooter - kPad * 2);
 }
 
-void QuickSwitcher::resizeEvent(QResizeEvent*) {
-    const QRect c = cardRect();
+void QuickSwitcher::updateFieldGeometry() {
+    QRect c = cardRect();
+    if (m_show < 1.0) c.translate(0, int(-10 * (1.0 - m_show)));
     m_field->setGeometry(c.left() + 52, c.top() + 10, c.width() - 52 - 18, kField - 20);
+}
+
+void QuickSwitcher::resizeEvent(QResizeEvent*) {
+    updateFieldGeometry();
 }
 
 void QuickSwitcher::select(int item) {
@@ -175,7 +199,7 @@ void QuickSwitcher::finish(std::function<void()> then) {
     m_closing = true;
     m_then = std::move(then);
     m_field->clearFocus();
-    m_field->hide();
+    m_field->setEnabled(false);
     const int ms = Pacitum::motionMs(110);
     if (ms <= 0) {
         auto t = std::move(m_then);

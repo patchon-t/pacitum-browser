@@ -9,6 +9,7 @@
 #include <functional>
 
 class QLineEdit;
+class QGraphicsOpacityEffect;
 
 class QuickSwitcher : public QWidget {
     Q_OBJECT
@@ -56,6 +57,7 @@ private:
     void select(int item);
     void ensureVisible();
     void finish(std::function<void()> then);
+    void updateFieldGeometry();
     QRect cardRect() const;
     QRect listRect() const;
     int rowAt(const QPoint& p) const;
@@ -63,6 +65,7 @@ private:
 
     Provider m_provider;
     QLineEdit* m_field = nullptr;
+    QGraphicsOpacityEffect* m_fieldOpacity = nullptr;
     QList<Item> m_items;
     QList<Row> m_rows;
     int m_sel = -1;          // index into m_items
