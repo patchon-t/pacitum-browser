@@ -37,17 +37,22 @@ public:
         });
         updateRate();
     }
-    qint64 elapsed() const override { return m_clock.isValid() ? m_clock.elapsed() : 0; }
+    qint64 elapsed() const override { return isRunning() && m_clock.isValid() ? m_clock.elapsed() : 0; }
     int hz() const { return m_hz; }
 protected:
-    void start() override { m_clock.start(); m_tick.start(); QAnimationDriver::start(); }
-    void stop() override { m_tick.stop(); QAnimationDriver::stop(); }
+    void start() override { m_clock.restart(); m_tick.start(); QAnimationDriver::start(); }
+    void stop() override { m_tick.stop(); m_clock.invalidate(); QAnimationDriver::stop(); }
 private:
     void updateRate() {
         qreal hz = m_forced > 0 ? m_forced : 60.0;
-        if (m_forced <= 0) for (QScreen* s : QGuiApplication::screens()) hz = qMax(hz, s->refreshRate());
+        if (m_forced <= 0) {
+            for (QScreen* s : QGuiApplication::screens()) {
+                const qreal r = s ? s->refreshRate() : 0.0;
+                if (r > 1.0) hz = qMax(hz, r);
+            }
+        }
         m_hz = int(qBound(60.0, hz, 240.0));
-        m_tick.setInterval(qMax(1, int(1000.0 / m_hz)));
+        m_tick.setInterval(qMax(1, int(qRound(1000.0 / m_hz))));
     }
     QTimer m_tick;
     QElapsedTimer m_clock;
@@ -284,6 +289,7 @@ FadeOverlay::FadeOverlay(QWidget* parent) : QWidget(parent) {
     });
     connect(&m_anim, &QVariantAnimation::finished, this, [this] {
         m_tilt = 0.0; m_scaleTo = 1.0; m_t = 0.0;
+        if (!m_drift.isNull()) { move(m_origin); m_drift = {}; }
         if (m_deleteWhenDone) { hide(); deleteLater(); return; }
         if (m_to <= 0.0) { hide(); m_pm = QPixmap(); }   // release the snapshot right away
     });
@@ -299,7 +305,13 @@ void FadeOverlay::fade(qreal from, qreal to, int ms, QEasingCurve::Type curve, i
     QPointer<FadeOverlay> g(this);
     QTimer::singleShot(delayMs, this, [g] { if (g && g->m_pendingStart) { g->m_pendingStart = false; g->m_anim.start(); } });
 }
-void FadeOverlay::stop() { m_pendingStart = false; m_anim.stop(); hide(); m_pm = QPixmap(); }
+void FadeOverlay::stop() {
+    m_pendingStart = false;
+    m_anim.stop();
+    if (!m_drift.isNull()) { move(m_origin); m_drift = {}; }
+    hide();
+    m_pm = QPixmap();
+}
 void FadeOverlay::paintEvent(QPaintEvent* e) {
     if (m_opacity <= 0.0) return;
     QPainter p(this);
